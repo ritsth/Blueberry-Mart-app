@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,14 +10,19 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { logout } from '../services/authService';
 import type { RootStackParamList } from '../../App';
 
-type Tab = 'shop' | 'analytics';
+type View_ = 'analytics' | 'shopping';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ShareholderDashboard'>;
 };
 
+const PLACEHOLDER_BRANCHES = [
+  { id: '1', name: 'Blueberry Mart Downtown', city: 'Kathmandu' },
+  { id: '2', name: 'Blueberry Mart Suburbs',  city: 'Lalitpur'  },
+];
+
 export default function ShareholderDashboard({ navigation }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('shop');
+  const [activeView, setActiveView] = useState<View_>('analytics');
 
   async function handleLogout() {
     await logout();
@@ -25,60 +31,68 @@ export default function ShareholderDashboard({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Tab bar */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'shop' && styles.tabActive]}
-          onPress={() => setActiveTab('shop')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'shop' && styles.tabTextActive]}>
-            🛒  Shop
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'analytics' && styles.tabActive]}
-          onPress={() => setActiveTab('analytics')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'analytics' && styles.tabTextActive]}>
-            📊  Analytics
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {activeTab === 'shop' ? <ShopView /> : <AnalyticsView />}
-      </View>
+      {/* Toggle button */}
+      <TouchableOpacity
+        style={styles.toggleButton}
+        onPress={() => setActiveView(v => v === 'analytics' ? 'shopping' : 'analytics')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.toggleText}>
+          {activeView === 'analytics' ? '🛒  Switch to Shopping View' : '📊  Switch to Analytics View'}
+        </Text>
+      </TouchableOpacity>
+
+      {activeView === 'analytics' ? <AnalyticsView /> : <ShoppingView />}
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
-    </View>
-  );
-}
 
-function ShopView() {
-  return (
-    <View style={styles.panel}>
-      <Text style={styles.panelEmoji}>🏪</Text>
-      <Text style={styles.panelTitle}>Shareholder Shop View</Text>
-      <Text style={styles.panelSubtitle}>
-        Full inventory — including bulk-only items — across all branches.
-      </Text>
     </View>
   );
 }
 
 function AnalyticsView() {
   return (
-    <View style={styles.panel}>
-      <Text style={styles.panelEmoji}>📈</Text>
-      <Text style={styles.panelTitle}>Business Analytics</Text>
-      <Text style={styles.panelSubtitle}>
-        Revenue by branch, top-selling items, and low-stock alerts.
-      </Text>
+    <View style={styles.section}>
+      <Text style={styles.heading}>Shareholder Analytics</Text>
+      <Text style={styles.subheading}>Business metrics across all branches</Text>
+
+      <View style={styles.metricsGrid}>
+        {[
+          { label: 'Total Revenue',    value: '—'  },
+          { label: 'Active Branches',  value: '2'  },
+          { label: 'Top Item',         value: '—'  },
+          { label: 'Low Stock Alerts', value: '4'  },
+        ].map(m => (
+          <View key={m.label} style={styles.metricCard}>
+            <Text style={styles.metricValue}>{m.value}</Text>
+            <Text style={styles.metricLabel}>{m.label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ShoppingView() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.heading}>Welcome to the Grocery Store</Text>
+      <Text style={styles.subheading}>Select a branch to start shopping</Text>
+
+      <FlatList
+        data={PLACEHOLDER_BRANCHES}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <View style={styles.branchCard}>
+            <Text style={styles.branchName}>{item.name}</Text>
+            <Text style={styles.branchCity}>{item.city}</Text>
+          </View>
+        )}
+      />
     </View>
   );
 }
@@ -87,51 +101,98 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0fdf4',
-    paddingTop: 56,
+    paddingTop: 64,
+    paddingHorizontal: 24,
   },
-  tabBar: {
-    flexDirection: 'row',
-    marginHorizontal: 24,
-    backgroundColor: '#dcfce7',
-    borderRadius: 12,
-    padding: 4,
+  toggleButton: {
+    backgroundColor: '#14532d',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  toggleText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  section: {
+    flex: 1,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#14532d',
+    marginBottom: 4,
+  },
+  subheading: {
+    fontSize: 14,
+    color: '#6b7280',
     marginBottom: 24,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9,
-    alignItems: 'center',
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  tabActive: {
+  metricCard: {
+    flex: 1,
+    minWidth: '45%',
     backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 18,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 2,
   },
-  tabText:       { fontSize: 14, fontWeight: '500', color: '#6b7280' },
-  tabTextActive: { color: '#14532d', fontWeight: '700' },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
+  metricValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#14532d',
+    marginBottom: 4,
   },
-  panel: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  metricLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
   },
-  panelEmoji:    { fontSize: 52, marginBottom: 16 },
-  panelTitle:    { fontSize: 22, fontWeight: '700', color: '#14532d', marginBottom: 8, textAlign: 'center' },
-  panelSubtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 22 },
+  list: {
+    gap: 12,
+  },
+  branchCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  branchName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#14532d',
+    marginBottom: 2,
+  },
+  branchCity: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
   logoutButton: {
-    margin: 24,
+    marginTop: 24,
+    marginBottom: 40,
     borderWidth: 1,
     borderColor: '#d1fae5',
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
-  logoutText: { color: '#16a34a', fontWeight: '600' },
+  logoutText: {
+    color: '#16a34a',
+    fontWeight: '600',
+  },
 });
