@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
 
@@ -32,7 +33,7 @@ export default function ActivityTab() {
   const [activeTab, setActiveTab]     = useState<'orders' | 'reviews'>('orders');
   const [expandedId, setExpandedId]   = useState<string | null>(null);
 
-  useEffect(() => { fetchData(); }, []);
+  useFocusEffect(useCallback(() => { fetchData(); }, []));
 
   async function fetchData() {
     try {
