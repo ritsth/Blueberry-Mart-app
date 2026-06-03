@@ -1,25 +1,63 @@
-name: Deploy to Cloud Run
+name: Test & Deploy to Cloud Run
 
 on:
   push:
     branches: [main]
     paths:
       - 'BlueberryMart.Api/**'
+      - 'Tests/**'
       - '.github/workflows/deploy.yml'
 
 env:
-  PROJECT_ID:  project-76ca6efe-7878-4dc8-bff
-  REGION:      us-central1
-  SERVICE:     blueberrymart-api
-  IMAGE:       us-central1-docker.pkg.dev/project-76ca6efe-7878-4dc8-bff/blueberrymart/api
+  PROJECT_ID: project-76ca6efe-7878-4dc8-bff
+  REGION:     us-central1
+  SERVICE:    blueberrymart-api
+  IMAGE:      us-central1-docker.pkg.dev/project-76ca6efe-7878-4dc8-bff/blueberrymart/api
 
 jobs:
+  # ── Job 1: Run the integration test suite ────────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB:       blueberry_mart_test
+          POSTGRES_USER:     postgres
+          POSTGRES_PASSWORD: ritsth
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Tests/BlueberryMart.Api.Tests
+
+      - name: Run integration tests
+        run: dotnet test Tests/BlueberryMart.Api.Tests --no-restore --verbosity normal
+
+  # ── Job 2: Build image and deploy (only if tests passed) ─────────────────
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
+    needs: test
 
     permissions:
-      contents: read        # checkout
+      contents: read
       id-token: write       # Workload Identity Federation
 
     steps:
