@@ -80,6 +80,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.MapGet("/", () => Results.Ok(new { service = "BlueberryMart API", status = "running", version = "1.0.0" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAuthentication();
