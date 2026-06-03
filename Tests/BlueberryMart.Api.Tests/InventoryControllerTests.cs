@@ -37,14 +37,15 @@ public class InventoryControllerTests
     }
 
     [Fact]
-    public async Task GetCustomerInventory_ShareholderToken_ReturnsForbidden()
+    public async Task GetCustomerInventory_ShareholderToken_ReturnsOk()
     {
+        // Shareholders can browse customer inventory (they can also shop)
         var token = await TestHelpers.GetShareholderTokenAsync(_client);
         var resp  = await _client.SendAsync(
             new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/customer?branchId={_downtownBranchId}")
             .WithBearer(token));
 
-        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
     [Fact]

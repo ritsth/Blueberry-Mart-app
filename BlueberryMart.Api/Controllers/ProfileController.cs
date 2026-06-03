@@ -48,7 +48,7 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
             .Select(r => new
             {
                 r.Id,
-                ItemName  = r.Item.ItemName,
+                ItemName = r.Item.ItemName,
                 r.Rating,
                 r.Comment,
                 r.ImagePath,
@@ -58,14 +58,14 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
 
         return Ok(new
         {
-            Email         = user.Email,
-            Role          = user.Role,
+            Email = user.Email,
+            Role = user.Role,
             LoyaltyPoints = user.LoyaltyPoints,
-            MemberSince   = user.CreatedAt,
-            TotalOrders   = orders.Count,
-            TotalSpent    = orders.Sum(o => o.TotalAmount),
-            Orders        = orders,
-            Reviews       = reviews,
+            MemberSince = user.CreatedAt,
+            TotalOrders = orders.Count,
+            TotalSpent = orders.Sum(o => o.TotalAmount),
+            Orders = orders,
+            Reviews = reviews,
         });
     }
 }

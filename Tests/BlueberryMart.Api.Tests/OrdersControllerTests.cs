@@ -87,8 +87,9 @@ public class OrdersControllerTests
     }
 
     [Fact]
-    public async Task PlaceOrder_ShareholderToken_ReturnsForbidden()
+    public async Task PlaceOrder_ShareholderToken_ReturnsCreated()
     {
+        // Shareholders can also place orders (they can shop too)
         var token = await TestHelpers.GetShareholderTokenAsync(_client);
         var req   = new HttpRequestMessage(HttpMethod.Post, "/api/orders")
         {
@@ -103,7 +104,7 @@ public class OrdersControllerTests
 
         var resp = await _client.SendAsync(req);
 
-        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
     }
 
     [Fact]

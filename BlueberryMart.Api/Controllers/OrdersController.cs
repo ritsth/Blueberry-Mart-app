@@ -80,10 +80,10 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
             {
                 context.OrderItems.Add(new OrderItem
                 {
-                    Id        = Guid.NewGuid(),
-                    OrderId   = order.Id,
-                    ItemId    = inv.Id,
-                    Quantity  = qty,
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    ItemId = inv.Id,
+                    Quantity = qty,
                     UnitPrice = inv.Price
                 });
             }

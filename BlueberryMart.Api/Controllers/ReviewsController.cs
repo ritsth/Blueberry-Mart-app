@@ -12,7 +12,7 @@ namespace BlueberryMart.Api.Controllers;
 [Authorize(Roles = "Customer,Shareholder")]
 public class ReviewsController(BlueberryMartDbContext context, IWebHostEnvironment env) : ControllerBase
 {
-    private const int TextReviewPoints  = 10;
+    private const int TextReviewPoints = 10;
     private const int PhotoReviewPoints = 20;
 
     // POST /api/reviews
@@ -64,7 +64,7 @@ public class ReviewsController(BlueberryMartDbContext context, IWebHostEnvironme
             var uploadDir = Path.Combine(env.WebRootPath, "images", "reviews");
             Directory.CreateDirectory(uploadDir);
 
-            var ext      = Path.GetExtension(image.FileName);
+            var ext = Path.GetExtension(image.FileName);
             var fileName = $"{Guid.NewGuid()}{ext}";
             var fullPath = Path.Combine(uploadDir, fileName);
 
@@ -77,12 +77,12 @@ public class ReviewsController(BlueberryMartDbContext context, IWebHostEnvironme
 
         var review = new Review
         {
-            Id        = Guid.NewGuid(),
-            UserId    = userId,
-            OrderId   = orderId,
-            ItemId    = itemId,
-            Rating    = rating,
-            Comment   = comment,
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            OrderId = orderId,
+            ItemId = itemId,
+            Rating = rating,
+            Comment = comment,
             ImagePath = savedImagePath,
             CreatedAt = DateTime.UtcNow
         };

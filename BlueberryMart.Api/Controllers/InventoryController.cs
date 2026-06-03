@@ -49,13 +49,13 @@ public class InventoryController(BlueberryMartDbContext context) : ControllerBas
             .ThenBy(i => i.ItemName)
             .Select(i => new
             {
-                Id            = i.Id,
-                ItemName      = i.ItemName,
-                Price         = i.Price,
+                Id = i.Id,
+                ItemName = i.ItemName,
+                Price = i.Price,
                 StockQuantity = i.StockQuantity,
-                BranchId      = i.BranchId,
-                BranchName    = i.Branch.Name,
-                BranchCity    = i.Branch.LocationCity,
+                BranchId = i.BranchId,
+                BranchName = i.Branch.Name,
+                BranchCity = i.Branch.LocationCity,
             })
             .ToListAsync();
 
@@ -63,10 +63,10 @@ public class InventoryController(BlueberryMartDbContext context) : ControllerBas
             .GroupBy(i => new { i.BranchId, i.BranchName, i.BranchCity })
             .Select(g => new
             {
-                BranchId   = g.Key.BranchId,
+                BranchId = g.Key.BranchId,
                 BranchName = g.Key.BranchName,
                 BranchCity = g.Key.BranchCity,
-                Items      = g.Select(i => new { i.Id, i.ItemName, i.Price, i.StockQuantity }).ToList(),
+                Items = g.Select(i => new { i.Id, i.ItemName, i.Price, i.StockQuantity }).ToList(),
             });
 
         return Ok(grouped);

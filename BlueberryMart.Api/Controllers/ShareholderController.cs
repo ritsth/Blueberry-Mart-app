@@ -21,9 +21,9 @@ public class ShareholderController(BlueberryMartDbContext context) : ControllerB
             .GroupBy(o => new { o.BranchId, o.Branch.Name })
             .Select(g => new
             {
-                BranchId   = g.Key.BranchId,
+                BranchId = g.Key.BranchId,
                 BranchName = g.Key.Name,
-                Revenue    = g.Sum(o => o.TotalAmount),
+                Revenue = g.Sum(o => o.TotalAmount),
                 OrderCount = g.Count()
             })
             .OrderByDescending(x => x.Revenue)
@@ -33,12 +33,12 @@ public class ShareholderController(BlueberryMartDbContext context) : ControllerB
             .GroupBy(oi => new { oi.ItemId, oi.Item.ItemName, oi.Item.BranchId, oi.Item.Price })
             .Select(g => new
             {
-                ItemId          = g.Key.ItemId,
-                ItemName        = g.Key.ItemName,
-                BranchId        = g.Key.BranchId,
-                UnitPrice       = g.Key.Price,
+                ItemId = g.Key.ItemId,
+                ItemName = g.Key.ItemName,
+                BranchId = g.Key.BranchId,
+                UnitPrice = g.Key.Price,
                 TotalQuantitySold = g.Sum(oi => oi.Quantity),
-                TotalRevenue    = g.Sum(oi => oi.Quantity * oi.UnitPrice)
+                TotalRevenue = g.Sum(oi => oi.Quantity * oi.UnitPrice)
             })
             .OrderByDescending(x => x.TotalQuantitySold)
             .Take(10)
@@ -51,7 +51,7 @@ public class ShareholderController(BlueberryMartDbContext context) : ControllerB
                 i.Id,
                 i.ItemName,
                 i.BranchId,
-                BranchName    = i.Branch.Name,
+                BranchName = i.Branch.Name,
                 i.StockQuantity,
                 i.IsBulkOnly
             })
@@ -60,10 +60,10 @@ public class ShareholderController(BlueberryMartDbContext context) : ControllerB
 
         return Ok(new
         {
-            TotalRevenue   = totalRevenue,
-            RevenueByBranch  = revenueByBranch,
-            TopSellingItems  = topSellingItems,
-            LowStockAlerts   = lowStockAlerts
+            TotalRevenue = totalRevenue,
+            RevenueByBranch = revenueByBranch,
+            TopSellingItems = topSellingItems,
+            LowStockAlerts = lowStockAlerts
         });
     }
 }
