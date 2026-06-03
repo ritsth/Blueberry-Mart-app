@@ -3,6 +3,9 @@ name: Deploy to Cloud Run
 on:
   push:
     branches: [main]
+    paths:
+      - 'BlueberryMart.Api/**'
+      - '.github/workflows/deploy.yml'
 
 env:
   PROJECT_ID:  project-76ca6efe-7878-4dc8-bff
