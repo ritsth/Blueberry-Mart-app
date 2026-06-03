@@ -9,6 +9,8 @@ public class Order
     public string Status { get; set; } = "pending";
     public decimal TotalAmount { get; set; }
     public decimal DiscountAmount { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public decimal DeliveryFee { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

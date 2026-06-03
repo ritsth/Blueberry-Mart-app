@@ -120,6 +120,17 @@ export default function AccountTab() {
         </View>
       </View>
 
+      {/* Delivery addresses link */}
+      <TouchableOpacity
+        style={styles.linkRow}
+        onPress={() => navigation.navigate('AddressesScreen')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.linkIcon}>📍</Text>
+        <Text style={styles.linkLabel}>Delivery Addresses</Text>
+        <Text style={styles.linkChevron}>›</Text>
+      </TouchableOpacity>
+
       {/* Membership */}
       {profile?.isMember ? (
         <View style={styles.memberCard}>
@@ -203,6 +214,17 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 18, fontWeight: '700', color: '#14532d', marginBottom: 4 },
   statLabel: { fontSize: 11, color: '#6b7280', textAlign: 'center', lineHeight: 15 },
+  // Link row
+  linkRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#ffffff', borderRadius: 12,
+    paddingVertical: 16, paddingHorizontal: 16, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+  },
+  linkIcon: { fontSize: 18, marginRight: 12 },
+  linkLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111827' },
+  linkChevron: { fontSize: 20, color: '#9ca3af' },
   // Active member card
   memberCard: {
     backgroundColor: '#14532d', borderRadius: 16,

@@ -30,6 +30,11 @@ interface BranchCart    { branch: Branch; items: CartItem[]; }
 interface SearchItem    { id: string; itemName: string; price: number; stockQuantity: number; }
 interface SearchGroup   { branchId: string; branchName: string; branchCity: string; items: SearchItem[]; }
 
+interface Address       { id: string; label: string; addressLine: string; city: string; phone: string | null; isDefault: boolean; }
+
+type OrderMode = 'pickup' | 'delivery';
+const DELIVERY_FEE = 100;
+
 export default function ShoppingView() {
   const navigation = useNavigation<any>();
 
@@ -48,13 +53,18 @@ export default function ShoppingView() {
   const [isMember, setIsMember]         = useState(false);
   const [discountRate, setDiscountRate] = useState(0);
 
+  // Delivery
+  const [addresses, setAddresses]             = useState<Address[]>([]);
+  const [orderModes, setOrderModes]           = useState<Record<string, OrderMode>>({});
+  const [selectedAddressId, setSelectedAddressId] = useState<Record<string, string>>({});
+
   // Search
   const [query, setQuery]               = useState('');
   const [searchResults, setSearchResults] = useState<SearchGroup[]>([]);
   const [searching, setSearching]       = useState(false);
   const debounceRef                     = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { fetchBranches(); fetchMembership(); }, []);
+  useEffect(() => { fetchBranches(); fetchMembership(); fetchAddresses(); }, []);
 
   async function fetchMembership() {
     try {
@@ -67,6 +77,33 @@ export default function ShoppingView() {
       setIsMember(data.isMember);
       setDiscountRate(data.discountRate ?? 0);
     } catch { /* non-blocking */ }
+  }
+
+  async function fetchAddresses() {
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/addresses`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      setAddresses(await res.json());
+    } catch { /* non-blocking */ }
+  }
+
+  // Refresh addresses whenever the cart opens (user may have added one in Account)
+  useEffect(() => { if (cartVisible) fetchAddresses(); }, [cartVisible]);
+
+  function setMode(branchId: string, mode: OrderMode) {
+    setOrderModes(prev => ({ ...prev, [branchId]: mode }));
+    // Auto-select the default address when switching to delivery
+    if (mode === 'delivery' && !selectedAddressId[branchId]) {
+      const def = addresses.find(a => a.isDefault) ?? addresses[0];
+      if (def) setSelectedAddressId(prev => ({ ...prev, [branchId]: def.id }));
+    }
+  }
+
+  function selectAddress(branchId: string, addressId: string) {
+    setSelectedAddressId(prev => ({ ...prev, [branchId]: addressId }));
   }
 
   // Debounced search
@@ -156,6 +193,14 @@ export default function ShoppingView() {
   async function placeOrder(branchId: string) {
     const bc = carts[branchId];
     if (!bc) return;
+
+    const mode = orderModes[branchId] ?? 'pickup';
+    const addressId = selectedAddressId[branchId];
+    if (mode === 'delivery' && !addressId) {
+      Alert.alert('Address required', 'Please select a delivery address.');
+      return;
+    }
+
     setPlacingId(branchId);
     try {
       const token = await getStoredToken();
@@ -164,7 +209,8 @@ export default function ShoppingView() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           branchId,
-          orderType: 'Pickup',
+          orderType: mode === 'delivery' ? 'Delivery' : 'Pickup',
+          addressId: mode === 'delivery' ? addressId : null,
           items: bc.items.map(c => ({ itemId: c.itemId, quantity: c.quantity })),
         }),
       });
@@ -254,6 +300,8 @@ export default function ShoppingView() {
         <CartsModal
           carts={carts} visible={cartVisible} expandedCartId={expandedCartId}
           placingId={placingId} isMember={isMember} discountRate={discountRate}
+          addresses={addresses} orderModes={orderModes} selectedAddressId={selectedAddressId}
+          onSetMode={setMode} onSelectAddress={selectAddress}
           onClose={() => setCartVisible(false)}
           onToggle={id => setExpandedCartId(prev => prev === id ? null : id)}
           onUpdateQty={updateQty} onPlaceOrder={placeOrder}
@@ -380,6 +428,8 @@ export default function ShoppingView() {
       <CartsModal
         carts={carts} visible={cartVisible} expandedCartId={expandedCartId}
         placingId={placingId} isMember={isMember} discountRate={discountRate}
+        addresses={addresses} orderModes={orderModes} selectedAddressId={selectedAddressId}
+        onSetMode={setMode} onSelectAddress={selectAddress}
         onClose={() => setCartVisible(false)}
         onToggle={id => setExpandedCartId(prev => prev === id ? null : id)}
         onUpdateQty={updateQty} onPlaceOrder={placeOrder}
@@ -401,13 +451,18 @@ function CartFab({ count, cartCount, onPress }: { count: number; cartCount: numb
   );
 }
 
-function CartsModal({ carts, visible, expandedCartId, placingId, isMember, discountRate, onClose, onToggle, onUpdateQty, onPlaceOrder }: {
+function CartsModal({ carts, visible, expandedCartId, placingId, isMember, discountRate, addresses, orderModes, selectedAddressId, onSetMode, onSelectAddress, onClose, onToggle, onUpdateQty, onPlaceOrder }: {
   carts: Record<string, BranchCart>;
   visible: boolean;
   expandedCartId: string | null;
   placingId: string | null;
   isMember: boolean;
   discountRate: number;
+  addresses: Address[];
+  orderModes: Record<string, OrderMode>;
+  selectedAddressId: Record<string, string>;
+  onSetMode: (branchId: string, mode: OrderMode) => void;
+  onSelectAddress: (branchId: string, addressId: string) => void;
   onClose: () => void;
   onToggle: (id: string) => void;
   onUpdateQty: (branchId: string, itemId: string, delta: number) => void;
@@ -431,11 +486,14 @@ function CartsModal({ carts, visible, expandedCartId, placingId, isMember, disco
           renderItem={({ item: bc }) => {
             const subtotal = bc.items.reduce((s, i) => s + i.price * i.quantity, 0);
             const discount = isMember ? Math.round(subtotal * discountRate * 100) / 100 : 0;
-            const total    = subtotal - discount;
+            const mode     = orderModes[bc.branch.id] ?? 'pickup';
+            const deliveryFee = mode === 'delivery' ? (isMember ? 0 : DELIVERY_FEE) : 0;
+            const total    = subtotal - discount + deliveryFee;
             const count    = bc.items.reduce((s, i) => s + i.quantity, 0);
             const color    = branchColor(bc.branch.name);
             const expanded = expandedCartId === bc.branch.id;
             const placing  = placingId === bc.branch.id;
+            const chosenAddressId = selectedAddressId[bc.branch.id];
             return (
               <View style={styles.branchCartSection}>
                 <TouchableOpacity style={styles.branchCartRow} onPress={() => onToggle(bc.branch.id)} activeOpacity={0.8}>
@@ -445,7 +503,9 @@ function CartsModal({ carts, visible, expandedCartId, placingId, isMember, disco
                   <View style={styles.cartBranchInfo}>
                     <Text style={styles.cartBranchName}>{bc.branch.name}</Text>
                     <Text style={styles.cartBranchMeta}>{count} item{count !== 1 ? 's' : ''} · Rs {total.toFixed(2)}</Text>
-                    <Text style={styles.cartBranchCity}>Pickup from {bc.branch.city}</Text>
+                    <Text style={styles.cartBranchCity}>
+                      {mode === 'delivery' ? 'Delivery' : `Pickup from ${bc.branch.city}`}
+                    </Text>
                   </View>
                   <Text style={styles.cartChevron}>{expanded ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
@@ -469,20 +529,72 @@ function CartsModal({ carts, visible, expandedCartId, placingId, isMember, disco
                         <Text style={styles.cartItemTotal}>Rs {(item.price * item.quantity).toFixed(2)}</Text>
                       </View>
                     ))}
+                    {/* Pickup / Delivery toggle */}
+                    <View style={styles.modeToggle}>
+                      {(['pickup', 'delivery'] as OrderMode[]).map(m => (
+                        <TouchableOpacity
+                          key={m}
+                          style={[styles.modeBtn, mode === m && styles.modeBtnActive]}
+                          onPress={() => onSetMode(bc.branch.id, m)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.modeBtnText, mode === m && styles.modeBtnTextActive]}>
+                            {m === 'pickup' ? '🏬  Pickup' : '🛵  Delivery'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {/* Address picker (delivery only) */}
+                    {mode === 'delivery' && (
+                      addresses.length === 0 ? (
+                        <Text style={styles.noAddressNote}>
+                          No saved address. Add one in Account → Delivery Addresses.
+                        </Text>
+                      ) : (
+                        <View style={styles.addressPicker}>
+                          {addresses.map(addr => (
+                            <TouchableOpacity
+                              key={addr.id}
+                              style={[styles.addressOption, chosenAddressId === addr.id && styles.addressOptionSelected]}
+                              onPress={() => onSelectAddress(bc.branch.id, addr.id)}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.radioOuter}>
+                                {chosenAddressId === addr.id && <View style={styles.radioInner} />}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.addressOptLabel}>{addr.label}</Text>
+                                <Text style={styles.addressOptText}>{addr.addressLine}, {addr.city}</Text>
+                              </View>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )
+                    )}
+
                     <View style={styles.cartFooter}>
-                      {isMember && discount > 0 && (
-                        <>
-                          <View style={styles.breakdownRow}>
-                            <Text style={styles.breakdownLabel}>Subtotal</Text>
-                            <Text style={styles.breakdownValue}>Rs {subtotal.toFixed(2)}</Text>
-                          </View>
-                          <View style={styles.breakdownRow}>
-                            <Text style={styles.discountLabel}>
-                              🫐 Member discount ({Math.round(discountRate * 100)}%)
-                            </Text>
-                            <Text style={styles.discountValue}>− Rs {discount.toFixed(2)}</Text>
-                          </View>
-                        </>
+                      {(discount > 0 || deliveryFee > 0 || mode === 'delivery') && (
+                        <View style={styles.breakdownRow}>
+                          <Text style={styles.breakdownLabel}>Subtotal</Text>
+                          <Text style={styles.breakdownValue}>Rs {subtotal.toFixed(2)}</Text>
+                        </View>
+                      )}
+                      {discount > 0 && (
+                        <View style={styles.breakdownRow}>
+                          <Text style={styles.discountLabel}>
+                            🫐 Member discount ({Math.round(discountRate * 100)}%)
+                          </Text>
+                          <Text style={styles.discountValue}>− Rs {discount.toFixed(2)}</Text>
+                        </View>
+                      )}
+                      {mode === 'delivery' && (
+                        <View style={styles.breakdownRow}>
+                          <Text style={styles.breakdownLabel}>Delivery fee</Text>
+                          {deliveryFee === 0
+                            ? <Text style={styles.freeText}>{isMember ? 'FREE (member)' : 'FREE'}</Text>
+                            : <Text style={styles.breakdownValue}>Rs {deliveryFee.toFixed(2)}</Text>}
+                        </View>
                       )}
                       <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>Total</Text>
@@ -496,7 +608,9 @@ function CartsModal({ carts, visible, expandedCartId, placingId, isMember, disco
                       >
                         {placing
                           ? <ActivityIndicator color="#fff" />
-                          : <Text style={styles.placeOrderText}>Place Order (Pickup)</Text>}
+                          : <Text style={styles.placeOrderText}>
+                              Place Order ({mode === 'delivery' ? 'Delivery' : 'Pickup'})
+                            </Text>}
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -636,6 +750,36 @@ const styles = StyleSheet.create({
   breakdownValue: { fontSize: 13, color: '#374151' },
   discountLabel:  { fontSize: 13, color: '#16a34a', fontWeight: '600' },
   discountValue:  { fontSize: 13, color: '#16a34a', fontWeight: '600' },
+  freeText:       { fontSize: 13, color: '#16a34a', fontWeight: '700' },
+  // Mode toggle
+  modeToggle: {
+    flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 12,
+  },
+  modeBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
+    backgroundColor: '#ffffff', borderWidth: 1.5, borderColor: '#e5e7eb',
+  },
+  modeBtnActive: { backgroundColor: '#f0fdf4', borderColor: '#16a34a' },
+  modeBtnText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
+  modeBtnTextActive: { color: '#14532d' },
+  // Address picker
+  noAddressNote: {
+    fontSize: 12, color: '#dc2626', marginBottom: 12, lineHeight: 17,
+  },
+  addressPicker: { marginBottom: 12, gap: 8 },
+  addressOption: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#ffffff', borderRadius: 10, padding: 12,
+    borderWidth: 1.5, borderColor: '#e5e7eb',
+  },
+  addressOptionSelected: { borderColor: '#16a34a', backgroundColor: '#f0fdf4' },
+  radioOuter: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#16a34a',
+    marginRight: 12, justifyContent: 'center', alignItems: 'center',
+  },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#16a34a' },
+  addressOptLabel: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  addressOptText: { fontSize: 12, color: '#6b7280', marginTop: 1 },
   totalRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, marginTop: 4 },
   totalLabel:    { fontSize: 15, fontWeight: '600', color: '#374151' },
   totalValue:    { fontSize: 19, fontWeight: '700', color: '#14532d' },

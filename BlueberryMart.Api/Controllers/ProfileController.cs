@@ -29,6 +29,9 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
                 o.OrderType,
                 o.Status,
                 o.TotalAmount,
+                o.DiscountAmount,
+                o.DeliveryFee,
+                o.DeliveryAddress,
                 o.CreatedAt,
                 Items = context.OrderItems
                     .Where(oi => oi.OrderId == o.Id)

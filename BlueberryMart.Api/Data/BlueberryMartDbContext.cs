@@ -11,6 +11,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Address> Addresses => Set<Address>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -108,6 +109,8 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(o => o.Status).HasColumnName("status").HasDefaultValue("pending");
             e.Property(o => o.TotalAmount).HasColumnName("total_amount").HasColumnType("numeric(12,2)");
             e.Property(o => o.DiscountAmount).HasColumnName("discount_amount").HasColumnType("numeric(12,2)").HasDefaultValue(0);
+            e.Property(o => o.DeliveryAddress).HasColumnName("delivery_address");
+            e.Property(o => o.DeliveryFee).HasColumnName("delivery_fee").HasColumnType("numeric(12,2)").HasDefaultValue(0);
             e.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(o => o.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(o => o.User).WithMany(u => u.Orders).HasForeignKey(o => o.UserId).OnDelete(DeleteBehavior.Restrict);
@@ -116,6 +119,22 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.HasIndex(o => o.BranchId);
             e.HasIndex(o => o.Status);
             e.HasIndex(o => o.CreatedAt);
+        });
+
+        modelBuilder.Entity<Address>(e =>
+        {
+            e.ToTable("addresses");
+            e.HasKey(a => a.Id);
+            e.Property(a => a.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(a => a.UserId).HasColumnName("user_id");
+            e.Property(a => a.Label).HasColumnName("label").IsRequired();
+            e.Property(a => a.AddressLine).HasColumnName("address_line").IsRequired();
+            e.Property(a => a.City).HasColumnName("city").IsRequired();
+            e.Property(a => a.Phone).HasColumnName("phone");
+            e.Property(a => a.IsDefault).HasColumnName("is_default").HasDefaultValue(false);
+            e.Property(a => a.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.HasOne(a => a.User).WithMany(u => u.Addresses).HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(a => a.UserId);
         });
     }
 }

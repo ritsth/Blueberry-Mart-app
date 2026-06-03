@@ -13,6 +13,8 @@ namespace BlueberryMart.Api.Controllers;
 [Authorize(Roles = "Customer,Shareholder")]
 public class OrdersController(BlueberryMartDbContext context) : ControllerBase
 {
+    public const decimal DeliveryFee = 100m; // flat delivery fee, waived for members
+
     // POST /api/orders
     [HttpPost]
     public async Task<IActionResult> PlaceOrder([FromBody] PlaceOrderRequest request)
@@ -63,10 +65,35 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
 
             // Apply the 5% member discount if the user is a member
             var user = await context.Users.FindAsync(userId);
-            var discount = user is { IsMember: true }
+            var isMember = user is { IsMember: true };
+            var discount = isMember
                 ? Math.Round(subtotal * MembershipController.MemberDiscountRate, 2)
                 : 0m;
-            var total = subtotal - discount;
+
+            // Resolve delivery details
+            var orderType = request.OrderType!.ToLower();
+            string? deliveryAddressSnapshot = null;
+            decimal deliveryFee = 0m;
+            if (orderType == "delivery")
+            {
+                if (request.AddressId is null)
+                    return BadRequest(new { message = "A delivery address is required for delivery orders." });
+
+                var address = await context.Addresses
+                    .FirstOrDefaultAsync(a => a.Id == request.AddressId && a.UserId == userId);
+                if (address is null)
+                    return BadRequest(new { message = "The selected delivery address was not found." });
+
+                deliveryAddressSnapshot = address.Phone is null
+                    ? $"{address.Label}: {address.AddressLine}, {address.City}"
+                    : $"{address.Label}: {address.AddressLine}, {address.City} (Phone: {address.Phone})";
+
+                // Members get free delivery
+                deliveryFee = isMember ? 0m : DeliveryFee;
+            }
+
+            var goodsTotal = subtotal - discount;   // loyalty points earned on this
+            var total = goodsTotal + deliveryFee;
 
             // Create the order
             var order = new Order
@@ -74,10 +101,12 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 BranchId = request.BranchId,
-                OrderType = request.OrderType!.ToLower(),
+                OrderType = orderType,
                 Status = "pending",
                 TotalAmount = total,
                 DiscountAmount = discount,
+                DeliveryAddress = deliveryAddressSnapshot,
+                DeliveryFee = deliveryFee,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -96,10 +125,10 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
                 });
             }
 
-            // Credit loyalty points: 1 point per whole unit of currency actually paid
+            // Credit loyalty points: 1 point per whole unit of goods value (excludes delivery fee)
             if (user is not null)
             {
-                user.LoyaltyPoints += (int)Math.Floor(total);
+                user.LoyaltyPoints += (int)Math.Floor(goodsTotal);
                 user.UpdatedAt = DateTime.UtcNow;
             }
 
@@ -112,9 +141,11 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
                 order.Status,
                 Subtotal = subtotal,
                 order.DiscountAmount,
+                order.DeliveryFee,
                 order.TotalAmount,
                 order.OrderType,
-                LoyaltyPointsEarned = (int)Math.Floor(total)
+                order.DeliveryAddress,
+                LoyaltyPointsEarned = (int)Math.Floor(goodsTotal)
             });
         }
         catch

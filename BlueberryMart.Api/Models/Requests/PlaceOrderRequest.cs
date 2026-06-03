@@ -4,6 +4,7 @@ public class PlaceOrderRequest
 {
     public Guid BranchId { get; set; }
     public string OrderType { get; set; } = null!;
+    public Guid? AddressId { get; set; }
     public List<OrderItemRequest> Items { get; set; } = [];
 }
 
