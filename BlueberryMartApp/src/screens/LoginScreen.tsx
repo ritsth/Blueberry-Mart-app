@@ -36,9 +36,9 @@ export default function LoginScreen({ navigation }: Props) {
       const { role } = await login(email.trim().toLowerCase(), password);
 
       if (role === 'Shareholder') {
-        navigation.replace('ShareholderDashboard');
+        navigation.replace('ShareholderTabs');
       } else {
-        navigation.replace('CustomerDashboard');
+        navigation.replace('CustomerTabs');
       }
     } catch {
       setError('Invalid email or password.');

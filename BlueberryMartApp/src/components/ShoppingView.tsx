@@ -10,9 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getStoredToken } from '../services/authService';
-import type { RootStackParamList } from '../../App';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
@@ -37,7 +35,7 @@ interface CartItem {
 }
 
 export default function ShoppingView() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<any>();
   const [branches, setBranches]                 = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch]     = useState<Branch | null>(null);
   const [inventory, setInventory]               = useState<InventoryItem[]>([]);
