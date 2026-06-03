@@ -1,0 +1,45 @@
+# ── .NET ──────────────────────────────────────────────────
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.log
+
+# NuGet
+*.nupkg
+.nuget/
+packages/
+
+# Published output
+publish/
+out/
+
+# Secrets / local config
+appsettings.Development.json
+*.pfx
+*.p12
+
+# ── Node / Expo ───────────────────────────────────────────
+node_modules/
+.expo/
+dist/
+web-build/
+.env
+.env.local
+
+# ── Uploaded user content ─────────────────────────────────
+BlueberryMart.Api/wwwroot/images/reviews/*.jpg
+BlueberryMart.Api/wwwroot/images/reviews/*.jpeg
+BlueberryMart.Api/wwwroot/images/reviews/*.png
+BlueberryMart.Api/wwwroot/images/reviews/*.webp
+
+# ── Test output ───────────────────────────────────────────
+TestResults/
+coverage/
+*.trx
+*.coveragexml
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

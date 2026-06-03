@@ -1,0 +1,6 @@
+@BlueberryMart.Api_HostAddress = http://localhost:5027
+
+GET {{BlueberryMart.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
