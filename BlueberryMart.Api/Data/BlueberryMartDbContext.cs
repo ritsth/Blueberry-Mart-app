@@ -27,6 +27,8 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
             e.Property(u => u.Role).HasColumnName("role").HasDefaultValue("customer");
             e.Property(u => u.LoyaltyPoints).HasColumnName("loyalty_points").HasDefaultValue(0);
+            e.Property(u => u.IsMember).HasColumnName("is_member").HasDefaultValue(false);
+            e.Property(u => u.MemberSince).HasColumnName("member_since");
             e.Property(u => u.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(u => u.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasIndex(u => u.Email).IsUnique();
@@ -105,6 +107,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(o => o.OrderType).HasColumnName("order_type").IsRequired();
             e.Property(o => o.Status).HasColumnName("status").HasDefaultValue("pending");
             e.Property(o => o.TotalAmount).HasColumnName("total_amount").HasColumnType("numeric(12,2)");
+            e.Property(o => o.DiscountAmount).HasColumnName("discount_amount").HasColumnType("numeric(12,2)").HasDefaultValue(0);
             e.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(o => o.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(o => o.User).WithMany(u => u.Orders).HasForeignKey(o => o.UserId).OnDelete(DeleteBehavior.Restrict);

@@ -8,6 +8,7 @@ public class Order
     public string OrderType { get; set; } = null!;
     public string Status { get; set; } = "pending";
     public decimal TotalAmount { get; set; }
+    public decimal DiscountAmount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

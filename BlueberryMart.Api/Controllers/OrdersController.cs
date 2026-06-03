@@ -49,17 +49,24 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
             if (insufficientStock.Count > 0)
                 return Conflict(new { message = "Insufficient stock for one or more items.", insufficientStock });
 
-            // Deduct stock and calculate total
-            decimal total = 0;
+            // Deduct stock and calculate the subtotal
+            decimal subtotal = 0;
             var lineItems = new List<(Inventory Inv, int Qty)>();
             foreach (var requestItem in request.Items)
             {
                 var inv = inventoryItems.First(i => i.Id == requestItem.ItemId);
                 inv.StockQuantity -= requestItem.Quantity;
                 inv.UpdatedAt = DateTime.UtcNow;
-                total += inv.Price * requestItem.Quantity;
+                subtotal += inv.Price * requestItem.Quantity;
                 lineItems.Add((inv, requestItem.Quantity));
             }
+
+            // Apply the 5% member discount if the user is a member
+            var user = await context.Users.FindAsync(userId);
+            var discount = user is { IsMember: true }
+                ? Math.Round(subtotal * MembershipController.MemberDiscountRate, 2)
+                : 0m;
+            var total = subtotal - discount;
 
             // Create the order
             var order = new Order
@@ -70,6 +77,7 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
                 OrderType = request.OrderType!.ToLower(),
                 Status = "pending",
                 TotalAmount = total,
+                DiscountAmount = discount,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -88,8 +96,7 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
                 });
             }
 
-            // Credit loyalty points: 1 point per whole unit of currency spent
-            var user = await context.Users.FindAsync(userId);
+            // Credit loyalty points: 1 point per whole unit of currency actually paid
             if (user is not null)
             {
                 user.LoyaltyPoints += (int)Math.Floor(total);
@@ -103,6 +110,8 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
             {
                 order.Id,
                 order.Status,
+                Subtotal = subtotal,
+                order.DiscountAmount,
                 order.TotalAmount,
                 order.OrderType,
                 LoyaltyPointsEarned = (int)Math.Floor(total)

@@ -44,13 +44,30 @@ export default function ShoppingView() {
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [error, setError]                       = useState<string | null>(null);
 
+  // Membership
+  const [isMember, setIsMember]         = useState(false);
+  const [discountRate, setDiscountRate] = useState(0);
+
   // Search
   const [query, setQuery]               = useState('');
   const [searchResults, setSearchResults] = useState<SearchGroup[]>([]);
   const [searching, setSearching]       = useState(false);
   const debounceRef                     = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { fetchBranches(); }, []);
+  useEffect(() => { fetchBranches(); fetchMembership(); }, []);
+
+  async function fetchMembership() {
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/membership/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setIsMember(data.isMember);
+      setDiscountRate(data.discountRate ?? 0);
+    } catch { /* non-blocking */ }
+  }
 
   // Debounced search
   useEffect(() => {
@@ -236,7 +253,7 @@ export default function ShoppingView() {
         {totalCartCount > 0 && <CartFab count={totalCartCount} cartCount={Object.keys(carts).length} onPress={() => setCartVisible(true)} />}
         <CartsModal
           carts={carts} visible={cartVisible} expandedCartId={expandedCartId}
-          placingId={placingId}
+          placingId={placingId} isMember={isMember} discountRate={discountRate}
           onClose={() => setCartVisible(false)}
           onToggle={id => setExpandedCartId(prev => prev === id ? null : id)}
           onUpdateQty={updateQty} onPlaceOrder={placeOrder}
@@ -362,7 +379,7 @@ export default function ShoppingView() {
       {totalCartCount > 0 && <CartFab count={totalCartCount} cartCount={Object.keys(carts).length} onPress={() => setCartVisible(true)} />}
       <CartsModal
         carts={carts} visible={cartVisible} expandedCartId={expandedCartId}
-        placingId={placingId}
+        placingId={placingId} isMember={isMember} discountRate={discountRate}
         onClose={() => setCartVisible(false)}
         onToggle={id => setExpandedCartId(prev => prev === id ? null : id)}
         onUpdateQty={updateQty} onPlaceOrder={placeOrder}
@@ -384,11 +401,13 @@ function CartFab({ count, cartCount, onPress }: { count: number; cartCount: numb
   );
 }
 
-function CartsModal({ carts, visible, expandedCartId, placingId, onClose, onToggle, onUpdateQty, onPlaceOrder }: {
+function CartsModal({ carts, visible, expandedCartId, placingId, isMember, discountRate, onClose, onToggle, onUpdateQty, onPlaceOrder }: {
   carts: Record<string, BranchCart>;
   visible: boolean;
   expandedCartId: string | null;
   placingId: string | null;
+  isMember: boolean;
+  discountRate: number;
   onClose: () => void;
   onToggle: (id: string) => void;
   onUpdateQty: (branchId: string, itemId: string, delta: number) => void;
@@ -410,7 +429,9 @@ function CartsModal({ carts, visible, expandedCartId, placingId, onClose, onTogg
           contentContainerStyle={styles.cartList}
           ListEmptyComponent={<Text style={styles.emptyNote}>Your carts are empty.</Text>}
           renderItem={({ item: bc }) => {
-            const total    = bc.items.reduce((s, i) => s + i.price * i.quantity, 0);
+            const subtotal = bc.items.reduce((s, i) => s + i.price * i.quantity, 0);
+            const discount = isMember ? Math.round(subtotal * discountRate * 100) / 100 : 0;
+            const total    = subtotal - discount;
             const count    = bc.items.reduce((s, i) => s + i.quantity, 0);
             const color    = branchColor(bc.branch.name);
             const expanded = expandedCartId === bc.branch.id;
@@ -449,6 +470,20 @@ function CartsModal({ carts, visible, expandedCartId, placingId, onClose, onTogg
                       </View>
                     ))}
                     <View style={styles.cartFooter}>
+                      {isMember && discount > 0 && (
+                        <>
+                          <View style={styles.breakdownRow}>
+                            <Text style={styles.breakdownLabel}>Subtotal</Text>
+                            <Text style={styles.breakdownValue}>Rs {subtotal.toFixed(2)}</Text>
+                          </View>
+                          <View style={styles.breakdownRow}>
+                            <Text style={styles.discountLabel}>
+                              🫐 Member discount ({Math.round(discountRate * 100)}%)
+                            </Text>
+                            <Text style={styles.discountValue}>− Rs {discount.toFixed(2)}</Text>
+                          </View>
+                        </>
+                      )}
                       <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>Total</Text>
                         <Text style={styles.totalValue}>Rs {total.toFixed(2)}</Text>
@@ -596,7 +631,12 @@ const styles = StyleSheet.create({
   },
   cartItemTotal: { fontSize: 13, fontWeight: '700', color: '#14532d', minWidth: 72, textAlign: 'right' },
   cartFooter:    { paddingTop: 12 },
-  totalRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  breakdownRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  breakdownLabel: { fontSize: 13, color: '#6b7280' },
+  breakdownValue: { fontSize: 13, color: '#374151' },
+  discountLabel:  { fontSize: 13, color: '#16a34a', fontWeight: '600' },
+  discountValue:  { fontSize: 13, color: '#16a34a', fontWeight: '600' },
+  totalRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, marginTop: 4 },
   totalLabel:    { fontSize: 15, fontWeight: '600', color: '#374151' },
   totalValue:    { fontSize: 19, fontWeight: '700', color: '#14532d' },
   placeOrderBtn: { backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },

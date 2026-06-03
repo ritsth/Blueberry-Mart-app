@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -21,6 +22,8 @@ interface ProfileSummary {
   role: string;
   loyaltyPoints: number;
   memberSince: string;
+  isMember: boolean;
+  membershipSince: string | null;
   totalOrders: number;
   totalSpent: number;
 }
@@ -30,6 +33,7 @@ export default function AccountTab() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activating, setActivating] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchProfile(); }, []));
 
@@ -42,6 +46,27 @@ export default function AccountTab() {
       if (res.ok) setProfile(await res.json());
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function activateMembership() {
+    setActivating(true);
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/membership/activate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        Alert.alert('Activation Failed', 'Could not activate membership. Try again.');
+        return;
+      }
+      await fetchProfile();
+      Alert.alert('Welcome to Blueberry Plus!', 'You now get 5% off every order.');
+    } catch {
+      Alert.alert('Error', 'Could not activate membership. Check your connection.');
+    } finally {
+      setActivating(false);
     }
   }
 
@@ -95,6 +120,40 @@ export default function AccountTab() {
         </View>
       </View>
 
+      {/* Membership */}
+      {profile?.isMember ? (
+        <View style={styles.memberCard}>
+          <Text style={styles.memberBadgeIcon}>🫐  Blueberry Plus</Text>
+          <Text style={styles.memberActiveLabel}>Active Membership</Text>
+          <View style={styles.perkRow}>
+            <Text style={styles.perkText}>✓  5% off every order</Text>
+          </View>
+          {profile.membershipSince && (
+            <Text style={styles.memberSinceNote}>
+              Member since {new Date(profile.membershipSince).toLocaleDateString('en-NP', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              })}
+            </Text>
+          )}
+        </View>
+      ) : (
+        <View style={styles.joinCard}>
+          <Text style={styles.joinIcon}>🫐</Text>
+          <Text style={styles.joinTitle}>Join Blueberry Plus</Text>
+          <Text style={styles.joinSubtitle}>Get 5% off every order, automatically applied at checkout.</Text>
+          <TouchableOpacity
+            style={[styles.joinButton, activating && styles.joinButtonDisabled]}
+            onPress={activateMembership}
+            disabled={activating}
+            activeOpacity={0.8}
+          >
+            {activating
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.joinButtonText}>Become a Member</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Sign out */}
       <TouchableOpacity style={styles.signOutButton} onPress={handleLogout} activeOpacity={0.8}>
         <Text style={styles.signOutText}>Sign Out</Text>
@@ -144,6 +203,31 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 18, fontWeight: '700', color: '#14532d', marginBottom: 4 },
   statLabel: { fontSize: 11, color: '#6b7280', textAlign: 'center', lineHeight: 15 },
+  // Active member card
+  memberCard: {
+    backgroundColor: '#14532d', borderRadius: 16,
+    padding: 22, marginBottom: 16,
+  },
+  memberBadgeIcon: { fontSize: 18, fontWeight: '800', color: '#ffffff', marginBottom: 4 },
+  memberActiveLabel: { fontSize: 12, color: '#bbf7d0', fontWeight: '600', marginBottom: 14 },
+  perkRow: { marginBottom: 10 },
+  perkText: { fontSize: 14, color: '#ffffff', fontWeight: '500' },
+  memberSinceNote: { fontSize: 11, color: '#86efac', marginTop: 4 },
+  // Join card
+  joinCard: {
+    backgroundColor: '#ffffff', borderRadius: 16,
+    padding: 24, marginBottom: 16, alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#bbf7d0',
+  },
+  joinIcon: { fontSize: 32, marginBottom: 8 },
+  joinTitle: { fontSize: 18, fontWeight: '700', color: '#14532d', marginBottom: 6 },
+  joinSubtitle: { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 19, marginBottom: 18 },
+  joinButton: {
+    backgroundColor: '#16a34a', borderRadius: 12,
+    paddingVertical: 14, paddingHorizontal: 32, alignSelf: 'stretch', alignItems: 'center',
+  },
+  joinButtonDisabled: { backgroundColor: '#86efac' },
+  joinButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
   signOutButton: {
     borderWidth: 1.5, borderColor: '#e5e7eb',
     borderRadius: 12, paddingVertical: 14, alignItems: 'center',
