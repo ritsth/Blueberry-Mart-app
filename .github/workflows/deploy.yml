@@ -45,10 +45,13 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore Tests/BlueberryMart.Api.Tests
+        run: dotnet restore BlueberryMart.Api
+
+      - name: Check formatting
+        run: dotnet format BlueberryMart.Api --verify-no-changes
 
       - name: Run integration tests
-        run: dotnet test Tests/BlueberryMart.Api.Tests --no-restore --verbosity normal
+        run: dotnet test Tests/BlueberryMart.Api.Tests --verbosity normal
 
   # ── Job 2: Build image and deploy (only if tests passed) ─────────────────
   deploy:
