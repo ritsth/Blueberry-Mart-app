@@ -10,7 +10,7 @@ namespace BlueberryMart.Api.Controllers;
 
 [ApiController]
 [Route("api/orders")]
-[Authorize(Roles = "Customer")]
+[Authorize(Roles = "Customer,Shareholder")]
 public class OrdersController(BlueberryMartDbContext context) : ControllerBase
 {
     // POST /api/orders

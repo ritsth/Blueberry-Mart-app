@@ -10,7 +10,7 @@ namespace BlueberryMart.Api.Controllers;
 [Route("api/inventory")]
 public class InventoryController(BlueberryMartDbContext context) : ControllerBase
 {
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("customer")]
     public async Task<ActionResult<IEnumerable<Inventory>>> GetForCustomer([FromQuery] Guid branchId)
     {

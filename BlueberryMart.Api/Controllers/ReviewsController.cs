@@ -9,7 +9,7 @@ namespace BlueberryMart.Api.Controllers;
 
 [ApiController]
 [Route("api/reviews")]
-[Authorize(Roles = "Customer")]
+[Authorize(Roles = "Customer,Shareholder")]
 public class ReviewsController(BlueberryMartDbContext context, IWebHostEnvironment env) : ControllerBase
 {
     private const int TextReviewPoints  = 10;
