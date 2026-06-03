@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     height: 2.5, backgroundColor: '#111827', borderRadius: 2,
   },
   // Shopping
-  shopContainer: { flex: 1, paddingHorizontal: 24 },
+  shopContainer: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
   // Analytics
   analyticsScroll: { flex: 1 },
   analyticsContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 32 },
