@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { getStoredToken } from '../services/authService';
 import type { RootStackParamList } from '../../App';
@@ -26,6 +27,7 @@ type Props = {
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
 export default function ReviewScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
   const { orderId, items } = route.params;
 
   const [selectedItemId, setSelectedItemId] = useState(items[0]?.id ?? '');
@@ -135,7 +137,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]} keyboardShouldPersistTaps="handled">
 
         {/* Header */}
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow}>
@@ -242,7 +244,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
   },
   content: {
-    paddingTop: 64,
     paddingHorizontal: 24,
     paddingBottom: 48,
   },

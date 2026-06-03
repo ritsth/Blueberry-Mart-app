@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
 import ShoppingView from '../../components/ShoppingView';
 
@@ -25,12 +26,13 @@ interface Analytics {
 }
 
 export default function ShareholderHomeTab() {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TopTab>('analytics');
 
   return (
     <View style={styles.wrapper}>
       {/* Uber-style top tabs */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
         {(['analytics', 'shopping'] as TopTab[]).map(tab => (
           <TouchableOpacity
             key={tab}
@@ -161,7 +163,6 @@ const styles = StyleSheet.create({
   // Top tabs (Uber style)
   topBar: {
     flexDirection: 'row',
-    paddingTop: 56,
     paddingHorizontal: 24,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,

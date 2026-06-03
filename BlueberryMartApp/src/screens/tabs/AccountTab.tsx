@@ -7,6 +7,7 @@ import {
   View,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getStoredToken, logout } from '../../services/authService';
@@ -24,6 +25,7 @@ interface ProfileSummary {
 }
 
 export default function AccountTab() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export default function AccountTab() {
   const memberYear = profile ? new Date(profile.memberSince).getFullYear() : '—';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.heading}>Account</Text>
 
       {/* Avatar */}
@@ -102,7 +104,7 @@ export default function AccountTab() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingTop: 64, paddingHorizontal: 24, paddingBottom: 40 },
+  content: { paddingHorizontal: 24, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   heading: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 24 },
   avatarCard: {

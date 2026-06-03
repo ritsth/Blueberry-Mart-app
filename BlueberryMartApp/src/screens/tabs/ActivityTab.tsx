@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
@@ -25,6 +26,7 @@ interface ProfileData {
 }
 
 export default function ActivityTab() {
+  const insets = useSafeAreaInsets();
   const [data, setData]               = useState<ProfileData | null>(null);
   const [loading, setLoading]         = useState(true);
   const [activeTab, setActiveTab]     = useState<'orders' | 'reviews'>('orders');
@@ -56,7 +58,7 @@ export default function ActivityTab() {
   const reviews = data?.reviews ?? [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]} showsVerticalScrollIndicator={false}>
       <Text style={styles.heading}>Activity</Text>
 
       {/* Tabs */}
@@ -152,7 +154,7 @@ export default function ActivityTab() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingTop: 64, paddingHorizontal: 24, paddingBottom: 32 },
+  content: { paddingHorizontal: 24, paddingBottom: 32 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   heading: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 20 },
   tabs: {

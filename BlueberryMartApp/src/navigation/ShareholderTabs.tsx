@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ShareholderHomeTab from '../screens/tabs/ShareholderHomeTab';
 import ActivityTab        from '../screens/tabs/ActivityTab';
 import AccountTab         from '../screens/tabs/AccountTab';
@@ -8,6 +9,7 @@ import AccountTab         from '../screens/tabs/AccountTab';
 const Tab = createBottomTabNavigator();
 
 export default function ShareholderTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -18,8 +20,8 @@ export default function ShareholderTabs() {
           backgroundColor: '#ffffff',
           borderTopColor: '#f3f4f6',
           borderTopWidth: 1,
-          height: 80,
-          paddingBottom: 18,
+          height: 56 + insets.bottom,
+          paddingBottom: insets.bottom + 4,
           paddingTop: 10,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
