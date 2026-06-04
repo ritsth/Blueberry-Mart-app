@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -16,6 +17,24 @@ public class InventoryController(BlueberryMartDbContext context) : ControllerBas
     {
         var items = await context.Inventory
             .Where(i => i.BranchId == branchId && i.StockQuantity > 0 && !i.IsBulkOnly)
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
+    // Bulk (business) catalogue — Blueberry Plus members only
+    [Authorize(Roles = "Customer,Shareholder")]
+    [HttpGet("bulk")]
+    public async Task<IActionResult> GetBulk([FromQuery] Guid branchId)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await context.Users.FindAsync(userId);
+        if (user is null || !user.IsMember)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { message = "Bulk ordering is available to Blueberry Plus members only." });
+
+        var items = await context.Inventory
+            .Where(i => i.BranchId == branchId && i.StockQuantity > 0 && i.IsBulkOnly)
             .ToListAsync();
 
         return Ok(items);

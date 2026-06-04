@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CustomerShopTab from '../screens/tabs/CustomerShopTab';
+import BulkTab        from '../screens/tabs/BulkTab';
 import ActivityTab     from '../screens/tabs/ActivityTab';
 import AccountTab      from '../screens/tabs/AccountTab';
 
@@ -28,6 +29,7 @@ export default function CustomerTabs() {
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<string, [string, string]> = {
             Shop:     ['storefront',     'storefront-outline'],
+            Bulk:     ['cube',           'cube-outline'],
             Activity: ['receipt',        'receipt-outline'],
             Account:  ['person-circle',  'person-circle-outline'],
           };
@@ -43,6 +45,7 @@ export default function CustomerTabs() {
       })}
     >
       <Tab.Screen name="Shop"     component={CustomerShopTab} />
+      <Tab.Screen name="Bulk"     component={BulkTab} />
       <Tab.Screen name="Activity" component={ActivityTab} />
       <Tab.Screen name="Account"  component={AccountTab} />
     </Tab.Navigator>

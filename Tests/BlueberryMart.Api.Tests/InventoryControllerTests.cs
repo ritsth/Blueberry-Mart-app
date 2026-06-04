@@ -80,4 +80,44 @@ public class InventoryControllerTests
 
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task GetBulk_NonMember_ReturnsForbidden()
+    {
+        // customer1 is never made a member in the suite
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/bulk?branchId={_downtownBranchId}")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetBulk_Member_ReturnsOnlyInStockBulkItems()
+    {
+        // Use customer2 and activate membership first so they can access bulk
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "customer2@blueberrymart.com",
+            password = "customer2_password"
+        });
+        var token = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
+        await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, "/api/membership/activate").WithBearer(token));
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/bulk?branchId={_downtownBranchId}")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.NotNull(items);
+        Assert.NotEmpty(items);
+        Assert.All(items, item =>
+        {
+            Assert.True(item.GetProperty("stockQuantity").GetInt32() > 0);
+            Assert.True(item.GetProperty("isBulkOnly").GetBoolean());
+        });
+    }
 }

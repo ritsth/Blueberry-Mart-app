@@ -36,8 +36,9 @@ interface Address       { id: string; label: string; addressLine: string; city: 
 type OrderMode = 'pickup' | 'delivery';
 const DELIVERY_FEE = 100;
 
-export default function ShoppingView() {
+export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 'bulk' }) {
   const navigation = useNavigation<any>();
+  const isBulk = mode === 'bulk';
 
   const [branches, setBranches]                 = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch]     = useState<Branch | null>(null);
@@ -179,8 +180,9 @@ export default function ShoppingView() {
     setLoadingInventory(true);
     try {
       const token = await getStoredToken();
+      const endpoint = isBulk ? 'bulk' : 'customer';
       const res = await fetch(
-        `${API_BASE}/api/inventory/customer?branchId=${branch.id}`,
+        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error();
@@ -292,7 +294,7 @@ export default function ShoppingView() {
             keyExtractor={item => item.id}
             contentContainerStyle={styles.list}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
-            ListEmptyComponent={<Text style={styles.emptyNote}>No items available at this branch.</Text>}
+            ListEmptyComponent={<Text style={styles.emptyNote}>{isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}</Text>}
             renderItem={({ item }) => {
               const inCart = carts[selectedBranch.id]?.items.find(c => c.itemId === item.id);
               return (
@@ -339,21 +341,23 @@ export default function ShoppingView() {
   // ─── Branch list + search ───────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Search bar */}
-      <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search across all branches..."
-          placeholderTextColor="#9ca3af"
-          value={query}
-          onChangeText={setQuery}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          autoCorrect={false}
-        />
-        {searching && <ActivityIndicator size="small" color="#9ca3af" style={{ marginRight: 8 }} />}
-      </View>
+      {/* Search bar (regular shopping only — bulk catalogue isn't searched) */}
+      {!isBulk && (
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search across all branches..."
+            placeholderTextColor="#9ca3af"
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+          />
+          {searching && <ActivityIndicator size="small" color="#9ca3af" style={{ marginRight: 8 }} />}
+        </View>
+      )}
 
       {/* Search results */}
       {isSearching ? (
@@ -416,8 +420,10 @@ export default function ShoppingView() {
       ) : (
         /* Branch list */
         <>
-          <Text style={styles.heading}>Welcome to the Grocery Store</Text>
-          <Text style={styles.subheading}>Select a branch to start shopping</Text>
+          <Text style={styles.heading}>{isBulk ? 'Bulk Orders' : 'Welcome to the Grocery Store'}</Text>
+          <Text style={styles.subheading}>
+            {isBulk ? 'Business quantities · members only · select a branch' : 'Select a branch to start shopping'}
+          </Text>
           {error && <Text style={styles.errorText}>{error}</Text>}
           <FlatList
             data={branches}
