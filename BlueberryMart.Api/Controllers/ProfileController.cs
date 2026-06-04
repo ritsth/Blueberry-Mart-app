@@ -67,6 +67,8 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
             MemberSince = user.CreatedAt,
             IsMember = user.IsMember,
             MembershipSince = user.MemberSince,
+            MemberUntil = user.MemberUntil,
+            MembershipCancelled = user.MembershipCancelled,
             TotalOrders = orders.Count,
             TotalSpent = orders.Sum(o => o.TotalAmount),
             Orders = orders,

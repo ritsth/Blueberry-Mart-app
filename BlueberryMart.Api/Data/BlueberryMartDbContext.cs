@@ -28,8 +28,9 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
             e.Property(u => u.Role).HasColumnName("role").HasDefaultValue("customer");
             e.Property(u => u.LoyaltyPoints).HasColumnName("loyalty_points").HasDefaultValue(0);
-            e.Property(u => u.IsMember).HasColumnName("is_member").HasDefaultValue(false);
             e.Property(u => u.MemberSince).HasColumnName("member_since");
+            e.Property(u => u.MemberUntil).HasColumnName("member_until");
+            e.Property(u => u.MembershipCancelled).HasColumnName("membership_cancelled").HasDefaultValue(false);
             e.Property(u => u.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(u => u.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasIndex(u => u.Email).IsUnique();

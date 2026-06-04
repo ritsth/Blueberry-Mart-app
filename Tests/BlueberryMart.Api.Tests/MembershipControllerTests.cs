@@ -53,6 +53,30 @@ public class MembershipControllerTests
         var afterJson = await after.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.True(afterJson.GetProperty("isMember").GetBoolean());
+        Assert.False(afterJson.GetProperty("cancelled").GetBoolean());
+        // A one-month period is set
+        Assert.NotEqual(JsonValueKind.Null, afterJson.GetProperty("memberUntil").ValueKind);
+    }
+
+    [Fact]
+    public async Task Cancel_KeepsBenefitsUntilPeriodEnds()
+    {
+        var token = await GetCustomer2TokenAsync();
+
+        // Activate then cancel
+        await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, "/api/membership/activate").WithBearer(token));
+        var cancel = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, "/api/membership/cancel").WithBearer(token));
+        Assert.Equal(HttpStatusCode.OK, cancel.StatusCode);
+
+        var status = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, "/api/membership/status").WithBearer(token));
+        var json = await status.Content.ReadFromJsonAsync<JsonElement>();
+
+        // Still a member (within the paid month) but flagged as cancelled
+        Assert.True(json.GetProperty("isMember").GetBoolean());
+        Assert.True(json.GetProperty("cancelled").GetBoolean());
     }
 
     [Fact]

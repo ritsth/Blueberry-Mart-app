@@ -18,6 +18,8 @@ import type { RootStackParamList } from '../../../App';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
+const MONTHLY_FEE = 199;
+
 interface ProfileSummary {
   email: string;
   role: string;
@@ -25,6 +27,8 @@ interface ProfileSummary {
   memberSince: string;
   isMember: boolean;
   membershipSince: string | null;
+  memberUntil: string | null;
+  membershipCancelled: boolean;
   totalOrders: number;
   totalSpent: number;
 }
@@ -56,6 +60,22 @@ export default function AccountTab() {
     }
   }
 
+  // Second confirmation layer before joining
+  function confirmJoin() {
+    Alert.alert(
+      'Join Blueberry Plus?',
+      `You'll be charged Rs ${MONTHLY_FEE}/month for:\n\n` +
+        '•  5% off every order\n' +
+        '•  Free delivery\n\n' +
+        'Your membership stays active for a full month and keeps its benefits ' +
+        'even if you cancel before then. It renews monthly until you cancel.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: `Join · Rs ${MONTHLY_FEE}/mo`, onPress: activateMembership },
+      ],
+    );
+  }
+
   async function activateMembership() {
     setActivating(true);
     try {
@@ -69,9 +89,43 @@ export default function AccountTab() {
         return;
       }
       await fetchProfile();
-      Alert.alert('Welcome to Blueberry Plus!', 'You now get 5% off every order.');
+      Alert.alert('Welcome to Blueberry Plus!', 'You now get 5% off and free delivery.');
     } catch {
       Alert.alert('Error', 'Could not activate membership. Check your connection.');
+    } finally {
+      setActivating(false);
+    }
+  }
+
+  function confirmCancel() {
+    const until = profile?.memberUntil
+      ? new Date(profile.memberUntil).toLocaleDateString('en-NP', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'the end of your period';
+    Alert.alert(
+      'Cancel Membership?',
+      `You'll keep your Plus benefits until ${until}. After that it won't renew and you'll lose the 5% discount and free delivery.`,
+      [
+        { text: 'Keep Membership', style: 'cancel' },
+        { text: 'Cancel Membership', style: 'destructive', onPress: cancelMembership },
+      ],
+    );
+  }
+
+  async function cancelMembership() {
+    setActivating(true);
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/membership/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        Alert.alert('Failed', 'Could not cancel membership. Try again.');
+        return;
+      }
+      await fetchProfile();
+    } catch {
+      Alert.alert('Error', 'Could not cancel membership. Check your connection.');
     } finally {
       setActivating(false);
     }
@@ -146,26 +200,52 @@ export default function AccountTab() {
       {profile?.isMember ? (
         <View style={styles.memberCard}>
           <Text style={styles.memberBadgeIcon}>🫐  Blueberry Plus</Text>
-          <Text style={styles.memberActiveLabel}>Active Membership</Text>
+          <Text style={styles.memberActiveLabel}>
+            {profile.membershipCancelled ? 'Cancelled · benefits until period ends' : 'Active Membership'}
+          </Text>
           <View style={styles.perkRow}>
             <Text style={styles.perkText}>✓  5% off every order</Text>
+            <Text style={styles.perkText}>✓  Free delivery</Text>
           </View>
-          {profile.membershipSince && (
+          {profile.memberUntil && (
             <Text style={styles.memberSinceNote}>
-              Member since {new Date(profile.membershipSince).toLocaleDateString('en-NP', {
+              {profile.membershipCancelled ? 'Active until ' : 'Renews on '}
+              {new Date(profile.memberUntil).toLocaleDateString('en-NP', {
                 day: 'numeric', month: 'short', year: 'numeric',
               })}
             </Text>
+          )}
+
+          {profile.membershipCancelled ? (
+            <TouchableOpacity
+              style={[styles.memberActionBtn, activating && styles.memberActionBtnDisabled]}
+              onPress={confirmJoin}
+              disabled={activating}
+              activeOpacity={0.8}
+            >
+              {activating ? <ActivityIndicator color="#14532d" /> : <Text style={styles.resumeText}>Resume Membership</Text>}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.cancelLink}
+              onPress={confirmCancel}
+              disabled={activating}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelLinkText}>Cancel Membership</Text>
+            </TouchableOpacity>
           )}
         </View>
       ) : (
         <View style={styles.joinCard}>
           <Text style={styles.joinIcon}>🫐</Text>
           <Text style={styles.joinTitle}>Join Blueberry Plus</Text>
-          <Text style={styles.joinSubtitle}>Get 5% off every order, automatically applied at checkout.</Text>
+          <Text style={styles.joinSubtitle}>
+            Rs {MONTHLY_FEE}/month · 5% off every order and free delivery.
+          </Text>
           <TouchableOpacity
             style={[styles.joinButton, activating && styles.joinButtonDisabled]}
-            onPress={activateMembership}
+            onPress={confirmJoin}
             disabled={activating}
             activeOpacity={0.8}
           >
@@ -244,8 +324,16 @@ const styles = StyleSheet.create({
   memberBadgeIcon: { fontSize: 18, fontWeight: '800', color: '#ffffff', marginBottom: 4 },
   memberActiveLabel: { fontSize: 12, color: '#bbf7d0', fontWeight: '600', marginBottom: 14 },
   perkRow: { marginBottom: 10 },
-  perkText: { fontSize: 14, color: '#ffffff', fontWeight: '500' },
+  perkText: { fontSize: 14, color: '#ffffff', fontWeight: '500', marginBottom: 4 },
   memberSinceNote: { fontSize: 11, color: '#86efac', marginTop: 4 },
+  memberActionBtn: {
+    backgroundColor: '#ffffff', borderRadius: 10,
+    paddingVertical: 12, alignItems: 'center', marginTop: 16,
+  },
+  memberActionBtnDisabled: { opacity: 0.6 },
+  resumeText: { color: '#14532d', fontWeight: '700', fontSize: 14 },
+  cancelLink: { marginTop: 16, alignItems: 'center', paddingVertical: 6 },
+  cancelLinkText: { color: '#bbf7d0', fontWeight: '600', fontSize: 13, textDecorationLine: 'underline' },
   // Join card
   joinCard: {
     backgroundColor: '#ffffff', borderRadius: 16,
