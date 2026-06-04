@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -33,9 +34,15 @@ export default function AccountTab() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activating, setActivating] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchProfile(); }, []));
+
+  async function onRefresh() {
+    setRefreshing(true);
+    try { await fetchProfile(); } finally { setRefreshing(false); }
+  }
 
   async function fetchProfile() {
     try {
@@ -87,7 +94,11 @@ export default function AccountTab() {
   const memberYear = profile ? new Date(profile.memberSince).getFullYear() : '—';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
+    >
       <Text style={styles.heading}>Account</Text>
 
       {/* Avatar */}

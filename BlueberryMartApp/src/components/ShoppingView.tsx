@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -47,6 +48,7 @@ export default function ShoppingView() {
   const [placingId, setPlacingId]               = useState<string | null>(null);
   const [loadingBranches, setLoadingBranches]   = useState(true);
   const [loadingInventory, setLoadingInventory] = useState(false);
+  const [refreshing, setRefreshing]             = useState(false);
   const [error, setError]                       = useState<string | null>(null);
 
   // Membership
@@ -95,6 +97,26 @@ export default function ShoppingView() {
   useEffect(() => {
     if (cartVisible) { fetchMembership(); fetchAddresses(); }
   }, [cartVisible]);
+
+  // Pressing the bottom tab while inside a branch returns to the branch list
+  useEffect(() => {
+    const unsub = navigation.addListener('tabPress', () => {
+      setSelectedBranch(null);
+      setQuery('');
+    });
+    return unsub;
+  }, [navigation]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchMembership(), fetchAddresses()]);
+      if (selectedBranch) await selectBranch(selectedBranch);
+      else await fetchBranches();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   function setMode(branchId: string, mode: OrderMode) {
     setOrderModes(prev => ({ ...prev, [branchId]: mode }));
@@ -269,6 +291,7 @@ export default function ShoppingView() {
             data={inventory}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.list}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
             ListEmptyComponent={<Text style={styles.emptyNote}>No items available at this branch.</Text>}
             renderItem={({ item }) => {
               const inCart = carts[selectedBranch.id]?.items.find(c => c.itemId === item.id);
@@ -338,6 +361,7 @@ export default function ShoppingView() {
           data={searchResults}
           keyExtractor={g => g.branchId}
           contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
           ListEmptyComponent={
             !searching
               ? <Text style={styles.emptyNote}>No items found for "{query}"</Text>
@@ -399,6 +423,7 @@ export default function ShoppingView() {
             data={branches}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.list}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
             renderItem={({ item }) => {
               const color = branchColor(item.name);
               const branchCart = carts[item.id];

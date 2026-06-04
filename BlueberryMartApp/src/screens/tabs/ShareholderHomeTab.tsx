@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -63,9 +64,15 @@ export default function ShareholderHomeTab() {
 function AnalyticsView() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
   useEffect(() => { fetchAnalytics(); }, []);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    try { await fetchAnalytics(); } finally { setRefreshing(false); }
+  }
 
   async function fetchAnalytics() {
     try {
@@ -90,7 +97,12 @@ function AnalyticsView() {
   }
 
   return (
-    <ScrollView style={styles.analyticsScroll} contentContainerStyle={styles.analyticsContent} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.analyticsScroll}
+      contentContainerStyle={styles.analyticsContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
+    >
 
       <View style={styles.revenueCard}>
         <Text style={styles.revenueLabel}>Total Revenue</Text>

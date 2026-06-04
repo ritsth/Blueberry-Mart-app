@@ -4,6 +4,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,6 +37,7 @@ export default function AddressesScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm]   = useState(false);
   const [saving, setSaving]       = useState(false);
 
@@ -46,6 +48,11 @@ export default function AddressesScreen({ navigation }: Props) {
   const [phone, setPhone]             = useState('');
 
   useFocusEffect(useCallback(() => { fetchAddresses(); }, []));
+
+  async function onRefresh() {
+    setRefreshing(true);
+    try { await fetchAddresses(); } finally { setRefreshing(false); }
+  }
 
   async function fetchAddresses() {
     try {
@@ -119,7 +126,11 @@ export default function AddressesScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
+      >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>

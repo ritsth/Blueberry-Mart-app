@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,10 +31,16 @@ export default function ActivityTab() {
   const insets = useSafeAreaInsets();
   const [data, setData]               = useState<ProfileData | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
   const [activeTab, setActiveTab]     = useState<'orders' | 'reviews'>('orders');
   const [expandedId, setExpandedId]   = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
+
+  async function onRefresh() {
+    setRefreshing(true);
+    try { await fetchData(); } finally { setRefreshing(false); }
+  }
 
   async function fetchData() {
     try {
@@ -59,7 +66,12 @@ export default function ActivityTab() {
   const reviews = data?.reviews ?? [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
+    >
       <Text style={styles.heading}>Activity</Text>
 
       {/* Tabs */}
