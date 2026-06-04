@@ -1,23 +1,25 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
 import ShoppingView from '../../components/ShoppingView';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
+const MONTHLY_FEE = 199;
 
 export default function BulkTab() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading]   = useState(true);
+  const [activating, setActivating] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchMembership(); }, []));
 
@@ -33,6 +35,44 @@ export default function BulkTab() {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Second confirmation layer before joining (same as the Account tab)
+  function confirmJoin() {
+    Alert.alert(
+      'Join Blueberry Plus?',
+      `You'll be charged Rs ${MONTHLY_FEE}/month for:\n\n` +
+        '•  5% off every order\n' +
+        '•  Free delivery\n' +
+        '•  Bulk ordering\n\n' +
+        'Your membership stays active for a full month and keeps its benefits ' +
+        'even if you cancel before then. It renews monthly until you cancel.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: `Join · Rs ${MONTHLY_FEE}/mo`, onPress: activateMembership },
+      ],
+    );
+  }
+
+  async function activateMembership() {
+    setActivating(true);
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/membership/activate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        Alert.alert('Activation Failed', 'Could not activate membership. Try again.');
+        return;
+      }
+      await fetchMembership();
+      Alert.alert('Welcome to Blueberry Plus!', 'Bulk ordering is now unlocked.');
+    } catch {
+      Alert.alert('Error', 'Could not activate membership. Check your connection.');
+    } finally {
+      setActivating(false);
     }
   }
 
@@ -61,11 +101,14 @@ export default function BulkTab() {
       </Text>
       <Text style={styles.lockSub}>Join Blueberry Plus to unlock bulk ordering.</Text>
       <TouchableOpacity
-        style={styles.ctaButton}
-        onPress={() => navigation.navigate('Account')}
+        style={[styles.ctaButton, activating && styles.ctaButtonDisabled]}
+        onPress={confirmJoin}
+        disabled={activating}
         activeOpacity={0.85}
       >
-        <Text style={styles.ctaText}>Go to Account → Join Plus</Text>
+        {activating
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={styles.ctaText}>Join Plus · Rs {MONTHLY_FEE}/mo</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -88,5 +131,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a', borderRadius: 12,
     paddingVertical: 15, paddingHorizontal: 28, alignSelf: 'stretch', alignItems: 'center',
   },
+  ctaButtonDisabled: { backgroundColor: '#86efac' },
   ctaText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
 });
