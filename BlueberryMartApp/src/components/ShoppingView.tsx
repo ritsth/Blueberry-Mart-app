@@ -90,8 +90,11 @@ export default function ShoppingView() {
     } catch { /* non-blocking */ }
   }
 
-  // Refresh addresses whenever the cart opens (user may have added one in Account)
-  useEffect(() => { if (cartVisible) fetchAddresses(); }, [cartVisible]);
+  // Refresh membership + addresses whenever the cart opens, so the checkout
+  // reflects changes made elsewhere (e.g. joining Plus or adding an address)
+  useEffect(() => {
+    if (cartVisible) { fetchMembership(); fetchAddresses(); }
+  }, [cartVisible]);
 
   function setMode(branchId: string, mode: OrderMode) {
     setOrderModes(prev => ({ ...prev, [branchId]: mode }));
