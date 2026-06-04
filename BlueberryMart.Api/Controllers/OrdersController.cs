@@ -138,6 +138,7 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
             return CreatedAtAction(nameof(PlaceOrder), new { id = order.Id }, new
             {
                 order.Id,
+                order.OrderNumber,
                 order.Status,
                 Subtotal = subtotal,
                 order.DiscountAmount,

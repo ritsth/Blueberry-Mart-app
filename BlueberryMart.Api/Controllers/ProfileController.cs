@@ -25,6 +25,7 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
             .Select(o => new
             {
                 o.Id,
+                o.OrderNumber,
                 BranchName = o.Branch.Name,
                 o.OrderType,
                 o.Status,

@@ -3,6 +3,10 @@ namespace BlueberryMart.Api.Models.Entities;
 public class Order
 {
     public Guid Id { get; set; }
+
+    /// <summary>Human-friendly sequential order number (e.g. 1042), DB-generated.</summary>
+    public int OrderNumber { get; set; }
+
     public Guid UserId { get; set; }
     public Guid BranchId { get; set; }
     public string OrderType { get; set; } = null!;

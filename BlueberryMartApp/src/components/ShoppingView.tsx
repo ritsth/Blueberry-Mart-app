@@ -251,9 +251,13 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
       setCarts(prev => { const { [branchId]: _, ...rest } = prev; return rest; });
       if (Object.keys(carts).length <= 1) setCartVisible(false);
       if (selectedBranch?.id === branchId) selectBranch(selectedBranch);
+
+      const fulfilment = mode === 'delivery'
+        ? `\nDelivery — track with this number.`
+        : `\nShow order #${data.orderNumber} at the counter to collect.`;
       Alert.alert(
-        'Order Placed!',
-        `Total: Rs ${data.totalAmount?.toFixed(2)}\nLoyalty points earned: ${data.loyaltyPointsEarned}`,
+        `Order #${data.orderNumber} Placed!`,
+        `Total: Rs ${data.totalAmount?.toFixed(2)}\nLoyalty points earned: ${data.loyaltyPointsEarned}${fulfilment}`,
         [
           { text: 'Done', style: 'cancel' },
           { text: 'Write a Review', onPress: () => navigation.navigate('ReviewScreen', { orderId: data.id, items: orderedItems }) },

@@ -19,6 +19,9 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
         modelBuilder.HasPostgresEnum("order_type", ["pickup", "delivery"]);
         modelBuilder.HasPostgresEnum("order_status", ["pending", "confirmed", "processing", "ready", "completed", "cancelled"]);
 
+        // Human-friendly sequential order numbers, starting at 1001
+        modelBuilder.HasSequence<int>("order_number_seq").StartsAt(1001);
+
         modelBuilder.Entity<User>(e =>
         {
             e.ToTable("users");
@@ -104,6 +107,10 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.ToTable("orders");
             e.HasKey(o => o.Id);
             e.Property(o => o.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(o => o.OrderNumber).HasColumnName("order_number")
+                .HasDefaultValueSql("nextval('order_number_seq')")
+                .ValueGeneratedOnAdd();
+            e.HasIndex(o => o.OrderNumber).IsUnique();
             e.Property(o => o.UserId).HasColumnName("user_id");
             e.Property(o => o.BranchId).HasColumnName("branch_id");
             e.Property(o => o.OrderType).HasColumnName("order_type").IsRequired();

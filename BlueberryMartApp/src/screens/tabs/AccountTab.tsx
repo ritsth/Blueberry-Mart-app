@@ -66,7 +66,8 @@ export default function AccountTab() {
       'Join Blueberry Plus?',
       `You'll be charged Rs ${MONTHLY_FEE}/month for:\n\n` +
         '•  5% off every order\n' +
-        '•  Free delivery\n\n' +
+        '•  Free delivery\n' +
+        '•  Bulk ordering\n\n' +
         'Your membership stays active for a full month and keeps its benefits ' +
         'even if you cancel before then. It renews monthly until you cancel.',
       [
@@ -206,6 +207,7 @@ export default function AccountTab() {
           <View style={styles.perkRow}>
             <Text style={styles.perkText}>✓  5% off every order</Text>
             <Text style={styles.perkText}>✓  Free delivery</Text>
+            <Text style={styles.perkText}>✓  Bulk ordering</Text>
           </View>
           {profile.memberUntil && (
             <Text style={styles.memberSinceNote}>
@@ -241,7 +243,7 @@ export default function AccountTab() {
           <Text style={styles.joinIcon}>🫐</Text>
           <Text style={styles.joinTitle}>Join Blueberry Plus</Text>
           <Text style={styles.joinSubtitle}>
-            Rs {MONTHLY_FEE}/month · 5% off every order and free delivery.
+            Rs {MONTHLY_FEE}/month · 5% off every order, free delivery, and bulk ordering.
           </Text>
           <TouchableOpacity
             style={[styles.joinButton, activating && styles.joinButtonDisabled]}

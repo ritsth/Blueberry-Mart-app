@@ -16,8 +16,9 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
 interface OrderItem { itemName: string; quantity: number; unitPrice: number; }
 interface Order {
-  id: string; branchName: string; orderType: string;
+  id: string; orderNumber: number; branchName: string; orderType: string;
   status: string; totalAmount: number; createdAt: string; items: OrderItem[];
+  deliveryAddress?: string | null;
 }
 interface Review {
   id: string; itemName: string; rating: number; comment: string; createdAt: string;
@@ -106,10 +107,10 @@ export default function ActivityTab() {
             >
               <View style={styles.orderHeader}>
                 <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.orderNumber}>Order #{order.orderNumber}</Text>
                   <Text style={styles.orderBranch}>{order.branchName}</Text>
                   <Text style={styles.orderMeta}>
                     {new Date(order.createdAt).toLocaleDateString('en-NP', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    {'  ·  '}{order.orderType}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
@@ -119,6 +120,23 @@ export default function ActivityTab() {
                   </View>
                 </View>
               </View>
+
+              {/* Fulfilment line: pickup code vs delivery address */}
+              {order.orderType === 'delivery' ? (
+                <View style={styles.fulfilRow}>
+                  <Text style={styles.fulfilIcon}>🛵</Text>
+                  <Text style={styles.fulfilText} numberOfLines={1}>
+                    Delivery{order.deliveryAddress ? ` · ${order.deliveryAddress}` : ''}
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.fulfilRow, styles.pickupRow]}>
+                  <Text style={styles.fulfilIcon}>🏬</Text>
+                  <Text style={styles.pickupText}>
+                    Pickup · show <Text style={styles.pickupCode}>#{order.orderNumber}</Text> at the counter
+                  </Text>
+                </View>
+              )}
 
               {expandedId === order.id && (
                 <View style={styles.itemsContainer}>
@@ -186,8 +204,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
   },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  orderBranch: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 },
+  orderNumber: { fontSize: 14, fontWeight: '700', color: '#14532d', marginBottom: 2 },
+  orderBranch: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 2 },
   orderMeta: { fontSize: 12, color: '#6b7280' },
+  fulfilRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: '#f3f4f6',
+  },
+  pickupRow: {},
+  fulfilIcon: { fontSize: 14, marginRight: 8 },
+  fulfilText: { fontSize: 12, color: '#6b7280', flex: 1 },
+  pickupText: { fontSize: 12, color: '#374151', flex: 1 },
+  pickupCode: { fontWeight: '800', color: '#14532d' },
   orderTotal: { fontSize: 14, fontWeight: '700', color: '#14532d', marginBottom: 4 },
   statusBadge: {
     backgroundColor: '#fef9c3', borderRadius: 6,

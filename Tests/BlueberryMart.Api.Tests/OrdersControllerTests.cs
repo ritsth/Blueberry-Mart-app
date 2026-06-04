@@ -44,6 +44,8 @@ public class OrdersControllerTests
         Assert.Equal("pending", json.GetProperty("status").GetString());
         Assert.True(json.GetProperty("totalAmount").GetDecimal() > 0);
         Assert.True(json.GetProperty("loyaltyPointsEarned").GetInt32() > 0);
+        // A human-friendly sequential order number is assigned (sequence starts at 1001)
+        Assert.True(json.GetProperty("orderNumber").GetInt32() >= 1001);
     }
 
     [Fact]
