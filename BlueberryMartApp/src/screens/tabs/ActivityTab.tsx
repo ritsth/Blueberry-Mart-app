@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ interface Order {
 }
 interface Review {
   id: string; itemName: string; rating: number; comment: string; createdAt: string;
+  imagePath?: string | null;
 }
 interface ProfileData {
   orders: Order[];
@@ -174,6 +176,13 @@ export default function ActivityTab() {
                 ))}
               </View>
               <Text style={styles.comment}>{review.comment}</Text>
+              {review.imagePath && (
+                <Image
+                  source={{ uri: review.imagePath }}
+                  style={styles.reviewImage}
+                  resizeMode="cover"
+                />
+              )}
             </View>
           ))
       )}
@@ -236,5 +245,6 @@ const styles = StyleSheet.create({
   starOn: { fontSize: 16, color: '#f59e0b' },
   starOff: { fontSize: 16, color: '#d1d5db' },
   comment: { fontSize: 13, color: '#374151', lineHeight: 18 },
+  reviewImage: { width: '100%', height: 180, borderRadius: 10, marginTop: 10, backgroundColor: '#f3f4f6' },
   empty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
 });
