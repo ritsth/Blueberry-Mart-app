@@ -58,12 +58,38 @@ public class ShareholderController(BlueberryMartDbContext context) : ControllerB
             .OrderBy(i => i.StockQuantity)
             .ToListAsync();
 
+        // Revenue over the last 14 days, grouped by day
+        var sinceDate = DateTime.UtcNow.Date.AddDays(-13);
+        var dailyRaw = await context.Orders
+            .Where(o => o.CreatedAt >= sinceDate)
+            .GroupBy(o => o.CreatedAt.Date)
+            .Select(g => new { Day = g.Key, Revenue = g.Sum(o => o.TotalAmount) })
+            .ToListAsync();
+
+        // Fill missing days with 0 so the line chart is continuous
+        var revenueOverTime = Enumerable.Range(0, 14)
+            .Select(offset => sinceDate.AddDays(offset))
+            .Select(day => new
+            {
+                Date = day,
+                Revenue = dailyRaw.FirstOrDefault(d => d.Day == day)?.Revenue ?? 0m
+            })
+            .ToList();
+
+        // Pickup vs delivery split
+        var orderTypeSplit = await context.Orders
+            .GroupBy(o => o.OrderType)
+            .Select(g => new { Type = g.Key, Count = g.Count(), Revenue = g.Sum(o => o.TotalAmount) })
+            .ToListAsync();
+
         return Ok(new
         {
             TotalRevenue = totalRevenue,
             RevenueByBranch = revenueByBranch,
             TopSellingItems = topSellingItems,
-            LowStockAlerts = lowStockAlerts
+            LowStockAlerts = lowStockAlerts,
+            RevenueOverTime = revenueOverTime,
+            OrderTypeSplit = orderTypeSplit
         });
     }
 }

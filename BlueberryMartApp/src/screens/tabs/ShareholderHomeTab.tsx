@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -8,9 +9,25 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
 import ShoppingView from '../../components/ShoppingView';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CHART_WIDTH = SCREEN_WIDTH - 48; // 24 padding each side
+
+const chartConfig = {
+  backgroundGradientFrom: '#ffffff',
+  backgroundGradientTo: '#ffffff',
+  decimalPlaces: 0,
+  color: (opacity = 1) => `rgba(20, 83, 45, ${opacity})`,      // dark green
+  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+  propsForDots: { r: '4', strokeWidth: '2', stroke: '#16a34a' },
+  barPercentage: 0.6,
+};
+
+const PIE_COLORS = ['#16a34a', '#0284c7', '#d97706', '#7c3aed'];
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
@@ -19,11 +36,15 @@ type TopTab = 'analytics' | 'shopping';
 interface BranchRevenue { branchName: string; revenue: number; orderCount: number; }
 interface TopItem { itemName: string; totalQuantitySold: number; totalRevenue: number; }
 interface LowStockItem { itemName: string; branchName: string; stockQuantity: number; }
+interface DailyRevenue { date: string; revenue: number; }
+interface OrderTypeSplit { type: string; count: number; revenue: number; }
 interface Analytics {
   totalRevenue: number;
   revenueByBranch: BranchRevenue[];
   topSellingItems: TopItem[];
   lowStockAlerts: LowStockItem[];
+  revenueOverTime: DailyRevenue[];
+  orderTypeSplit: OrderTypeSplit[];
 }
 
 export default function ShareholderHomeTab() {
@@ -111,21 +132,86 @@ function AnalyticsView() {
         </Text>
       </View>
 
+      {/* Revenue over time — line chart */}
+      <Text style={styles.sectionTitle}>Revenue · last 14 days</Text>
+      <View style={styles.chartCard}>
+        <LineChart
+          data={{
+            labels: analytics.revenueOverTime.map((d, i) => {
+              const dt = new Date(d.date);
+              return i % 3 === 0 ? `${dt.getDate()}/${dt.getMonth() + 1}` : '';
+            }),
+            datasets: [{ data: analytics.revenueOverTime.map(d => d.revenue) }],
+          }}
+          width={CHART_WIDTH}
+          height={200}
+          chartConfig={chartConfig}
+          bezier
+          yAxisLabel="Rs "
+          yAxisSuffix=""
+          style={styles.chart}
+        />
+      </View>
+
+      {/* Revenue by branch — bar chart */}
       <Text style={styles.sectionTitle}>Revenue by Branch</Text>
-      {analytics.revenueByBranch.length === 0
-        ? <Text style={styles.emptyNote}>No orders yet.</Text>
-        : analytics.revenueByBranch.map((b, i) => (
-          <View key={i} style={styles.rowCard}>
-            <View>
-              <Text style={styles.rowPrimary}>{b.branchName}</Text>
-              <Text style={styles.rowSecondary}>{b.orderCount} orders</Text>
-            </View>
-            <Text style={styles.rowValue}>
-              Rs {b.revenue.toLocaleString('en-NP', { minimumFractionDigits: 2 })}
-            </Text>
+      {analytics.revenueByBranch.length === 0 ? (
+        <Text style={styles.emptyNote}>No orders yet.</Text>
+      ) : (
+        <>
+          <View style={styles.chartCard}>
+            <BarChart
+              data={{
+                labels: analytics.revenueByBranch.map(b => b.branchName.replace('Blueberry Mart ', '')),
+                datasets: [{ data: analytics.revenueByBranch.map(b => b.revenue) }],
+              }}
+              width={CHART_WIDTH}
+              height={220}
+              chartConfig={chartConfig}
+              yAxisLabel="Rs "
+              yAxisSuffix=""
+              fromZero
+              showValuesOnTopOfBars
+              style={styles.chart}
+            />
           </View>
-        ))
-      }
+          {analytics.revenueByBranch.map((b, i) => (
+            <View key={i} style={styles.rowCard}>
+              <View>
+                <Text style={styles.rowPrimary}>{b.branchName}</Text>
+                <Text style={styles.rowSecondary}>{b.orderCount} orders</Text>
+              </View>
+              <Text style={styles.rowValue}>
+                Rs {b.revenue.toLocaleString('en-NP', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          ))}
+        </>
+      )}
+
+      {/* Pickup vs Delivery — pie chart */}
+      {analytics.orderTypeSplit.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Pickup vs Delivery</Text>
+          <View style={styles.chartCard}>
+            <PieChart
+              data={analytics.orderTypeSplit.map((s, i) => ({
+                name: s.type === 'delivery' ? 'Delivery' : 'Pickup',
+                population: s.count,
+                color: PIE_COLORS[i % PIE_COLORS.length],
+                legendFontColor: '#374151',
+                legendFontSize: 13,
+              }))}
+              width={CHART_WIDTH}
+              height={170}
+              chartConfig={chartConfig}
+              accessor="population"
+              backgroundColor="transparent"
+              paddingLeft="12"
+            />
+          </View>
+        </>
+      )}
 
       <Text style={styles.sectionTitle}>Top Selling Items</Text>
       {analytics.topSellingItems.length === 0
@@ -202,6 +288,13 @@ const styles = StyleSheet.create({
   revenueLabel: { color: '#bbf7d0', fontSize: 13, marginBottom: 6 },
   revenueValue: { color: '#ffffff', fontSize: 28, fontWeight: '700' },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 10, marginTop: 4 },
+  chartCard: {
+    backgroundColor: '#ffffff', borderRadius: 14, paddingVertical: 12,
+    marginBottom: 16, alignItems: 'center', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+  },
+  chart: { borderRadius: 12 },
   alertCount: { color: '#dc2626', fontWeight: '700' },
   rowCard: {
     backgroundColor: '#ffffff', borderRadius: 10, padding: 14,
