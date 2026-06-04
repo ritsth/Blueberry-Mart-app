@@ -40,6 +40,14 @@ builder.Services.AddControllers()
 builder.Services.AddDbContext<BlueberryMartDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Review image storage: GCS when a bucket is configured, otherwise local filesystem
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Gcs:BucketName"]))
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IReviewImageStorage,
+        BlueberryMart.Api.Services.GcsReviewImageStorage>();
+else
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IReviewImageStorage,
+        BlueberryMart.Api.Services.LocalReviewImageStorage>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {

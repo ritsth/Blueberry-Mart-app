@@ -85,7 +85,9 @@ export default function ReviewScreen({ navigation, route }: Props) {
       formData.append('comment', comment.trim());
 
       if (photo) {
-        const ext      = photo.uri.split('.').pop() ?? 'jpg';
+        const rawExt = (photo.uri.split('.').pop() ?? 'jpg').toLowerCase();
+        const ext    = rawExt === 'jpg' ? 'jpeg' : rawExt;
+        // Normalize so "jpg" maps to the correct "image/jpeg" the backend expects
         const mimeType = photo.mimeType ?? `image/${ext}`;
         formData.append('image', {
           uri:  photo.uri,

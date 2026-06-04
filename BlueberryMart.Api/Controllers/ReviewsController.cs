@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/reviews")]
 [Authorize(Roles = "Customer,Shareholder")]
-public class ReviewsController(BlueberryMartDbContext context, IWebHostEnvironment env) : ControllerBase
+public class ReviewsController(BlueberryMartDbContext context, IReviewImageStorage imageStorage) : ControllerBase
 {
     private const int TextReviewPoints = 10;
     private const int PhotoReviewPoints = 20;
@@ -57,22 +58,11 @@ public class ReviewsController(BlueberryMartDbContext context, IWebHostEnvironme
         string? savedImagePath = null;
         if (image is not null)
         {
-            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
-            if (!allowedTypes.Contains(image.ContentType.ToLower()))
+            var ext = IReviewImageStorage.ResolveExtension(image.ContentType);
+            if (ext is null)
                 return BadRequest(new { message = "Only JPEG, PNG, and WebP images are allowed." });
 
-            var uploadDir = Path.Combine(env.WebRootPath, "images", "reviews");
-            Directory.CreateDirectory(uploadDir);
-
-            var ext = Path.GetExtension(image.FileName);
-            var fileName = $"{Guid.NewGuid()}{ext}";
-            var fullPath = Path.Combine(uploadDir, fileName);
-
-            await using var stream = System.IO.File.Create(fullPath);
-            await image.CopyToAsync(stream);
-
-            // Store a relative path for future cloud bucket migration
-            savedImagePath = $"/images/reviews/{fileName}";
+            savedImagePath = await imageStorage.SaveAsync(image, ext);
         }
 
         var review = new Review
