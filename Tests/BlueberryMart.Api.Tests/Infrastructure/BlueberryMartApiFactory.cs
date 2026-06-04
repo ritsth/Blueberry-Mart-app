@@ -41,7 +41,7 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
         var context = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
 
         await context.Database.EnsureDeletedAsync();
-        await context.Database.EnsureCreatedAsync();
+        // DbInitializer.Initialize runs Migrate() to build the schema from migrations, then seeds
         DbInitializer.Initialize(context);
 
         DowntownBranchId = (await context.Branches.FirstAsync(b => b.Name == "Blueberry Mart Downtown")).Id;

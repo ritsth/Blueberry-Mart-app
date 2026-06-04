@@ -7,7 +7,9 @@ public static class DbInitializer
 {
     public static void Initialize(BlueberryMartDbContext context)
     {
-        context.Database.EnsureCreated();
+        // Apply any pending EF Core migrations (creates the schema on a fresh DB,
+        // brings an existing DB up to date). Replaces the old EnsureCreated().
+        context.Database.Migrate();
 
         if (context.Branches.Any() || context.Users.Any()) return;
 
