@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getStoredToken } from '../services/authService';
+import EsewaCheckout, { PaymentOutcome } from './EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
@@ -47,6 +48,9 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   const [cartVisible, setCartVisible]           = useState(false);
   const [expandedCartId, setExpandedCartId]     = useState<string | null>(null);
   const [placingId, setPlacingId]               = useState<string | null>(null);
+  const [payOrder, setPayOrder]                 = useState<{
+    id: string; orderNumber: number; total: number; mode: OrderMode; items: { id: string; name: string }[];
+  } | null>(null);
   const [loadingBranches, setLoadingBranches]   = useState(true);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [refreshing, setRefreshing]             = useState(false);
@@ -252,21 +256,62 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
       if (Object.keys(carts).length <= 1) setCartVisible(false);
       if (selectedBranch?.id === branchId) selectBranch(selectedBranch);
 
-      const fulfilment = mode === 'delivery'
-        ? `\nDelivery — track with this number.`
-        : `\nShow order #${data.orderNumber} at the counter to collect.`;
-      Alert.alert(
-        `Order #${data.orderNumber} Placed!`,
-        `Total: Rs ${data.totalAmount?.toFixed(2)}\nLoyalty points earned: ${data.loyaltyPointsEarned}${fulfilment}`,
-        [
-          { text: 'Done', style: 'cancel' },
-          { text: 'Write a Review', onPress: () => navigation.navigate('ReviewScreen', { orderId: data.id, items: orderedItems }) },
-        ],
-      );
+      // The order is created as 'pending'; collect payment via eSewa before it's confirmed.
+      setPayOrder({
+        id: data.id,
+        orderNumber: data.orderNumber,
+        total: data.totalAmount,
+        mode,
+        items: orderedItems,
+      });
     } catch {
       Alert.alert('Error', 'Could not place order. Check your connection.');
     } finally {
       setPlacingId(null);
+    }
+  }
+
+  // Called when the eSewa WebView reports the payment outcome.
+  async function onPaymentClose(outcome: PaymentOutcome) {
+    const order = payOrder;
+    setPayOrder(null);
+    if (!order) return;
+
+    // The WebView may close before we catch the result page; confirm the real
+    // state with the backend so we never report "not paid" on a paid order.
+    let paid = outcome === 'success';
+    if (!paid) {
+      try {
+        const token = await getStoredToken();
+        const res = await fetch(`${API_BASE}/api/orders/${order.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          paid = data?.payment?.status === 'completed';
+        }
+      } catch { /* fall back to the reported outcome */ }
+    }
+
+    if (paid) {
+      const fulfilment = order.mode === 'delivery'
+        ? `\nDelivery — track with order #${order.orderNumber}.`
+        : `\nShow order #${order.orderNumber} at the counter to collect.`;
+      Alert.alert(
+        `Payment successful — Order #${order.orderNumber} confirmed!`,
+        `Paid Rs ${order.total?.toFixed(2)}${fulfilment}`,
+        [
+          { text: 'Done', style: 'cancel' },
+          { text: 'Write a Review', onPress: () => navigation.navigate('ReviewScreen', { orderId: order.id, items: order.items }) },
+        ],
+      );
+    } else {
+      Alert.alert(
+        `Order #${order.orderNumber} not paid`,
+        outcome === 'cancelled'
+          ? 'Payment was cancelled. Your order is saved as pending.'
+          : 'Payment did not complete. Your order is saved as pending.',
+      );
     }
   }
 
@@ -338,6 +383,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
           onToggle={id => setExpandedCartId(prev => prev === id ? null : id)}
           onUpdateQty={updateQty} onPlaceOrder={placeOrder}
         />
+        <EsewaCheckout orderId={payOrder?.id ?? null} onClose={onPaymentClose} />
       </View>
     );
   }

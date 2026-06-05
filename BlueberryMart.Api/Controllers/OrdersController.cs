@@ -15,6 +15,41 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
 {
     public const decimal DeliveryFee = 100m; // flat delivery fee, waived for members
 
+    // GET /api/orders/{id}
+    // Lets the app read an order's current state — including payment status — after
+    // the eSewa redirect, rather than trusting the deep link alone.
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetOrder(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var order = await context.Orders
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
+        if (order is null)
+            return NotFound(new { message = "Order not found." });
+
+        var payment = await context.Payments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.OrderId == id);
+
+        return Ok(new
+        {
+            order.Id,
+            order.OrderNumber,
+            order.Status,
+            order.OrderType,
+            order.TotalAmount,
+            order.DiscountAmount,
+            order.DeliveryFee,
+            order.DeliveryAddress,
+            order.CreatedAt,
+            Payment = payment is null
+                ? null
+                : (object)new { payment.Status, payment.TransactionUuid, payment.ProviderRef }
+        });
+    }
+
     // POST /api/orders
     [HttpPost]
     public async Task<IActionResult> PlaceOrder([FromBody] PlaceOrderRequest request)
@@ -125,12 +160,8 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
                 });
             }
 
-            // Credit loyalty points: 1 point per whole unit of goods value (excludes delivery fee)
-            if (user is not null)
-            {
-                user.LoyaltyPoints += (int)Math.Floor(goodsTotal);
-                user.UpdatedAt = DateTime.UtcNow;
-            }
+            // Loyalty points are credited later, when the eSewa payment completes
+            // (see PaymentsController.Success) — not at placement, so unpaid orders earn nothing.
 
             await context.SaveChangesAsync();
             await transaction.CommitAsync();

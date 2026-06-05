@@ -128,4 +128,41 @@ public class OrdersControllerTests
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task GetOrder_OwnOrder_ReturnsStatusAndUnpaidPayment()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, _eggsItemId);
+
+        var req = new HttpRequestMessage(HttpMethod.Get, $"/api/orders/{orderId}").WithBearer(token);
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("pending", json.GetProperty("status").GetString());
+        // No payment has been initiated yet, so payment is null.
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("payment").ValueKind);
+    }
+
+    [Fact]
+    public async Task GetOrder_AnotherUsersOrder_ReturnsNotFound()
+    {
+        // Shareholder places an order; a customer must not be able to read it back.
+        var ownerToken = await TestHelpers.GetShareholderTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, ownerToken, _downtownBranchId, _milkItemId);
+
+        var otherToken = await TestHelpers.GetCustomerTokenAsync(_client);
+        var req = new HttpRequestMessage(HttpMethod.Get, $"/api/orders/{orderId}").WithBearer(otherToken);
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOrder_WithoutAuth_ReturnsUnauthorized()
+    {
+        var resp = await _client.GetAsync($"/api/orders/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
 }

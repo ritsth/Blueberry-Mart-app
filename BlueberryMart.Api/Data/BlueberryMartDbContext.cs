@@ -12,12 +12,14 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Address> Addresses => Set<Address>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresEnum("user_role", ["customer", "shareholder"]);
         modelBuilder.HasPostgresEnum("order_type", ["pickup", "delivery"]);
         modelBuilder.HasPostgresEnum("order_status", ["pending", "confirmed", "processing", "ready", "completed", "cancelled"]);
+        modelBuilder.HasPostgresEnum("payment_status", ["initiated", "completed", "failed"]);
 
         // Human-friendly sequential order numbers, starting at 1001
         modelBuilder.HasSequence<int>("order_number_seq").StartsAt(1001);
@@ -143,6 +145,23 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(a => a.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.HasOne(a => a.User).WithMany(u => u.Addresses).HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(a => a.UserId);
+        });
+
+        modelBuilder.Entity<Payment>(e =>
+        {
+            e.ToTable("payments");
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(p => p.OrderId).HasColumnName("order_id");
+            e.Property(p => p.TransactionUuid).HasColumnName("transaction_uuid").IsRequired();
+            e.Property(p => p.Amount).HasColumnName("amount").HasColumnType("numeric(12,2)");
+            e.Property(p => p.Status).HasColumnName("status").HasDefaultValue("initiated");
+            e.Property(p => p.ProviderRef).HasColumnName("provider_ref");
+            e.Property(p => p.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
+            e.HasOne(p => p.Order).WithMany().HasForeignKey(p => p.OrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(p => p.OrderId).IsUnique();
+            e.HasIndex(p => p.TransactionUuid).IsUnique();
         });
     }
 }

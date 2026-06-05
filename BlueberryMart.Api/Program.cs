@@ -40,6 +40,12 @@ builder.Services.AddControllers()
 builder.Services.AddDbContext<BlueberryMartDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// eSewa payment integration
+builder.Services.Configure<BlueberryMart.Api.Configuration.EsewaOptions>(
+    builder.Configuration.GetSection("Esewa"));
+builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IEsewaPaymentService,
+    BlueberryMart.Api.Services.EsewaPaymentService>();
+
 // Review image storage: GCS when a bucket is configured, otherwise local filesystem
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Gcs:BucketName"]))
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IReviewImageStorage,
