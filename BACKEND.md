@@ -78,6 +78,7 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `GET /api/addresses` · `POST` · `PUT /{id}/default` · `DELETE /{id}` | any | Manage addresses |
 | `GET /api/membership/status` · `POST /activate` · `POST /cancel` | any | Blueberry Plus membership |
 | `GET /api/shareholders/analytics` | Shareholder | Sales analytics + charts |
+| `GET /api/shareholders/inventory-analytics` | Shareholder | Stock-movement analytics from BigQuery (Kafka pipeline) |
 
 ## Key business rules
 - **Membership (Blueberry Plus):** 5% member discount on goods, free delivery

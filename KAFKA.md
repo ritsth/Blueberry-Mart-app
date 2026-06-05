@@ -5,8 +5,9 @@ an event stream. End goal: item **availability per branch**, **"notify me when b
 in stock"** (Sephora-style), and **analytics in BigQuery** — all fed by one stream
 of stock-change events.
 
-**Status:** ✅ **Stages 1 & 2 shipped** (events flow, and drive back-in-stock
-notifications). Stage 3 (BigQuery) planned.
+**Status:** ✅ **Stages 1–3 working locally** — events flow, drive back-in-stock
+notifications, and stream to BigQuery for analytics. Production roll-out (managed
+Kafka) is the remaining step.
 
 ---
 
@@ -101,6 +102,28 @@ scoped `DbContext` per message.
 > producer** (no broker), restocks emit nothing and no back-in-stock notifications
 > fire there yet. The feature goes live in prod once managed Kafka is added.
 
+## Stage 3 — BigQuery analytics warehouse (DONE)
+
+A **second consumer group** streams the same events into BigQuery — Kafka fan-out:
+the back-in-stock consumer and this sink read the stream independently.
+
+**Files / infra**
+- BigQuery dataset `blueberrymart`, table `stock_events` (created via `bq`).
+- `Configuration/BigQueryOptions.cs` — bound from the `"BigQuery"` section (opt-in via `ProjectId`).
+- `Services/BigQueryStockSink.cs` — `BackgroundService` consumer (group
+  `blueberrymart-bigquery-sink`) that streaming-inserts each event into the table.
+- `Services/BigQueryInventoryAnalytics.cs` (+ `DisabledInventoryAnalytics`) — queries BQ.
+- `Controllers/ShareholderController.cs` — `GET /api/shareholders/inventory-analytics`
+  (reports `enabled:false` when BigQuery isn't configured).
+- `Program.cs` — registers the analytics service always (real vs disabled) and the
+  sink only when **both** Kafka and BigQuery are configured.
+
+**Concepts:** **fan-out** (multiple consumer groups, one topic), a streaming **sink**
+to a warehouse, and OLAP **analytics** (`GROUP BY reason`) vs the OLTP Postgres reads.
+
+> BigQuery is cloud-only: locally the app uses **Application Default Credentials**
+> (`gcloud auth application-default login`) against a real BQ dataset in the project.
+
 ## Running it locally
 
 ```bash
@@ -128,14 +151,6 @@ docker compose down           # broker (+ -v to wipe topic data)
 ---
 
 ## Roadmap
-
-### Stage 3 — BigQuery analytics warehouse
-- A sink (a `.NET` consumer, or the **Kafka Connect BigQuery Sink**) streams events
-  into a BigQuery `stock_events` table.
-- Rebuild/augment the shareholder analytics (`/api/shareholders/analytics`, currently
-  Cloud SQL) from BigQuery SQL.
-- Wrinkle: BigQuery is cloud-only, so this is **local Kafka + a real BQ dataset** in
-  the GCP project.
 
 ### Production (later, separate effort)
 Production Kafka needs an always-on broker (managed: Confluent / Redpanda Cloud / GCP

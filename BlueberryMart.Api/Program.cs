@@ -69,6 +69,20 @@ else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
         BlueberryMart.Api.Services.NoOpStockEventProducer>();
 
+// BigQuery analytics warehouse: opt-in via BigQuery:ProjectId. The sink (Kafka ->
+// BigQuery) runs only when both Kafka and BigQuery are configured.
+builder.Services.Configure<BlueberryMart.Api.Configuration.BigQueryOptions>(
+    builder.Configuration.GetSection("BigQuery"));
+var bigQueryConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["BigQuery:ProjectId"]);
+if (bigQueryConfigured)
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IInventoryAnalytics,
+        BlueberryMart.Api.Services.BigQueryInventoryAnalytics>();
+else
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IInventoryAnalytics,
+        BlueberryMart.Api.Services.DisabledInventoryAnalytics>();
+if (bigQueryConfigured && !string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]))
+    builder.Services.AddHostedService<BlueberryMart.Api.Services.BigQueryStockSink>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {

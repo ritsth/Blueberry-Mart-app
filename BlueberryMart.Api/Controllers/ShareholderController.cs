@@ -1,4 +1,5 @@
 using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/shareholders")]
 [Authorize(Roles = "Shareholder")]
-public class ShareholderController(BlueberryMartDbContext context) : ControllerBase
+public class ShareholderController(BlueberryMartDbContext context, IInventoryAnalytics inventoryAnalytics) : ControllerBase
 {
     // GET /api/shareholders/analytics
     [HttpGet("analytics")]
@@ -91,5 +92,18 @@ public class ShareholderController(BlueberryMartDbContext context) : ControllerB
             RevenueOverTime = revenueOverTime,
             OrderTypeSplit = orderTypeSplit
         });
+    }
+
+    // GET /api/shareholders/inventory-analytics
+    // Stock movement from the BigQuery event warehouse. Reports enabled=false when
+    // BigQuery isn't configured (e.g. production today).
+    [HttpGet("inventory-analytics")]
+    public async Task<IActionResult> GetInventoryAnalytics(CancellationToken ct)
+    {
+        if (!inventoryAnalytics.Enabled)
+            return Ok(new { enabled = false, stockMovementByReason = Array.Empty<object>() });
+
+        var movement = await inventoryAnalytics.StockMovementByReasonAsync(ct);
+        return Ok(new { enabled = true, stockMovementByReason = movement });
     }
 }
