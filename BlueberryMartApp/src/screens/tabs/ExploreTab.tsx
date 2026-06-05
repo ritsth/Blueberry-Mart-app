@@ -3,11 +3,11 @@ import {
   ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Catalog, MeasureSpec, QueryResult, QuerySpec, SavedReport,
-  createReport, getCatalog, runQuery, updateReport,
+  createReport, getCatalog, listReports, runQuery, updateReport,
 } from '../../services/analyticsService';
 import { ChartType, ResultView } from '../../components/ReportChart';
 
@@ -88,6 +88,24 @@ export default function ExploreTab() {
     }
   }, [route.params?.report]);
 
+  // If the loaded report was deleted elsewhere (e.g. on the Analytics page), drop
+  // the stale binding so the button reverts from "Update" to "Save".
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!loadedReportId) return;
+      let alive = true;
+      (async () => {
+        try {
+          const list = await listReports();
+          if (alive && !list.some(r => r.id === loadedReportId)) setLoadedReportId(null);
+        } catch {
+          // ignore; the save-fallback still protects us
+        }
+      })();
+      return () => { alive = false; };
+    }, [loadedReportId]),
+  );
+
   async function runSpec(spec: QuerySpec) {
     setRunning(true);
     setRunError(null);
@@ -143,8 +161,18 @@ export default function ExploreTab() {
     setSaving(true);
     try {
       const spec = buildSpec(measures, dims, year, completedOnly, chartType);
-      if (loadedReportId && !asNew) await updateReport(loadedReportId, saveName.trim(), spec);
-      else { const r = await createReport(saveName.trim(), spec); setLoadedReportId(r.id); }
+      if (loadedReportId && !asNew) {
+        try {
+          await updateReport(loadedReportId, saveName.trim(), spec);
+        } catch {
+          // report was likely deleted elsewhere — save it as a new one instead
+          const r = await createReport(saveName.trim(), spec);
+          setLoadedReportId(r.id);
+        }
+      } else {
+        const r = await createReport(saveName.trim(), spec);
+        setLoadedReportId(r.id);
+      }
       setSaveOpen(false);
     } catch (e: any) {
       Alert.alert('Save failed', e?.message ?? 'Could not save.');
