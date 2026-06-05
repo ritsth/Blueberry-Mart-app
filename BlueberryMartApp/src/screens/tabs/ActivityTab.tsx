@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   RefreshControl,
   ScrollView,
@@ -12,6 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
+import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
@@ -37,8 +39,18 @@ export default function ActivityTab() {
   const [refreshing, setRefreshing]   = useState(false);
   const [activeTab, setActiveTab]     = useState<'orders' | 'reviews'>('orders');
   const [expandedId, setExpandedId]   = useState<string | null>(null);
+  const [payOrderId, setPayOrderId]   = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
+
+  // Retry payment for an unpaid (pending) order from the Activity list.
+  async function onPaymentClose(outcome: PaymentOutcome) {
+    setPayOrderId(null);
+    await fetchData(); // refresh statuses so a now-paid order drops the "Not paid" tag
+    if (outcome === 'success') {
+      Alert.alert('Payment successful', 'Your order is confirmed.');
+    }
+  }
 
   async function onRefresh() {
     setRefreshing(true);
@@ -69,6 +81,7 @@ export default function ActivityTab() {
   const reviews = data?.reviews ?? [];
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
@@ -117,8 +130,10 @@ export default function ActivityTab() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.orderTotal}>Rs {order.totalAmount.toFixed(2)}</Text>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>{order.status}</Text>
+                  <View style={[styles.statusBadge, order.status === 'pending' && styles.notPaidBadge]}>
+                    <Text style={[styles.statusText, order.status === 'pending' && styles.notPaidText]}>
+                      {order.status === 'pending' ? 'Not paid' : order.status}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -138,6 +153,16 @@ export default function ActivityTab() {
                     Pickup · show <Text style={styles.pickupCode}>#{order.orderNumber}</Text> at the counter
                   </Text>
                 </View>
+              )}
+
+              {order.status === 'pending' && (
+                <TouchableOpacity
+                  style={styles.payButton}
+                  onPress={() => setPayOrderId(order.id)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.payButtonText}>Pay now with eSewa</Text>
+                </TouchableOpacity>
               )}
 
               {expandedId === order.id && (
@@ -189,6 +214,8 @@ export default function ActivityTab() {
 
       <View style={{ height: 16 }} />
     </ScrollView>
+    <EsewaCheckout orderId={payOrderId} onClose={onPaymentClose} />
+    </>
   );
 }
 
@@ -232,6 +259,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2, paddingHorizontal: 8,
   },
   statusText: { fontSize: 11, fontWeight: '600', color: '#92400e' },
+  notPaidBadge: { backgroundColor: '#fee2e2' },
+  notPaidText: { color: '#b91c1c' },
+  payButton: {
+    backgroundColor: '#16a34a', borderRadius: 8,
+    paddingVertical: 10, alignItems: 'center', marginTop: 12,
+  },
+  payButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
   itemsContainer: { borderTopWidth: 1, borderTopColor: '#f0fdf4', marginTop: 10, paddingTop: 10, gap: 6 },
   itemRow: { flexDirection: 'row', alignItems: 'center' },
   itemName: { flex: 1, fontSize: 13, color: '#374151' },
