@@ -37,6 +37,9 @@ interface ProfileData {
   orders: Order[];
   reviews: Review[];
 }
+interface AppNotification {
+  id: string; message: string; inventoryId?: string | null; isRead: boolean; createdAt: string;
+}
 
 export default function ActivityTab() {
   const insets = useSafeAreaInsets();
@@ -44,9 +47,11 @@ export default function ActivityTab() {
   const [data, setData]               = useState<ProfileData | null>(null);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
-  const [activeTab, setActiveTab]     = useState<'orders' | 'reviews'>('orders');
+  const [activeTab, setActiveTab]     = useState<'orders' | 'reviews' | 'notifications'>('orders');
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [payOrderId, setPayOrderId]   = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unread, setUnread]           = useState(0);
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
@@ -87,13 +92,34 @@ export default function ActivityTab() {
   async function fetchData() {
     try {
       const token = await getStoredToken();
-      const res = await fetch(`${API_BASE}/api/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) setData(await res.json());
+      const auth = { headers: { Authorization: `Bearer ${token}` } };
+      const [pRes, nRes] = await Promise.all([
+        fetch(`${API_BASE}/api/profile`, auth),
+        fetch(`${API_BASE}/api/notifications`, auth),
+      ]);
+      if (pRes.ok) setData(await pRes.json());
+      if (nRes.ok) {
+        const n = await nRes.json();
+        setNotifications(n.notifications ?? []);
+        setUnread(n.unread ?? 0);
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  // Open the notifications tab and mark everything read.
+  async function openNotifications() {
+    setActiveTab('notifications');
+    if (unread === 0) return;
+    try {
+      const token = await getStoredToken();
+      await fetch(`${API_BASE}/api/notifications/read`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      });
+      setUnread(0);
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch { /* ignore */ }
   }
 
   if (loading) {
@@ -133,6 +159,14 @@ export default function ActivityTab() {
         >
           <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
             Reviews ({reviews.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'notifications' && styles.tabActive]}
+          onPress={openNotifications}
+        >
+          <Text style={[styles.tabText, activeTab === 'notifications' && styles.tabTextActive]}>
+            Alerts{unread > 0 ? ` (${unread})` : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -260,6 +294,19 @@ export default function ActivityTab() {
           ))
       )}
 
+      {activeTab === 'notifications' && (
+        notifications.length === 0
+          ? <Text style={styles.empty}>No notifications yet.</Text>
+          : notifications.map(n => (
+            <View key={n.id} style={[styles.card, !n.isRead && styles.cardUnread]}>
+              <Text style={styles.notifMessage}>{n.message}</Text>
+              <Text style={styles.notifDate}>
+                {new Date(n.createdAt).toLocaleString('en-NP', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          ))
+      )}
+
       <View style={{ height: 16 }} />
     </ScrollView>
     <EsewaCheckout orderId={payOrderId} onClose={onPaymentClose} />
@@ -324,6 +371,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center', marginTop: 12,
   },
   receiveButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  cardUnread: { borderLeftWidth: 3, borderLeftColor: '#16a34a' },
+  notifMessage: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 4 },
+  notifDate: { fontSize: 12, color: '#9ca3af' },
   itemsContainer: { borderTopWidth: 1, borderTopColor: '#f0fdf4', marginTop: 10, paddingTop: 10, gap: 6 },
   itemRow: { flexDirection: 'row', alignItems: 'center' },
   itemName: { flex: 1, fontSize: 13, color: '#374151' },

@@ -185,8 +185,10 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
     try {
       const token = await getStoredToken();
       const endpoint = isBulk ? 'bulk' : 'customer';
+      // Show sold-out items in the regular catalogue so customers can subscribe to them.
+      const qs = isBulk ? '' : '&includeOutOfStock=true';
       const res = await fetch(
-        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}`,
+        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}${qs}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error();
@@ -219,6 +221,24 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
       if (updated.length === 0) { const { [branchId]: _, ...rest } = prev; return rest; }
       return { ...prev, [branchId]: { ...bc, items: updated } };
     });
+  }
+
+  // Subscribe to a back-in-stock notification for a sold-out item.
+  async function notifyMe(item: InventoryItem) {
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/inventory/${item.id}/notify-me`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      Alert.alert(
+        res.ok ? "You're on the list" : 'Heads up',
+        body.message ?? (res.ok ? "We'll notify you when it's back." : 'Could not subscribe.'),
+      );
+    } catch {
+      Alert.alert('Error', 'Could not subscribe. Check your connection.');
+    }
   }
 
   async function placeOrder(branchId: string) {
@@ -346,13 +366,20 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
             ListEmptyComponent={<Text style={styles.emptyNote}>{isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}</Text>}
             renderItem={({ item }) => {
               const inCart = carts[selectedBranch.id]?.items.find(c => c.itemId === item.id);
+              const outOfStock = item.stockQuantity <= 0;
               return (
-                <View style={styles.itemCard}>
+                <View style={[styles.itemCard, outOfStock && styles.itemCardMuted]}>
                   <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.itemName}</Text>
-                    <Text style={styles.itemMeta}>Rs {item.price.toFixed(2)}{'  ·  '}{item.stockQuantity} in stock</Text>
+                    <Text style={[styles.itemName, outOfStock && styles.itemNameMuted]}>{item.itemName}</Text>
+                    <Text style={styles.itemMeta}>
+                      Rs {item.price.toFixed(2)}{'  ·  '}{outOfStock ? 'Out of stock' : `${item.stockQuantity} in stock`}
+                    </Text>
                   </View>
-                  {inCart ? (
+                  {outOfStock ? (
+                    <TouchableOpacity style={styles.notifyButton} onPress={() => notifyMe(item)} activeOpacity={0.8}>
+                      <Text style={styles.notifyButtonText}>🔔 Notify me</Text>
+                    </TouchableOpacity>
+                  ) : inCart ? (
                     <View style={styles.qtyRow}>
                       <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(selectedBranch.id, item.id, -1)}>
                         <Text style={styles.qtyBtnText}>−</Text>
@@ -776,6 +803,10 @@ const styles = StyleSheet.create({
   itemMeta:      { fontSize: 12, color: '#6b7280' },
   addButton:     { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 },
   addButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 13 },
+  itemCardMuted: { backgroundColor: '#f9fafb' },
+  itemNameMuted: { color: '#9ca3af' },
+  notifyButton:  { backgroundColor: '#fff', borderWidth: 1, borderColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12 },
+  notifyButtonText: { color: '#16a34a', fontWeight: '700', fontSize: 12 },
   qtyRow:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn:        {
     width: 30, height: 30, borderRadius: 15,

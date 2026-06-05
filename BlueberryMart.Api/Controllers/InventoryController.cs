@@ -16,12 +16,14 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
 {
     [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("customer")]
-    public async Task<ActionResult<IEnumerable<Inventory>>> GetForCustomer([FromQuery] Guid branchId)
+    public async Task<ActionResult<IEnumerable<Inventory>>> GetForCustomer(
+        [FromQuery] Guid branchId, [FromQuery] bool includeOutOfStock = false)
     {
-        var items = await context.Inventory
-            .Where(i => i.BranchId == branchId && i.StockQuantity > 0 && !i.IsBulkOnly)
-            .ToListAsync();
+        var query = context.Inventory.Where(i => i.BranchId == branchId && !i.IsBulkOnly);
+        if (!includeOutOfStock)   // default keeps sold-out items hidden
+            query = query.Where(i => i.StockQuantity > 0);
 
+        var items = await query.OrderByDescending(i => i.StockQuantity > 0).ThenBy(i => i.ItemName).ToListAsync();
         return Ok(items);
     }
 
