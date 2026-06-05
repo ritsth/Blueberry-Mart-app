@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../services/authService';
 import EsewaCheckout, { PaymentOutcome } from './EsewaCheckout';
 
@@ -148,9 +149,10 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   async function runSearch(q: string) {
     try {
       const token = await getStoredToken();
-      const res = await fetch(`${API_BASE}/api/inventory/search?q=${encodeURIComponent(q)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_BASE}/api/inventory/search?q=${encodeURIComponent(q)}${isBulk ? '&bulk=true' : ''}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
       if (!res.ok) throw new Error();
       setSearchResults(await res.json());
     } catch {
@@ -418,23 +420,21 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   // ─── Branch list + search ───────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Search bar (regular shopping only — bulk catalogue isn't searched) */}
-      {!isBulk && (
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search across all branches..."
-            placeholderTextColor="#9ca3af"
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-            autoCorrect={false}
-          />
-          {searching && <ActivityIndicator size="small" color="#9ca3af" style={{ marginRight: 8 }} />}
-        </View>
-      )}
+      {/* Search bar — across all branches (regular or bulk catalogue) */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={isBulk ? 'Search bulk items...' : 'Search across all branches...'}
+          placeholderTextColor="#9ca3af"
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          autoCorrect={false}
+        />
+        {searching && <ActivityIndicator size="small" color="#9ca3af" style={{ marginRight: 8 }} />}
+      </View>
 
       {/* Search results */}
       {isSearching ? (

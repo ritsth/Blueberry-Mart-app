@@ -58,15 +58,16 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
 
     [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string q)
+    public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] bool bulk = false)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
             return Ok(Array.Empty<object>());
 
         var term = q.Trim();
 
+        // bulk=false → regular (non-bulk) catalogue; bulk=true → bulk-only items.
         var matches = await context.Inventory
-            .Where(i => i.StockQuantity > 0 && !i.IsBulkOnly &&
+            .Where(i => i.StockQuantity > 0 && i.IsBulkOnly == bulk &&
                         EF.Functions.ILike(i.ItemName, $"%{term}%"))
             .Include(i => i.Branch)
             .OrderBy(i => i.Branch.Name)
