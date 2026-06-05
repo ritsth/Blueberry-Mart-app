@@ -152,10 +152,32 @@ docker compose down           # broker (+ -v to wipe topic data)
 
 ## Roadmap
 
-### Production (later, separate effort)
-Production Kafka needs an always-on broker (managed: Confluent / Redpanda Cloud / GCP
-Managed Kafka) **and** an always-on consumer — which Cloud Run (scales to zero) isn't
-ideal for. Deferred until the local pipeline is solid.
+### Production roll-out (remaining work)
+
+Everything above runs locally. To run it in production:
+
+1. **Managed broker** — stand up Kafka you don't operate: Confluent Cloud, Redpanda
+   Cloud, or **GCP Managed Service for Apache Kafka**. You get a bootstrap server +
+   SASL credentials.
+2. **Secrets/config** — put `Kafka:BootstrapServers` + SASL username/password in
+   **Secret Manager** and add them to the Cloud Run env (managed Kafka requires
+   `SecurityProtocol=SaslSsl`, which the current `ProducerConfig`/`ConsumerConfig`
+   don't set yet — add it). Set `BigQuery:ProjectId` as an env var.
+3. **Always-on consumers** — the producer is fine on the API (scales to zero), but a
+   **consumer must run continuously**. Cloud Run scales to zero, so either:
+   - run a **separate worker** (Cloud Run service with `--min-instances=1`, a GKE
+     deployment, or a small VM) that hosts `StockEventConsumer` + `BigQueryStockSink`, or
+   - keep them in the API but pin `--min-instances=1`.
+   Splitting the worker out is cleaner (independent scaling, restarts).
+4. **BigQuery IAM** — grant the worker's service account `roles/bigquery.dataEditor`
+   (insert) + `roles/bigquery.jobUser` (query). The Cloud Run SA currently has neither.
+5. **Reliability** — today producing is fire-and-forget *after* the DB commit, so a
+   crash between commit and publish loses the event. For production, add a
+   **transactional outbox** (write the event to an `outbox` table in the same DB
+   transaction; a relay publishes it) to get effectively-once delivery.
+6. **Operational** — a **schema registry** (Avro/Protobuf) instead of raw JSON;
+   **consumer-lag monitoring**; a **dead-letter topic** for poison messages;
+   topic partitioning/retention sizing; and cost/throughput review.
 
 ---
 
