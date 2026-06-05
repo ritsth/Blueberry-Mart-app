@@ -97,5 +97,5 @@ jobs:
             --image ${{ env.IMAGE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html" \
+            --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff" \
             --quiet
