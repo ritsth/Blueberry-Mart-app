@@ -172,12 +172,13 @@ export default function ExploreTab() {
     });
   }
 
-  async function doSave() {
+  // asNew = always create a new report (vs. updating the currently loaded one).
+  async function doSave(asNew: boolean) {
     if (!saveName.trim()) return;
     setSaving(true);
     try {
       const spec = buildSpec(measures, dims, year, completedOnly, chartType);
-      if (loadedReportId) {
+      if (loadedReportId && !asNew) {
         await updateReport(loadedReportId, saveName.trim(), spec);
       } else {
         const r = await createReport(saveName.trim(), spec);
@@ -372,6 +373,12 @@ export default function ExploreTab() {
               <Text style={styles.saveBtnText}>{loadedReportId ? 'Update' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
+          {loadedReportId && (
+            <TouchableOpacity style={styles.detachRow} onPress={() => setLoadedReportId(null)} activeOpacity={0.7}>
+              <Ionicons name="add-circle-outline" size={15} color="#6b7280" />
+              <Text style={styles.detachText}>Editing a saved report — tap to start a new one</Text>
+            </TouchableOpacity>
+          )}
 
           {/* RESULT */}
           {runError && <Text style={styles.errorText}>{runError}</Text>}
@@ -398,8 +405,15 @@ export default function ExploreTab() {
               <TouchableOpacity onPress={() => setSaveOpen(false)} style={styles.modalCancel}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={doSave} style={styles.modalSave} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSaveText}>Save</Text>}
+              {loadedReportId && (
+                <TouchableOpacity onPress={() => doSave(true)} style={styles.modalCancel} disabled={saving}>
+                  <Text style={styles.modalNewText}>Save as new</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => doSave(false)} style={styles.modalSave} disabled={saving}>
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.modalSaveText}>{loadedReportId ? 'Update' : 'Save'}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -581,6 +595,9 @@ const styles = StyleSheet.create({
     borderRadius: 12, borderWidth: 1.5, borderColor: '#14532d', backgroundColor: '#f0fdf4',
   },
   saveBtnText: { color: '#14532d', fontSize: 14, fontWeight: '700' },
+  detachRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
+  detachText: { fontSize: 12, color: '#6b7280' },
+  modalNewText: { fontSize: 14, color: '#14532d', fontWeight: '700' },
 
   // chart
   chartCard: {
