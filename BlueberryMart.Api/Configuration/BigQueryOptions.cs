@@ -11,6 +11,12 @@ public class BigQueryOptions
     public string DatasetId { get; set; } = "blueberrymart";
     public string TableId { get; set; } = "stock_events";
 
+    /// <summary>
+    /// Wide, denormalized fact table (one row per order-line) that backs the
+    /// self-service "Explore" analytics. Seeded by <c>BlueberryMart.SeedGen</c>.
+    /// </summary>
+    public string SalesFactTableId { get; set; } = "sales_fact";
+
     /// <summary>Consumer group for the BigQuery sink (independent of the back-in-stock group).</summary>
     public string ConsumerGroup { get; set; } = "blueberrymart-bigquery-sink";
 }

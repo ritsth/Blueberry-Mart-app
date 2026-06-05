@@ -23,12 +23,14 @@ screens/
     BulkTab.tsx             members-only bulk catalog (wraps ShoppingView)
     ActivityTab.tsx         order history + reviews; pay/review actions
     AccountTab.tsx          profile, loyalty, membership
-    ShareholderHomeTab.tsx  shareholder analytics
+    ShareholderHomeTab.tsx  shareholder analytics (fixed dashboards)
+    ExploreTab.tsx          self-service analytics — build/save custom charts
 components/
   ShoppingView.tsx       branch list, search, cart, checkout (regular + bulk)
   EsewaCheckout.tsx      eSewa payment WebView modal
 services/
   authService.ts         login, JWT storage, role parsing
+  analyticsService.ts    Explore catalog / query / saved-report calls
 navigation/
   CustomerTabs.tsx       bottom tabs for customers
   ShareholderTabs.tsx    bottom tabs for shareholders
@@ -66,7 +68,16 @@ attaches `Authorization: Bearer <token>` and reads the token with `getStoredToke
   loyalty points.
 - **Membership / Account**: activate/cancel Blueberry Plus, view loyalty points and
   membership status.
-- **Shareholder**: analytics dashboard with charts.
+- **Shareholder**: fixed analytics dashboard with charts (`ShareholderHomeTab`), plus
+  a self-service **Explore** tab.
+- **Explore** (`ExploreTab` + `analyticsService`): a self-service report builder for
+  shareholders over the BigQuery warehouse. Fetches `/api/analytics/catalog` and renders
+  catalog-driven pickers (measures + aggregation, group-by dimensions, time range,
+  chart type), POSTs the spec to `/api/analytics/query`, and renders a Bar/Line/Pie
+  chart (`react-native-chart-kit`) with a scrollable data-table fallback. Charts can be
+  **saved** (config only) to `/api/analytics/reports` and re-loaded/re-run against fresh
+  data. When BigQuery isn't configured (e.g. production), the catalog reports
+  `enabled:false` and the tab shows a "warehouse not configured" state.
 
 ## API configuration
 The base URL comes from `EXPO_PUBLIC_API_URL`:

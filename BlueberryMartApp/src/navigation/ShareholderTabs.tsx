@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ShareholderHomeTab from '../screens/tabs/ShareholderHomeTab';
+import ExploreTab         from '../screens/tabs/ExploreTab';
 import BulkTab            from '../screens/tabs/BulkTab';
 import ActivityTab        from '../screens/tabs/ActivityTab';
 import AccountTab         from '../screens/tabs/AccountTab';
@@ -29,6 +30,7 @@ export default function ShareholderTabs() {
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<string, [string, string]> = {
             Home:     ['home',           'home-outline'],
+            Explore:  ['stats-chart',    'stats-chart-outline'],
             Bulk:     ['cube',           'cube-outline'],
             Activity: ['receipt',        'receipt-outline'],
             Account:  ['person-circle',  'person-circle-outline'],
@@ -45,6 +47,7 @@ export default function ShareholderTabs() {
       })}
     >
       <Tab.Screen name="Home"     component={ShareholderHomeTab} />
+      <Tab.Screen name="Explore"  component={ExploreTab} />
       <Tab.Screen name="Bulk"     component={BulkTab} />
       <Tab.Screen name="Activity" component={ActivityTab} />
       <Tab.Screen name="Account"  component={AccountTab} />
