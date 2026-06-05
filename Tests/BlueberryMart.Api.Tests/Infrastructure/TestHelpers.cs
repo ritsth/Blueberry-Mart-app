@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +18,25 @@ public static class TestHelpers
         var order = await ctx.Orders.FirstAsync(o => o.Id == orderId);
         order.Status = status;
         await ctx.SaveChangesAsync();
+    }
+
+    /// <summary>Creates a fresh inventory item (default out of stock) so tests don't disturb seeded items.</summary>
+    public static async Task<Guid> CreateInventoryItemAsync(
+        BlueberryMartApiFactory factory, Guid branchId, string name, int stock = 0)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var item = new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BranchId = branchId,
+            ItemName = name,
+            StockQuantity = stock,
+            Price = 100m
+        };
+        ctx.Inventory.Add(item);
+        await ctx.SaveChangesAsync();
+        return item.Id;
     }
 
     public static async Task<string> GetCustomerTokenAsync(HttpClient client)

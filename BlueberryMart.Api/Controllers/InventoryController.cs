@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Models.Events;
+using BlueberryMart.Api.Models.Requests;
+using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +12,7 @@ namespace BlueberryMart.Api.Controllers;
 
 [ApiController]
 [Route("api/inventory")]
-public class InventoryController(BlueberryMartDbContext context) : ControllerBase
+public class InventoryController(BlueberryMartDbContext context, IStockEventProducer stockEvents) : ControllerBase
 {
     [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("customer")]
@@ -89,5 +92,69 @@ public class InventoryController(BlueberryMartDbContext context) : ControllerBas
             });
 
         return Ok(grouped);
+    }
+
+    // POST /api/inventory/{id}/restock
+    // Shareholder adds stock. Emits a stock-changed event (reason "restock"), which
+    // the Kafka consumer turns into back-in-stock notifications when it crosses 0.
+    [Authorize(Roles = "Shareholder")]
+    [HttpPost("{id:guid}/restock")]
+    public async Task<IActionResult> Restock(Guid id, [FromBody] RestockRequest request)
+    {
+        if (request.Quantity <= 0)
+            return BadRequest(new { message = "Quantity must be positive." });
+
+        var item = await context.Inventory.FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null)
+            return NotFound(new { message = "Item not found." });
+
+        var oldQty = item.StockQuantity;
+        item.StockQuantity += request.Quantity;
+        item.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        stockEvents.Publish(new StockChangedEvent(
+            ItemId: item.Id,
+            BranchId: item.BranchId,
+            ItemName: item.ItemName,
+            OldQuantity: oldQty,
+            NewQuantity: item.StockQuantity,
+            Reason: "restock",
+            OccurredAt: DateTime.UtcNow));
+
+        return Ok(new { item.Id, item.ItemName, item.StockQuantity });
+    }
+
+    // POST /api/inventory/{id}/notify-me
+    // Customer subscribes to a back-in-stock notification for an out-of-stock item.
+    [Authorize(Roles = "Customer,Shareholder")]
+    [HttpPost("{id:guid}/notify-me")]
+    public async Task<IActionResult> NotifyMe(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var item = await context.Inventory.FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null)
+            return NotFound(new { message = "Item not found." });
+
+        if (item.StockQuantity > 0)
+            return Conflict(new { message = "This item is already in stock." });
+
+        // Idempotent: one active subscription per user+item.
+        var existing = await context.StockSubscriptions
+            .AnyAsync(s => s.UserId == userId && s.InventoryId == id && s.NotifiedAt == null);
+        if (!existing)
+        {
+            context.StockSubscriptions.Add(new StockSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                InventoryId = id,
+                CreatedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+
+        return Ok(new { message = $"We'll notify you when {item.ItemName} is back in stock." });
     }
 }

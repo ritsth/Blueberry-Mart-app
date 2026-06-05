@@ -59,8 +59,12 @@ else
 builder.Services.Configure<BlueberryMart.Api.Configuration.KafkaOptions>(
     builder.Configuration.GetSection("Kafka"));
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]))
+{
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
         BlueberryMart.Api.Services.KafkaStockEventProducer>();
+    // Consumer turns stock-changed events into back-in-stock notifications.
+    builder.Services.AddHostedService<BlueberryMart.Api.Services.StockEventConsumer>();
+}
 else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
         BlueberryMart.Api.Services.NoOpStockEventProducer>();

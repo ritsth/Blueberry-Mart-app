@@ -65,6 +65,9 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |
 | `GET /api/inventory/shareholder` | Shareholder | Full inventory |
 | `GET /api/inventory/search?q=` | Customer/Shareholder | Search across branches |
+| `POST /api/inventory/{id}/restock` | Shareholder | Add stock; emits a stock-changed event |
+| `POST /api/inventory/{id}/notify-me` | Customer/Shareholder | Subscribe to back-in-stock for an item |
+| `GET /api/notifications` · `POST /api/notifications/read` | any | List / mark-read in-app notifications |
 | `POST /api/orders` | Customer/Shareholder | Place an order (creates `pending`) |
 | `GET /api/orders/{id}` | Customer/Shareholder | Order + payment status (owner only) |
 | `POST /api/payments/esewa/initiate` | Customer/Shareholder | Start eSewa payment |

@@ -13,6 +13,8 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<StockSubscription> StockSubscriptions => Set<StockSubscription>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -162,6 +164,35 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.HasOne(p => p.Order).WithMany().HasForeignKey(p => p.OrderId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(p => p.OrderId).IsUnique();
             e.HasIndex(p => p.TransactionUuid).IsUnique();
+        });
+
+        modelBuilder.Entity<StockSubscription>(e =>
+        {
+            e.ToTable("stock_subscriptions");
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(s => s.UserId).HasColumnName("user_id");
+            e.Property(s => s.InventoryId).HasColumnName("inventory_id");
+            e.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.Property(s => s.NotifiedAt).HasColumnName("notified_at");
+            e.HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.Item).WithMany().HasForeignKey(s => s.InventoryId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(s => s.InventoryId);
+            e.HasIndex(s => new { s.UserId, s.InventoryId });
+        });
+
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.ToTable("notifications");
+            e.HasKey(n => n.Id);
+            e.Property(n => n.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(n => n.UserId).HasColumnName("user_id");
+            e.Property(n => n.Message).HasColumnName("message").IsRequired();
+            e.Property(n => n.InventoryId).HasColumnName("inventory_id");
+            e.Property(n => n.IsRead).HasColumnName("is_read").HasDefaultValue(false);
+            e.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.HasOne(n => n.User).WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(n => n.UserId);
         });
     }
 }

@@ -12,4 +12,7 @@ public class KafkaOptions
 
     /// <summary>Topic that stock-change events are published to.</summary>
     public string StockChangedTopic { get; set; } = "inventory.stock-changed";
+
+    /// <summary>Consumer group for the back-in-stock consumer.</summary>
+    public string ConsumerGroup { get; set; } = "blueberrymart-backinstock";
 }
