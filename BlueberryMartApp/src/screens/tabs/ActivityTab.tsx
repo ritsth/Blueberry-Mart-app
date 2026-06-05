@@ -17,6 +17,12 @@ import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
+// GCS returns absolute URLs; a local/relative path (e.g. "/images/reviews/x.jpg")
+// is resolved against the API host so React Native can load it.
+function resolveImageUrl(path: string): string {
+  return /^https?:\/\//.test(path) ? path : `${API_BASE}${path}`;
+}
+
 interface OrderItem { itemId: string; itemName: string; quantity: number; unitPrice: number; }
 interface Order {
   id: string; orderNumber: number; branchName: string; orderType: string;
@@ -245,7 +251,7 @@ export default function ActivityTab() {
               <Text style={styles.comment}>{review.comment}</Text>
               {review.imagePath && (
                 <Image
-                  source={{ uri: review.imagePath }}
+                  source={{ uri: resolveImageUrl(review.imagePath) }}
                   style={styles.reviewImage}
                   resizeMode="cover"
                 />
