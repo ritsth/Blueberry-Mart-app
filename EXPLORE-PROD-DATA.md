@@ -43,6 +43,10 @@ The setup above. Properties:
 - Full rebuild each run (cheap at this data size; would go incremental if it ever got large).
 
 One-time setup that was done (for reference / disaster recovery):
+0. **API side (so prod reads BigQuery at all):** `BigQuery__ProjectId` set on Cloud Run via
+   `.github/workflows/deploy.yml` `--update-env-vars`; the Cloud Run runtime SA
+   `278293545480-compute@developer.gserviceaccount.com` granted `roles/bigquery.jobUser` +
+   `roles/bigquery.dataViewer`. Without this the endpoints report `enabled:false`.
 1. `bq mk --connection --connection_type=CLOUD_SQL … --location=US bbm-cloudsql-us`
    (credentials pulled from the `db-connection-string` secret).
 2. Granted the connection's service agent `roles/cloudsql.client`.

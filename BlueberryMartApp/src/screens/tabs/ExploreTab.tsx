@@ -98,7 +98,7 @@ export default function ExploreTab() {
   // builder state — sensible default that produces a good first chart
   const [measures, setMeasures] = useState<MeasureSpec[]>([{ field: 'line_revenue', agg: 'sum' }]);
   const [dims, setDims] = useState<string[]>(['category']);
-  const [year, setYear] = useState('2025');
+  const [year, setYear] = useState('All'); // 'All' so the first chart lands on data regardless of year
   const [completedOnly, setCompletedOnly] = useState(true);
   const [chartType, setChartType] = useState<ChartType>('bar');
 
