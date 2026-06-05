@@ -38,6 +38,7 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
                     .Where(oi => oi.OrderId == o.Id)
                     .Select(oi => new
                     {
+                        oi.ItemId,
                         oi.Item.ItemName,
                         oi.Quantity,
                         oi.UnitPrice,

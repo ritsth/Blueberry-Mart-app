@@ -10,14 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredToken } from '../../services/authService';
 import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
-interface OrderItem { itemName: string; quantity: number; unitPrice: number; }
+interface OrderItem { itemId: string; itemName: string; quantity: number; unitPrice: number; }
 interface Order {
   id: string; orderNumber: number; branchName: string; orderType: string;
   status: string; totalAmount: number; createdAt: string; items: OrderItem[];
@@ -34,6 +34,7 @@ interface ProfileData {
 
 export default function ActivityTab() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [data, setData]               = useState<ProfileData | null>(null);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
@@ -155,13 +156,24 @@ export default function ActivityTab() {
                 </View>
               )}
 
-              {order.status === 'pending' && (
+              {order.status === 'pending' ? (
                 <TouchableOpacity
                   style={styles.payButton}
                   onPress={() => setPayOrderId(order.id)}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.payButtonText}>Pay now with eSewa</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  onPress={() => navigation.navigate('ReviewScreen', {
+                    orderId: order.id,
+                    items: order.items.map(i => ({ id: i.itemId, name: i.itemName })),
+                  })}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.reviewButtonText}>★  Write a review</Text>
                 </TouchableOpacity>
               )}
 
@@ -266,6 +278,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center', marginTop: 12,
   },
   payButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  reviewButton: {
+    backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#16a34a',
+    paddingVertical: 10, alignItems: 'center', marginTop: 12,
+  },
+  reviewButtonText: { color: '#16a34a', fontSize: 13, fontWeight: '700' },
   itemsContainer: { borderTopWidth: 1, borderTopColor: '#f0fdf4', marginTop: 10, paddingTop: 10, gap: 6 },
   itemRow: { flexDirection: 'row', alignItems: 'center' },
   itemName: { flex: 1, fontSize: 13, color: '#374151' },
