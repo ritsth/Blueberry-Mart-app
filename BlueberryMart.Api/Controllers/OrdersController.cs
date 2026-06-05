@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Models.Events;
 using BlueberryMart.Api.Models.Requests;
+using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +13,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/orders")]
 [Authorize(Roles = "Customer,Shareholder")]
-public class OrdersController(BlueberryMartDbContext context) : ControllerBase
+public class OrdersController(BlueberryMartDbContext context, IStockEventProducer stockEvents) : ControllerBase
 {
     public const decimal DeliveryFee = 100m; // flat delivery fee, waived for members
 
@@ -189,6 +191,20 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
 
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Emit a stock-change event per item now that the order is committed.
+            // (Fire-and-forget; a no-op unless Kafka is configured.)
+            foreach (var (inv, qty) in lineItems)
+            {
+                stockEvents.Publish(new StockChangedEvent(
+                    ItemId: inv.Id,
+                    BranchId: inv.BranchId,
+                    ItemName: inv.ItemName,
+                    OldQuantity: inv.StockQuantity + qty,
+                    NewQuantity: inv.StockQuantity,
+                    Reason: "order_placed",
+                    OccurredAt: DateTime.UtcNow));
+            }
 
             return CreatedAtAction(nameof(PlaceOrder), new { id = order.Id }, new
             {

@@ -54,6 +54,17 @@ else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IReviewImageStorage,
         BlueberryMart.Api.Services.LocalReviewImageStorage>();
 
+// Inventory event stream: real Kafka producer when a broker is configured,
+// otherwise a no-op so the app runs without Kafka (production today, and tests).
+builder.Services.Configure<BlueberryMart.Api.Configuration.KafkaOptions>(
+    builder.Configuration.GetSection("Kafka"));
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]))
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
+        BlueberryMart.Api.Services.KafkaStockEventProducer>();
+else
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
+        BlueberryMart.Api.Services.NoOpStockEventProducer>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {

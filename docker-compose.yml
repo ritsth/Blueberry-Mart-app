@@ -1,0 +1,39 @@
+# Local Kafka (Redpanda) for the inventory event pipeline — learning/dev only.
+#   docker compose up -d
+# Kafka API for the .NET app:  localhost:19092
+# Redpanda Console (watch events in a browser):  http://localhost:8080
+name: blueberrymart-kafka
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: redpanda
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container          # single-node, auto-creates topics
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      # "internal" is how the console (inside docker) reaches the broker;
+      # "external" (localhost:19092) is how your .NET app on the host reaches it.
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+    ports:
+      - "19092:19092"   # Kafka API (host -> broker)
+      - "19644:9644"    # admin API
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  console:
+    image: docker.redpanda.com/redpandadata/console:latest
+    container_name: redpanda-console
+    depends_on:
+      - redpanda
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
