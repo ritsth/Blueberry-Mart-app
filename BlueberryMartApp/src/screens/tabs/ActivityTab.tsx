@@ -44,6 +44,26 @@ export default function ActivityTab() {
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
+  // Customer confirms they received a paid order -> backend moves it to 'completed',
+  // which unlocks reviewing it.
+  async function markReceived(orderId: string) {
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/orders/${orderId}/receive`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert('Could not update', body.message ?? 'Something went wrong.');
+        return;
+      }
+      await fetchData();
+    } catch {
+      Alert.alert('Error', 'Could not update the order. Check your connection.');
+    }
+  }
+
   // Retry payment for an unpaid (pending) order from the Activity list.
   async function onPaymentClose(outcome: PaymentOutcome) {
     setPayOrderId(null);
@@ -156,7 +176,7 @@ export default function ActivityTab() {
                 </View>
               )}
 
-              {order.status === 'pending' ? (
+              {order.status === 'pending' && (
                 <TouchableOpacity
                   style={styles.payButton}
                   onPress={() => setPayOrderId(order.id)}
@@ -164,7 +184,17 @@ export default function ActivityTab() {
                 >
                   <Text style={styles.payButtonText}>Pay now with eSewa</Text>
                 </TouchableOpacity>
-              ) : (
+              )}
+              {order.status === 'confirmed' && (
+                <TouchableOpacity
+                  style={styles.receiveButton}
+                  onPress={() => markReceived(order.id)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.receiveButtonText}>✓  Mark as received</Text>
+                </TouchableOpacity>
+              )}
+              {order.status === 'completed' && (
                 <TouchableOpacity
                   style={styles.reviewButton}
                   onPress={() => navigation.navigate('ReviewScreen', {
@@ -283,6 +313,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center', marginTop: 12,
   },
   reviewButtonText: { color: '#16a34a', fontSize: 13, fontWeight: '700' },
+  receiveButton: {
+    backgroundColor: '#14532d', borderRadius: 8,
+    paddingVertical: 10, alignItems: 'center', marginTop: 12,
+  },
+  receiveButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
   itemsContainer: { borderTopWidth: 1, borderTopColor: '#f0fdf4', marginTop: 10, paddingTop: 10, gap: 6 },
   itemRow: { flexDirection: 'row', alignItems: 'center' },
   itemName: { flex: 1, fontSize: 13, color: '#374151' },

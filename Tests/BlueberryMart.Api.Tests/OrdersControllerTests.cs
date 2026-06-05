@@ -9,6 +9,7 @@ namespace BlueberryMart.Api.Tests;
 [Collection("Integration")]
 public class OrdersControllerTests
 {
+    private readonly BlueberryMartApiFactory _factory;
     private readonly HttpClient _client;
     private readonly Guid _downtownBranchId;
     private readonly Guid _eggsItemId;
@@ -16,6 +17,7 @@ public class OrdersControllerTests
 
     public OrdersControllerTests(BlueberryMartApiFactory factory)
     {
+        _factory          = factory;
         _client           = factory.CreateClient();
         _downtownBranchId = factory.DowntownBranchId;
         _eggsItemId       = factory.EggsItemId;
@@ -164,5 +166,32 @@ public class OrdersControllerTests
     {
         var resp = await _client.GetAsync($"/api/orders/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task MarkReceived_ConfirmedOrder_BecomesCompleted()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, _eggsItemId);
+        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "confirmed");
+
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/receive").WithBearer(token);
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("completed", json.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task MarkReceived_PendingOrder_ReturnsConflict()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, _eggsItemId);
+
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/receive").WithBearer(token);
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
     }
 }

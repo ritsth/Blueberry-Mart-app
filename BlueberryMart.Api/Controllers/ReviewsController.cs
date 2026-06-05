@@ -35,15 +35,16 @@ public class ReviewsController(BlueberryMartDbContext context, IReviewImageStora
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // Verify the user placed the specified order and it contains the item
-        var orderBelongsToUser = await context.Orders
-            .AnyAsync(o => o.Id == orderId && o.UserId == userId);
-
-        if (!orderBelongsToUser)
+        var order = await context.Orders.FindAsync(orderId);
+        if (order is null || order.UserId != userId)
             return Forbid();
 
-        var order = await context.Orders.FindAsync(orderId);
+        // Reviews are only allowed once the order has been received (completed).
+        if (order.Status != "completed")
+            return Conflict(new { message = "You can review an order only after it's marked as received." });
+
         var itemExistsInBranch = await context.Inventory
-            .AnyAsync(i => i.Id == itemId && i.BranchId == order!.BranchId);
+            .AnyAsync(i => i.Id == itemId && i.BranchId == order.BranchId);
 
         if (!itemExistsInBranch)
             return BadRequest(new { message = "The specified item was not part of this order's branch." });

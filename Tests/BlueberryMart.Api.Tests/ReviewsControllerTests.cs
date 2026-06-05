@@ -28,6 +28,7 @@ public class ReviewsControllerTests
         var token   = await TestHelpers.GetCustomerTokenAsync(_client);
         var orderId = await TestHelpers.PlaceOrderAsync(
             _client, token, _factory.DowntownBranchId, _factory.EggsItemId);
+        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "completed");
 
         var req = BuildReviewRequest(token, orderId, _factory.EggsItemId,
             rating: 5, comment: "Very fresh eggs!");
@@ -46,6 +47,7 @@ public class ReviewsControllerTests
         var token   = await TestHelpers.GetCustomerTokenAsync(_client);
         var orderId = await TestHelpers.PlaceOrderAsync(
             _client, token, _factory.DowntownBranchId, _factory.BreadItemId);
+        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "completed");
 
         var imageContent = new ByteArrayContent(OnePxPng);
         imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
@@ -75,6 +77,7 @@ public class ReviewsControllerTests
         var token   = await TestHelpers.GetCustomerTokenAsync(_client);
         var orderId = await TestHelpers.PlaceOrderAsync(
             _client, token, _factory.DowntownBranchId, _factory.MilkItemId);
+        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "completed");
 
         Task<HttpResponseMessage> Post() =>
             _client.SendAsync(BuildReviewRequest(token, orderId, _factory.MilkItemId,
@@ -85,6 +88,20 @@ public class ReviewsControllerTests
 
         Assert.Equal(HttpStatusCode.Created,  first.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task SubmitReview_OrderNotReceived_ReturnsConflict()
+    {
+        var token   = await TestHelpers.GetCustomerTokenAsync(_client);
+        // Order is left 'pending' (not marked received) — reviewing it is not allowed.
+        var orderId = await TestHelpers.PlaceOrderAsync(
+            _client, token, _factory.DowntownBranchId, _factory.EggsItemId);
+
+        var resp = await _client.SendAsync(BuildReviewRequest(token, orderId, _factory.EggsItemId,
+            rating: 5, comment: "Too soon!"));
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
     }
 
     [Fact]

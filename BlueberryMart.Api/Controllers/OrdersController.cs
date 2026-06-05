@@ -50,6 +50,30 @@ public class OrdersController(BlueberryMartDbContext context) : ControllerBase
         });
     }
 
+    // POST /api/orders/{id}/receive
+    // Customer confirms they received the order; moves it from 'confirmed' to
+    // 'completed' (the terminal state for both pickup and delivery). Reviewing an
+    // order requires it to be completed.
+    [HttpPost("{id:guid}/receive")]
+    public async Task<IActionResult> MarkReceived(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var order = await context.Orders
+            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
+        if (order is null)
+            return NotFound(new { message = "Order not found." });
+
+        if (order.Status != "confirmed")
+            return Conflict(new { message = $"Order is '{order.Status}' and cannot be marked as received." });
+
+        order.Status = "completed";
+        order.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return Ok(new { order.Id, order.Status });
+    }
+
     // POST /api/orders
     [HttpPost]
     public async Task<IActionResult> PlaceOrder([FromBody] PlaceOrderRequest request)
