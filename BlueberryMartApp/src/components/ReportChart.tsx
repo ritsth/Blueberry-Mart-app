@@ -122,14 +122,18 @@ function DataTable({ columns, rows }: { columns: QueryResult['columns']; rows: R
 export function SavedReportCard({
   report, onEdit, onDelete,
 }: { report: SavedReport; onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
+  // Lazy: only run the query the first time the card is expanded.
   useEffect(() => {
+    if (!open || loaded) return;
     let alive = true;
+    setLoading(true);
     (async () => {
-      setLoading(true);
       try {
         const r = await runQuery(report.config);
         if (!alive) return;
@@ -138,28 +142,37 @@ export function SavedReportCard({
       } catch (e: any) {
         if (alive) setError(e?.message ?? 'Failed to load.');
       } finally {
-        if (alive) setLoading(false);
+        if (alive) { setLoading(false); setLoaded(true); }
       }
     })();
     return () => { alive = false; };
-  }, [report.id]);
+  }, [open, loaded, report.id]);
 
   const chartType = (report.config.chartType as ChartType) ?? 'table';
+  const meta = `${chartType} · ${(report.config.measures ?? []).length} measure(s) · ${(report.config.dimensions ?? []).length} group(s)`;
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
-        <Text style={styles.cardName} numberOfLines={1}>{report.name}</Text>
+        <TouchableOpacity style={styles.cardHeadLeft} onPress={() => setOpen(o => !o)} activeOpacity={0.7}>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#6b7280" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardName} numberOfLines={1}>{report.name}</Text>
+            {!open && <Text style={styles.cardMeta} numberOfLines={1}>{meta}</Text>}
+          </View>
+        </TouchableOpacity>
         <View style={styles.cardActions}>
           <TouchableOpacity onPress={onEdit} hitSlop={hit}><Ionicons name="create-outline" size={18} color="#6b7280" /></TouchableOpacity>
           <TouchableOpacity onPress={onDelete} hitSlop={hit}><Ionicons name="trash-outline" size={18} color="#dc2626" /></TouchableOpacity>
         </View>
       </View>
-      {loading
-        ? <View style={styles.cardLoading}><ActivityIndicator color="#16a34a" /></View>
-        : error
-          ? <Text style={styles.empty}>{error}</Text>
-          : result && <ResultView result={result} chartType={chartType} />}
+      {open && (
+        loading
+          ? <View style={styles.cardLoading}><ActivityIndicator color="#16a34a" /></View>
+          : error
+            ? <Text style={styles.empty}>{error}</Text>
+            : result && <View style={{ marginTop: 8 }}><ResultView result={result} chartType={chartType} /></View>
+      )}
     </View>
   );
 }
@@ -185,8 +198,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff', borderRadius: 14, padding: 14, marginBottom: 12,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  cardName: { flex: 1, fontSize: 14.5, fontWeight: '700', color: '#111827' },
+  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardHeadLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  cardName: { fontSize: 14.5, fontWeight: '700', color: '#111827' },
+  cardMeta: { fontSize: 11.5, color: '#9ca3af', marginTop: 2 },
   cardActions: { flexDirection: 'row', gap: 16, marginLeft: 8 },
   cardLoading: { paddingVertical: 24, alignItems: 'center' },
 });
