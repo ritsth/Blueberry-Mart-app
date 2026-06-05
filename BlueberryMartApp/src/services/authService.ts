@@ -39,6 +39,27 @@ export async function login(email: string, password: string): Promise<AuthResult
   return { token, role };
 }
 
+export async function register(email: string, password: string): Promise<AuthResult> {
+  const response = await fetch(`${API_BASE}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message ?? 'Could not create account.');
+  }
+
+  const { token } = await response.json();
+  const role = parseRole(token);
+
+  await AsyncStorage.setItem('jwt_token', token);
+  await AsyncStorage.setItem('user_role', role);
+
+  return { token, role };
+}
+
 export async function logout(): Promise<void> {
   await AsyncStorage.removeItem('jwt_token');
   await AsyncStorage.removeItem('user_role');

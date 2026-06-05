@@ -14,7 +14,8 @@ REST (see `BACKEND.md`).
 ## Structure (`src/`)
 ```
 screens/
-  LoginScreen.tsx        email/password login
+  LoginScreen.tsx        email/password login (+ link to sign up)
+  RegisterScreen.tsx     create a customer account
   AddressesScreen.tsx    manage delivery addresses
   ReviewScreen.tsx       write a review (rating, comment, optional photo)
   tabs/
@@ -41,9 +42,11 @@ On login the JWT's role claim is parsed (`authService.parseRole`) → routed to
 on top of the tabs from within tab screens via `useNavigation`.
 
 ## Auth flow
-`authService.login()` POSTs to `/api/auth/login`, stores `jwt_token` + `user_role`
-in AsyncStorage. Every API call attaches `Authorization: Bearer <token>` and reads
-the token with `getStoredToken()`.
+`authService.login()` POSTs to `/api/auth/login`; `authService.register()` POSTs to
+`/api/auth/register` (creates a customer and returns a token, just like login). Both
+store `jwt_token` + `user_role` in AsyncStorage. The login screen links to the
+register screen ("Don't have an account? Sign up") and vice versa. Every API call
+attaches `Authorization: Bearer <token>` and reads the token with `getStoredToken()`.
 
 ## Key flows
 - **Shopping** (`ShoppingView`): pick a branch → browse/search inventory → add to a

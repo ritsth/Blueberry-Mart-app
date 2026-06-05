@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Models.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,36 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
 
         if (user is null || !VerifyPassword(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid email or password." });
+
+        var token = GenerateToken(user.Id, user.Email, user.Role);
+        return Ok(new { token });
+    }
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    {
+        var email = request.Email?.Trim().ToLower() ?? "";
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+            return BadRequest(new { message = "A valid email is required." });
+
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
+            return BadRequest(new { message = "Password must be at least 6 characters." });
+
+        if (await context.Users.AnyAsync(u => u.Email == email))
+            return Conflict(new { message = "An account with this email already exists." });
+
+        // Public sign-up always creates a Customer account.
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            PasswordHash = HashPassword(request.Password),
+            Role = "customer",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
 
         var token = GenerateToken(user.Id, user.Email, user.Role);
         return Ok(new { token });
@@ -53,9 +84,9 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private static bool VerifyPassword(string plaintext, string storedHash)
-    {
-        var hash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
-        return hash == storedHash;
-    }
+    private static string HashPassword(string plaintext) =>
+        Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
+
+    private static bool VerifyPassword(string plaintext, string storedHash) =>
+        HashPassword(plaintext) == storedHash;
 }

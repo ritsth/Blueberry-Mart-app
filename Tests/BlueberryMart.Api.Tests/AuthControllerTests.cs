@@ -64,4 +64,43 @@ public class AuthControllerTests
 
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Register_NewEmail_ReturnsTokenAndCanLogin()
+    {
+        var email = $"new_{Guid.NewGuid():N}@blueberrymart.com";
+
+        var resp = await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(string.IsNullOrWhiteSpace(json.GetProperty("token").GetString()));
+
+        // The freshly created account can log in.
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_DuplicateEmail_ReturnsConflict()
+    {
+        var email = $"dup_{Guid.NewGuid():N}@blueberrymart.com";
+
+        var first  = await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+        var second = await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_ShortPassword_ReturnsBadRequest()
+    {
+        var resp = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email    = $"short_{Guid.NewGuid():N}@blueberrymart.com",
+            password = "123"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
 }

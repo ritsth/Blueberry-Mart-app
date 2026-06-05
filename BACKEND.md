@@ -58,6 +58,8 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | Method & path | Auth | Purpose |
 |---|---|---|
 | `POST /api/auth/login` | public | Email/password → JWT |
+| `POST /api/auth/register` | public | Create a customer account → JWT |
+| `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a confirmed order received (→ completed) |
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |

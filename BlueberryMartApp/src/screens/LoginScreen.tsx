@@ -91,6 +91,16 @@ export default function LoginScreen({ navigation }: Props) {
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.buttonText}>Sign In</Text>}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.linkRow}
+          onPress={() => navigation.navigate('Register')}
+          disabled={loading}
+        >
+          <Text style={styles.linkText}>
+            Don't have an account? <Text style={styles.linkAccent}>Sign up</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -165,5 +175,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  linkRow: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  linkAccent: {
+    color: '#16a34a',
+    fontWeight: '700',
   },
 });
