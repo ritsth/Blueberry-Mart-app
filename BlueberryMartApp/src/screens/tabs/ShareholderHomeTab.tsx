@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   RefreshControl,
   ScrollView,
@@ -11,7 +12,11 @@ import {
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
+import { SavedReport, deleteReport, listReports } from '../../services/analyticsService';
+import { SavedReportCard } from '../../components/ReportChart';
 import ShoppingView from '../../components/ShoppingView';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -62,9 +67,16 @@ export default function ShareholderHomeTab() {
             onPress={() => setActiveTab(tab)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.topTabText, activeTab === tab && styles.topTabTextActive]}>
-              {tab === 'analytics' ? '📊  Analytics' : '🛒  Shopping'}
-            </Text>
+            <View style={styles.topTabInner}>
+              <Ionicons
+                name={tab === 'analytics' ? 'stats-chart' : 'cart-outline'}
+                size={16}
+                color={activeTab === tab ? '#111827' : '#9ca3af'}
+              />
+              <Text style={[styles.topTabText, activeTab === tab && styles.topTabTextActive]}>
+                {tab === 'analytics' ? 'Analytics' : 'Shopping'}
+              </Text>
+            </View>
             {activeTab === tab && <View style={styles.topTabUnderline} />}
           </TouchableOpacity>
         ))}
@@ -88,7 +100,46 @@ function AnalyticsView() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
+  const navigation = useNavigation<any>();
+  const [reports, setReports] = useState<SavedReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+
   useEffect(() => { fetchAnalytics(); }, []);
+
+  // Refresh saved reports whenever the tab regains focus (e.g. after saving in Explore).
+  useFocusEffect(
+    React.useCallback(() => {
+      let alive = true;
+      (async () => {
+        try {
+          const r = await listReports();
+          if (alive) setReports(r);
+        } catch {
+          // leave the list as-is
+        } finally {
+          if (alive) setReportsLoading(false);
+        }
+      })();
+      return () => { alive = false; };
+    }, []),
+  );
+
+  function confirmDeleteReport(r: SavedReport) {
+    Alert.alert('Delete report', `Delete "${r.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteReport(r.id);
+            setReports(prev => prev.filter(x => x.id !== r.id));
+          } catch (e: any) {
+            Alert.alert('Delete failed', e?.message ?? '');
+          }
+        },
+      },
+    ]);
+  }
 
   async function onRefresh() {
     setRefreshing(true);
@@ -251,6 +302,21 @@ function AnalyticsView() {
         ))
       }
 
+      <Text style={styles.sectionTitle}>My Reports</Text>
+      {reportsLoading
+        ? <ActivityIndicator color="#16a34a" style={{ marginVertical: 16 }} />
+        : reports.length === 0
+          ? <Text style={styles.emptyNote}>No saved reports yet. Build one in the Explore tab.</Text>
+          : reports.map(r => (
+            <SavedReportCard
+              key={r.id}
+              report={r}
+              onEdit={() => navigation.navigate('Explore', { report: r })}
+              onDelete={() => confirmDeleteReport(r)}
+            />
+          ))
+      }
+
       <View style={{ height: 24 }} />
     </ScrollView>
   );
@@ -267,6 +333,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f3f4f6',
   },
   topTabBtn: { marginRight: 28, paddingBottom: 12, alignItems: 'center' },
+  topTabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   topTabText: { fontSize: 16, fontWeight: '600', color: '#9ca3af' },
   topTabTextActive: { color: '#111827' },
   topTabUnderline: {
