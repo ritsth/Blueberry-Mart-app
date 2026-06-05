@@ -39,6 +39,8 @@ wwwroot/       static files (eSewa result pages)
   `ProviderRef`.
 - **Review** — per order+item; rating, comment, optional image path.
 - **Address** — customer delivery addresses.
+- **SavedReport** — a shareholder's saved "Explore" chart: a `name` + the query
+  config as `jsonb` (config only, never data). Scoped per shareholder.
 
 ### PostgreSQL enums
 - `user_role`: `customer`, `shareholder`
@@ -79,6 +81,9 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `GET /api/membership/status` · `POST /activate` · `POST /cancel` | any | Blueberry Plus membership |
 | `GET /api/shareholders/analytics` | Shareholder | Sales analytics + charts |
 | `GET /api/shareholders/inventory-analytics` | Shareholder | Stock-movement analytics from BigQuery (Kafka pipeline) |
+| `GET /api/analytics/catalog` | Shareholder | Introspected field catalog (dimensions + measures) for the Explore builder |
+| `POST /api/analytics/query` | Shareholder | Run a validated, parameterized aggregation over the BigQuery `sales_fact` warehouse |
+| `GET/POST /api/analytics/reports` · `GET/PUT/DELETE /{id}` | Shareholder | CRUD for saved Explore chart configs (per shareholder) |
 
 ## Key business rules
 - **Membership (Blueberry Plus):** 5% member discount on goods, free delivery

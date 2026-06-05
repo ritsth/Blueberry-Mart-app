@@ -15,6 +15,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<StockSubscription> StockSubscriptions => Set<StockSubscription>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<SavedReport> SavedReports => Set<SavedReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -193,6 +194,20 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.HasOne(n => n.User).WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(n => n.UserId);
+        });
+
+        modelBuilder.Entity<SavedReport>(e =>
+        {
+            e.ToTable("saved_reports");
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(r => r.ShareholderId).HasColumnName("shareholder_id");
+            e.Property(r => r.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+            e.Property(r => r.ConfigJson).HasColumnName("config").HasColumnType("jsonb").IsRequired();
+            e.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.Property(r => r.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
+            e.HasOne(r => r.Shareholder).WithMany().HasForeignKey(r => r.ShareholderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(r => r.ShareholderId);
         });
     }
 }

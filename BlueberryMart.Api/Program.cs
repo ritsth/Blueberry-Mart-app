@@ -83,6 +83,15 @@ else
 if (bigQueryConfigured && !string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]))
     builder.Services.AddHostedService<BlueberryMart.Api.Services.BigQueryStockSink>();
 
+// Self-service "Explore" analytics over the sales_fact warehouse: opt-in via the same
+// BigQuery:ProjectId. A disabled (no-op) implementation is used when BigQuery is off.
+if (bigQueryConfigured)
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IAnalyticsQueryService,
+        BlueberryMart.Api.Services.BigQueryAnalyticsQueryService>();
+else
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IAnalyticsQueryService,
+        BlueberryMart.Api.Services.DisabledAnalyticsQueryService>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
