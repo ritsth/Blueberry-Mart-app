@@ -11,12 +11,12 @@ import {
   View,
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
 import { SavedReport, deleteReport, listReports } from '../../services/analyticsService';
 import { SavedReportCard } from '../../components/ReportChart';
-import AppHeader from '../../components/AppHeader';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CHART_WIDTH = SCREEN_WIDTH - 48;
@@ -49,6 +49,7 @@ interface Analytics {
 }
 
 export default function ShareholderHomeTab() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -123,11 +124,9 @@ export default function ShareholderHomeTab() {
   }
 
   return (
-    <View style={styles.wrapper}>
-    <AppHeader />
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
     >
@@ -268,7 +267,6 @@ export default function ShareholderHomeTab() {
 
       <View style={{ height: 24 }} />
     </ScrollView>
-    </View>
   );
 }
 

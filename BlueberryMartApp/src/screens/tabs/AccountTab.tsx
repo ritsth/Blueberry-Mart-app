@@ -214,7 +214,6 @@ export default function AccountTab() {
 
       {/* Account rows */}
       <Text style={styles.sectionLabel}>Account</Text>
-      <Row icon="location-outline" label="Delivery addresses" onPress={() => navigation.navigate('AddressesScreen')} />
       <Row icon="log-out-outline" label="Sign out" danger onPress={handleLogout} />
 
       <View style={{ height: 24 }} />
