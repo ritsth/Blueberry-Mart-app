@@ -57,7 +57,7 @@ export default function CustomerShopTab() {
         </TouchableOpacity>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Activity')} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('AlertsScreen')} activeOpacity={0.7}>
             <Ionicons name="notifications-outline" size={22} color="#111827" />
             {unread > 0 && (
               <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>

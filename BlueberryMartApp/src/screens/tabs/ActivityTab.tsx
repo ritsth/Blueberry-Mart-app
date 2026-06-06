@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
 import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
@@ -37,9 +38,6 @@ interface ProfileData {
   orders: Order[];
   reviews: Review[];
 }
-interface AppNotification {
-  id: string; message: string; inventoryId?: string | null; isRead: boolean; createdAt: string;
-}
 
 export default function ActivityTab() {
   const insets = useSafeAreaInsets();
@@ -47,11 +45,9 @@ export default function ActivityTab() {
   const [data, setData]               = useState<ProfileData | null>(null);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
-  const [activeTab, setActiveTab]     = useState<'orders' | 'reviews' | 'notifications'>('orders');
+  const [activeTab, setActiveTab]     = useState<'orders' | 'reviews'>('orders');
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [payOrderId, setPayOrderId]   = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unread, setUnread]           = useState(0);
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
@@ -92,34 +88,11 @@ export default function ActivityTab() {
   async function fetchData() {
     try {
       const token = await getStoredToken();
-      const auth = { headers: { Authorization: `Bearer ${token}` } };
-      const [pRes, nRes] = await Promise.all([
-        fetch(`${API_BASE}/api/profile`, auth),
-        fetch(`${API_BASE}/api/notifications`, auth),
-      ]);
-      if (pRes.ok) setData(await pRes.json());
-      if (nRes.ok) {
-        const n = await nRes.json();
-        setNotifications(n.notifications ?? []);
-        setUnread(n.unread ?? 0);
-      }
+      const res = await fetch(`${API_BASE}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setData(await res.json());
     } finally {
       setLoading(false);
     }
-  }
-
-  // Open the notifications tab and mark everything read.
-  async function openNotifications() {
-    setActiveTab('notifications');
-    if (unread === 0) return;
-    try {
-      const token = await getStoredToken();
-      await fetch(`${API_BASE}/api/notifications/read`, {
-        method: 'POST', headers: { Authorization: `Bearer ${token}` },
-      });
-      setUnread(0);
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch { /* ignore */ }
   }
 
   if (loading) {
@@ -161,14 +134,6 @@ export default function ActivityTab() {
             Reviews ({reviews.length})
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'notifications' && styles.tabActive]}
-          onPress={openNotifications}
-        >
-          <Text style={[styles.tabText, activeTab === 'notifications' && styles.tabTextActive]}>
-            Alerts{unread > 0 ? ` (${unread})` : ''}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {activeTab === 'orders' && (
@@ -202,14 +167,14 @@ export default function ActivityTab() {
               {/* Fulfilment line: pickup code vs delivery address */}
               {order.orderType === 'delivery' ? (
                 <View style={styles.fulfilRow}>
-                  <Text style={styles.fulfilIcon}>🛵</Text>
+                  <Ionicons name="bicycle-outline" size={15} color="#6b7280" style={{ marginRight: 8 }} />
                   <Text style={styles.fulfilText} numberOfLines={1}>
                     Delivery{order.deliveryAddress ? ` · ${order.deliveryAddress}` : ''}
                   </Text>
                 </View>
               ) : (
                 <View style={[styles.fulfilRow, styles.pickupRow]}>
-                  <Text style={styles.fulfilIcon}>🏬</Text>
+                  <Ionicons name="storefront-outline" size={15} color="#6b7280" style={{ marginRight: 8 }} />
                   <Text style={styles.pickupText}>
                     Pickup · show <Text style={styles.pickupCode}>#{order.orderNumber}</Text> at the counter
                   </Text>
@@ -231,7 +196,10 @@ export default function ActivityTab() {
                   onPress={() => markReceived(order.id)}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.receiveButtonText}>✓  Mark as received</Text>
+                  <View style={styles.btnRow}>
+                    <Ionicons name="checkmark-circle-outline" size={16} color="#ffffff" />
+                    <Text style={styles.receiveButtonText}>Mark as received</Text>
+                  </View>
                 </TouchableOpacity>
               )}
               {order.status === 'completed' && (
@@ -243,7 +211,10 @@ export default function ActivityTab() {
                   })}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.reviewButtonText}>★  Write a review</Text>
+                  <View style={styles.btnRow}>
+                    <Ionicons name="star-outline" size={16} color="#16a34a" />
+                    <Text style={styles.reviewButtonText}>Write a review</Text>
+                  </View>
                 </TouchableOpacity>
               )}
 
@@ -259,9 +230,10 @@ export default function ActivityTab() {
                 </View>
               )}
 
-              <Text style={styles.expandHint}>
-                {expandedId === order.id ? '▲ Hide items' : '▼ Show items'}
-              </Text>
+              <View style={styles.expandRow}>
+                <Ionicons name={expandedId === order.id ? 'chevron-up' : 'chevron-down'} size={13} color="#9ca3af" />
+                <Text style={styles.expandHint}>{expandedId === order.id ? 'Hide items' : 'Show items'}</Text>
+              </View>
             </TouchableOpacity>
           ))
       )}
@@ -290,19 +262,6 @@ export default function ActivityTab() {
                   resizeMode="cover"
                 />
               )}
-            </View>
-          ))
-      )}
-
-      {activeTab === 'notifications' && (
-        notifications.length === 0
-          ? <Text style={styles.empty}>No notifications yet.</Text>
-          : notifications.map(n => (
-            <View key={n.id} style={[styles.card, !n.isRead && styles.cardUnread]}>
-              <Text style={styles.notifMessage}>{n.message}</Text>
-              <Text style={styles.notifDate}>
-                {new Date(n.createdAt).toLocaleString('en-NP', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-              </Text>
             </View>
           ))
       )}
@@ -379,7 +338,9 @@ const styles = StyleSheet.create({
   itemName: { flex: 1, fontSize: 13, color: '#374151' },
   itemQty: { fontSize: 13, color: '#6b7280', marginRight: 12 },
   itemPrice: { fontSize: 13, fontWeight: '600', color: '#14532d' },
-  expandHint: { fontSize: 11, color: '#9ca3af', marginTop: 10, textAlign: 'center' },
+  expandRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 10 },
+  expandHint: { fontSize: 11, color: '#9ca3af', textAlign: 'center' },
+  btnRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   reviewItem: { fontSize: 14, fontWeight: '600', color: '#111827', flex: 1, marginRight: 8 },
   reviewDate: { fontSize: 11, color: '#9ca3af' },

@@ -116,7 +116,7 @@ export default function AccountTab() {
 
   async function handleLogout() {
     await logout();
-    navigation.replace('Login');
+    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   }
 
   if (loading) {
@@ -135,6 +135,10 @@ export default function AccountTab() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
     >
+      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons name="chevron-back" size={26} color="#111827" />
+      </TouchableOpacity>
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
@@ -146,7 +150,7 @@ export default function AccountTab() {
 
       {/* Quick actions */}
       <View style={styles.quickRow}>
-        <QuickCard icon="receipt-outline" label="Orders" onPress={() => (navigation as any).navigate('Activity')} />
+        <QuickCard icon="receipt-outline" label="Orders" onPress={() => (navigation as any).navigate('CustomerTabs', { screen: 'Activity' })} />
         <QuickCard icon="location-outline" label="Addresses" onPress={() => navigation.navigate('AddressesScreen')} />
         <QuickCard icon="headset-outline" label="Help" onPress={() => Alert.alert('Help & Support', 'Reach us at support@blueberrymart.com')} />
       </View>
@@ -254,6 +258,7 @@ const card = {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { paddingHorizontal: 24, paddingBottom: 40 },
+  back: { alignSelf: 'flex-start', marginBottom: 8, paddingVertical: 2 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },

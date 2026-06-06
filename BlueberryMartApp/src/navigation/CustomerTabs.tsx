@@ -7,7 +7,6 @@ import CustomerShopTab from '../screens/tabs/CustomerShopTab';
 import BulkTab from '../screens/tabs/BulkTab';
 import CartScreen from '../screens/tabs/CartScreen';
 import ActivityTab from '../screens/tabs/ActivityTab';
-import AccountTab from '../screens/tabs/AccountTab';
 import { useCart } from '../context/CartContext';
 
 const Tab = createBottomTabNavigator();
@@ -43,7 +42,6 @@ export default function CustomerTabs() {
             Shop: ['storefront', 'storefront-outline'],
             Bulk: ['cube', 'cube-outline'],
             Activity: ['receipt', 'receipt-outline'],
-            Account: ['person-circle', 'person-circle-outline'],
           };
           const [active, inactive] = icons[route.name] ?? ['ellipse', 'ellipse-outline'];
           return <Ionicons name={(focused ? active : inactive) as any} size={size} color={color} />;
@@ -62,7 +60,6 @@ export default function CustomerTabs() {
         }}
       />
       <Tab.Screen name="Activity" component={ActivityTab} />
-      <Tab.Screen name="Account" component={AccountTab} />
     </Tab.Navigator>
   );
 }
