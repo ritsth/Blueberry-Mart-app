@@ -17,26 +17,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
 import { SavedReport, deleteReport, listReports } from '../../services/analyticsService';
 import { SavedReportCard } from '../../components/ReportChart';
-import ShoppingView from '../../components/ShoppingView';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CHART_WIDTH = SCREEN_WIDTH - 48; // 24 padding each side
+const CHART_WIDTH = SCREEN_WIDTH - 48;
 
 const chartConfig = {
   backgroundGradientFrom: '#ffffff',
   backgroundGradientTo: '#ffffff',
   decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(20, 83, 45, ${opacity})`,      // dark green
+  color: (opacity = 1) => `rgba(20, 83, 45, ${opacity})`,
   labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
   propsForDots: { r: '4', strokeWidth: '2', stroke: '#16a34a' },
   barPercentage: 0.6,
 };
 
 const PIE_COLORS = ['#16a34a', '#0284c7', '#d97706', '#7c3aed'];
-
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
-
-type TopTab = 'analytics' | 'shopping';
 
 interface BranchRevenue { branchName: string; revenue: number; orderCount: number; }
 interface TopItem { itemName: string; totalQuantitySold: number; totalRevenue: number; }
@@ -54,53 +50,12 @@ interface Analytics {
 
 export default function ShareholderHomeTab() {
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<TopTab>('analytics');
-
-  return (
-    <View style={styles.wrapper}>
-      {/* Uber-style top tabs */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        {(['analytics', 'shopping'] as TopTab[]).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={styles.topTabBtn}
-            onPress={() => setActiveTab(tab)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.topTabInner}>
-              <Ionicons
-                name={tab === 'analytics' ? 'stats-chart' : 'cart-outline'}
-                size={16}
-                color={activeTab === tab ? '#111827' : '#9ca3af'}
-              />
-              <Text style={[styles.topTabText, activeTab === tab && styles.topTabTextActive]}>
-                {tab === 'analytics' ? 'Analytics' : 'Shopping'}
-              </Text>
-            </View>
-            {activeTab === tab && <View style={styles.topTabUnderline} />}
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {activeTab === 'analytics'
-        ? <AnalyticsView />
-        : (
-          <View style={styles.shopContainer}>
-            <ShoppingView />
-          </View>
-        )
-      }
-    </View>
-  );
-}
-
-function AnalyticsView() {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-
   const navigation = useNavigation<any>();
+
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
 
@@ -170,11 +125,17 @@ function AnalyticsView() {
 
   return (
     <ScrollView
-      style={styles.analyticsScroll}
-      contentContainerStyle={styles.analyticsContent}
+      style={styles.scroll}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
     >
+      <View style={styles.headerRow}>
+        <Text style={styles.heading}>Analytics</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Account')} activeOpacity={0.7}>
+          <Ionicons name="person-circle-outline" size={28} color="#111827" />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.revenueCard}>
         <Text style={styles.revenueLabel}>Total Revenue</Text>
@@ -183,7 +144,6 @@ function AnalyticsView() {
         </Text>
       </View>
 
-      {/* Revenue over time — line chart */}
       <Text style={styles.sectionTitle}>Revenue · last 14 days</Text>
       <View style={styles.chartCard}>
         <LineChart
@@ -194,17 +154,11 @@ function AnalyticsView() {
             }),
             datasets: [{ data: analytics.revenueOverTime.map(d => d.revenue) }],
           }}
-          width={CHART_WIDTH}
-          height={200}
-          chartConfig={chartConfig}
-          bezier
-          yAxisLabel="Rs "
-          yAxisSuffix=""
-          style={styles.chart}
+          width={CHART_WIDTH} height={200} chartConfig={chartConfig} bezier
+          yAxisLabel="Rs " yAxisSuffix="" style={styles.chart}
         />
       </View>
 
-      {/* Revenue by branch — bar chart */}
       <Text style={styles.sectionTitle}>Revenue by Branch</Text>
       {analytics.revenueByBranch.length === 0 ? (
         <Text style={styles.emptyNote}>No orders yet.</Text>
@@ -216,14 +170,8 @@ function AnalyticsView() {
                 labels: analytics.revenueByBranch.map(b => b.branchName.replace('Blueberry Mart ', '')),
                 datasets: [{ data: analytics.revenueByBranch.map(b => b.revenue) }],
               }}
-              width={CHART_WIDTH}
-              height={220}
-              chartConfig={chartConfig}
-              yAxisLabel="Rs "
-              yAxisSuffix=""
-              fromZero
-              showValuesOnTopOfBars
-              style={styles.chart}
+              width={CHART_WIDTH} height={220} chartConfig={chartConfig}
+              yAxisLabel="Rs " yAxisSuffix="" fromZero showValuesOnTopOfBars style={styles.chart}
             />
           </View>
           {analytics.revenueByBranch.map((b, i) => (
@@ -240,7 +188,6 @@ function AnalyticsView() {
         </>
       )}
 
-      {/* Pickup vs Delivery — pie chart */}
       {analytics.orderTypeSplit.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>Pickup vs Delivery</Text>
@@ -253,12 +200,8 @@ function AnalyticsView() {
                 legendFontColor: '#374151',
                 legendFontSize: 13,
               }))}
-              width={CHART_WIDTH}
-              height={170}
-              chartConfig={chartConfig}
-              accessor="population"
-              backgroundColor="transparent"
-              paddingLeft="12"
+              width={CHART_WIDTH} height={170} chartConfig={chartConfig}
+              accessor="population" backgroundColor="transparent" paddingLeft="12"
             />
           </View>
         </>
@@ -323,57 +266,29 @@ function AnalyticsView() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: '#f9fafb' },
-  // Top tabs (Uber style)
-  topBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  topTabBtn: { marginRight: 28, paddingBottom: 12, alignItems: 'center' },
-  topTabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  topTabText: { fontSize: 16, fontWeight: '600', color: '#9ca3af' },
-  topTabTextActive: { color: '#111827' },
-  topTabUnderline: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    height: 2.5, backgroundColor: '#111827', borderRadius: 2,
-  },
-  // Shopping
-  shopContainer: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
-  // Analytics
-  analyticsScroll: { flex: 1 },
-  analyticsContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 32 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scroll: { flex: 1, backgroundColor: '#f9fafb' },
+  content: { paddingHorizontal: 24, paddingBottom: 32 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   errorText: { color: '#dc2626', fontSize: 13 },
-  revenueCard: {
-    backgroundColor: '#14532d', borderRadius: 14,
-    padding: 20, marginBottom: 20, alignItems: 'center',
-  },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  heading: { fontSize: 26, fontWeight: '700', color: '#111827' },
+  revenueCard: { backgroundColor: '#14532d', borderRadius: 14, padding: 20, marginBottom: 20, alignItems: 'center' },
   revenueLabel: { color: '#bbf7d0', fontSize: 13, marginBottom: 6 },
   revenueValue: { color: '#ffffff', fontSize: 28, fontWeight: '700' },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 10, marginTop: 4 },
   chartCard: {
-    backgroundColor: '#ffffff', borderRadius: 14, paddingVertical: 12,
-    marginBottom: 16, alignItems: 'center', overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    backgroundColor: '#ffffff', borderRadius: 14, paddingVertical: 12, marginBottom: 16,
+    alignItems: 'center', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
   chart: { borderRadius: 12 },
   alertCount: { color: '#dc2626', fontWeight: '700' },
   rowCard: {
     backgroundColor: '#ffffff', borderRadius: 10, padding: 14,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
   },
-  rankBadge: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', marginRight: 10,
-  },
+  rankBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   rankText: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
   rowPrimary: { fontSize: 14, fontWeight: '600', color: '#111827' },
   rowSecondary: { fontSize: 12, color: '#6b7280', marginTop: 2 },
@@ -383,10 +298,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 8, borderLeftWidth: 3, borderLeftColor: '#dc2626',
   },
-  stockBadge: {
-    backgroundColor: '#fee2e2', borderRadius: 8,
-    paddingVertical: 4, paddingHorizontal: 10,
-  },
+  stockBadge: { backgroundColor: '#fee2e2', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
   stockText: { fontSize: 12, fontWeight: '700', color: '#dc2626' },
   emptyNote: { fontSize: 13, color: '#9ca3af', marginBottom: 12 },
 });

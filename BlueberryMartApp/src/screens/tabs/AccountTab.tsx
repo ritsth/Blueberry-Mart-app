@@ -150,7 +150,7 @@ export default function AccountTab() {
 
       {/* Quick actions */}
       <View style={styles.quickRow}>
-        <QuickCard icon="receipt-outline" label="Orders" onPress={() => (navigation as any).navigate('CustomerTabs', { screen: 'Activity' })} />
+        <QuickCard icon="receipt-outline" label="Orders" onPress={() => (navigation as any).navigate(profile?.role === 'shareholder' ? 'ShareholderTabs' : 'CustomerTabs', { screen: 'Activity' })} />
         <QuickCard icon="location-outline" label="Addresses" onPress={() => navigation.navigate('AddressesScreen')} />
         <QuickCard icon="headset-outline" label="Help" onPress={() => Alert.alert('Help & Support', 'Reach us at support@blueberrymart.com')} />
       </View>
