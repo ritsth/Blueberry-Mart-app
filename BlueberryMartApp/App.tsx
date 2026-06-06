@@ -9,6 +9,7 @@ import ReviewScreen      from './src/screens/ReviewScreen';
 import AddressesScreen   from './src/screens/AddressesScreen';
 import CustomerTabs      from './src/navigation/CustomerTabs';
 import ShareholderTabs   from './src/navigation/ShareholderTabs';
+import { CartProvider }  from './src/context/CartContext';
 
 export type RootStackParamList = {
   Login:            undefined;
@@ -25,14 +26,16 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Login"           component={LoginScreen} />
-        <Stack.Screen name="Register"        component={RegisterScreen} />
-        <Stack.Screen name="CustomerTabs"    component={CustomerTabs} />
-        <Stack.Screen name="ShareholderTabs" component={ShareholderTabs} />
-        <Stack.Screen name="ReviewScreen"    component={ReviewScreen} />
-        <Stack.Screen name="AddressesScreen" component={AddressesScreen} />
-      </Stack.Navigator>
+      <CartProvider>
+        <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login"           component={LoginScreen} />
+          <Stack.Screen name="Register"        component={RegisterScreen} />
+          <Stack.Screen name="CustomerTabs"    component={CustomerTabs} />
+          <Stack.Screen name="ShareholderTabs" component={ShareholderTabs} />
+          <Stack.Screen name="ReviewScreen"    component={ReviewScreen} />
+          <Stack.Screen name="AddressesScreen" component={AddressesScreen} />
+        </Stack.Navigator>
+      </CartProvider>
     </NavigationContainer>
   );
 }

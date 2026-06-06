@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
 import ShoppingView from '../../components/ShoppingView';
 
@@ -92,9 +93,12 @@ export default function BulkTab() {
   // Non-members see an upsell that routes to the Account tab to join
   return (
     <View style={[styles.lockWrap, { paddingTop: insets.top + 40 }]}>
-      <Text style={styles.lockIcon}>📦</Text>
+      <Ionicons name="cube-outline" size={54} color="#14532d" style={{ marginBottom: 12 }} />
       <Text style={styles.lockTitle}>Bulk Orders</Text>
-      <View style={styles.plusBadge}><Text style={styles.plusBadgeText}>🫐 Plus members only</Text></View>
+      <View style={styles.plusBadge}>
+        <Ionicons name="ribbon" size={13} color="#ffffff" />
+        <Text style={styles.plusBadgeText}>Plus members only</Text>
+      </View>
       <Text style={styles.lockBody}>
         Order business quantities — 25kg rice, 20L oil, 50kg flour and more —
         at member pricing with free delivery.
@@ -121,6 +125,7 @@ const styles = StyleSheet.create({
   lockIcon: { fontSize: 56, marginBottom: 12 },
   lockTitle: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 12 },
   plusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#14532d', borderRadius: 20,
     paddingVertical: 6, paddingHorizontal: 16, marginBottom: 20,
   },
