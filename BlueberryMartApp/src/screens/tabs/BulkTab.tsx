@@ -8,16 +8,15 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
+import AppHeader from '../../components/AppHeader';
 import ShoppingView from '../../components/ShoppingView';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 const MONTHLY_FEE = 199;
 
 export default function BulkTab() {
-  const insets = useSafeAreaInsets();
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading]   = useState(true);
   const [activating, setActivating] = useState(false);
@@ -84,15 +83,20 @@ export default function BulkTab() {
   // Members get the full bulk shopping flow (cart, delivery, member pricing)
   if (isMember) {
     return (
-      <View style={[styles.shopWrap, { paddingTop: insets.top + 12 }]}>
-        <ShoppingView mode="bulk" />
+      <View style={styles.container}>
+        <AppHeader />
+        <View style={styles.shopWrap}>
+          <ShoppingView mode="bulk" />
+        </View>
       </View>
     );
   }
 
   // Non-members see an upsell that routes to the Account tab to join
   return (
-    <View style={[styles.lockWrap, { paddingTop: insets.top + 40 }]}>
+    <View style={styles.container}>
+      <AppHeader />
+      <View style={styles.lockWrap}>
       <Ionicons name="cube-outline" size={54} color="#14532d" style={{ marginBottom: 12 }} />
       <Text style={styles.lockTitle}>Bulk Orders</Text>
       <View style={styles.plusBadge}>
@@ -114,14 +118,16 @@ export default function BulkTab() {
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.ctaText}>Join Plus · Rs {MONTHLY_FEE}/mo</Text>}
       </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f9fafb' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
-  shopWrap: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 24 },
-  lockWrap: { flex: 1, backgroundColor: '#f9fafb', alignItems: 'center', paddingHorizontal: 32 },
+  shopWrap: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 24, paddingTop: 16 },
+  lockWrap: { flex: 1, backgroundColor: '#f9fafb', alignItems: 'center', paddingHorizontal: 32, paddingTop: 40 },
   lockIcon: { fontSize: 56, marginBottom: 12 },
   lockTitle: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 12 },
   plusBadge: {

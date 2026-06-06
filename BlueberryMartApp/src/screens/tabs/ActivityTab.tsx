@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
+import AppHeader from '../../components/AppHeader';
 import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
@@ -40,7 +40,6 @@ interface ProfileData {
 }
 
 export default function ActivityTab() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [data, setData]               = useState<ProfileData | null>(null);
   const [loading, setLoading]         = useState(true);
@@ -107,10 +106,11 @@ export default function ActivityTab() {
   const reviews = data?.reviews ?? [];
 
   return (
-    <>
+    <View style={styles.wrapper}>
+    <AppHeader />
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+      contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
     >
@@ -269,13 +269,14 @@ export default function ActivityTab() {
       <View style={{ height: 16 }} />
     </ScrollView>
     <EsewaCheckout orderId={payOrderId} onClose={onPaymentClose} />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { flex: 1, backgroundColor: '#f9fafb' },
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingHorizontal: 24, paddingBottom: 32 },
+  content: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   heading: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 20 },
   tabs: {

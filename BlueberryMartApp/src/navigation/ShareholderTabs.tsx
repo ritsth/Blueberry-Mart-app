@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ShareholderHomeTab from '../screens/tabs/ShareholderHomeTab';
 import CustomerShopTab from '../screens/tabs/CustomerShopTab';
 import CartScreen from '../screens/tabs/CartScreen';
-import ExploreTab from '../screens/tabs/ExploreTab';
+import BulkTab from '../screens/tabs/BulkTab';
 import ActivityTab from '../screens/tabs/ActivityTab';
 import { useCart } from '../context/CartContext';
 
@@ -42,7 +42,7 @@ export default function ShareholderTabs() {
           const icons: Record<string, [string, string]> = {
             Analytics: ['stats-chart', 'stats-chart-outline'],
             Shop: ['storefront', 'storefront-outline'],
-            Explore: ['compass', 'compass-outline'],
+            Bulk: ['cube', 'cube-outline'],
             Activity: ['receipt', 'receipt-outline'],
           };
           const [active, inactive] = icons[route.name] ?? ['ellipse', 'ellipse-outline'];
@@ -61,7 +61,7 @@ export default function ShareholderTabs() {
           tabBarBadgeStyle: { backgroundColor: '#dc2626' },
         }}
       />
-      <Tab.Screen name="Explore" component={ExploreTab} />
+      <Tab.Screen name="Bulk" component={BulkTab} />
       <Tab.Screen name="Activity" component={ActivityTab} />
     </Tab.Navigator>
   );

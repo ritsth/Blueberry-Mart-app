@@ -9,6 +9,7 @@ import ReviewScreen      from './src/screens/ReviewScreen';
 import AddressesScreen   from './src/screens/AddressesScreen';
 import AlertsScreen      from './src/screens/AlertsScreen';
 import AccountTab        from './src/screens/tabs/AccountTab';
+import ExploreTab        from './src/screens/tabs/ExploreTab';
 import CustomerTabs      from './src/navigation/CustomerTabs';
 import ShareholderTabs   from './src/navigation/ShareholderTabs';
 import { CartProvider }  from './src/context/CartContext';
@@ -22,6 +23,7 @@ export type RootStackParamList = {
   AddressesScreen:  undefined;
   AlertsScreen:     undefined;
   Account:          undefined;
+  Explore:          { report?: any } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -40,6 +42,7 @@ export default function App() {
           <Stack.Screen name="AddressesScreen" component={AddressesScreen} />
           <Stack.Screen name="AlertsScreen"    component={AlertsScreen} />
           <Stack.Screen name="Account"         component={AccountTab} />
+          <Stack.Screen name="Explore"         component={ExploreTab} />
         </Stack.Navigator>
       </CartProvider>
     </NavigationContainer>

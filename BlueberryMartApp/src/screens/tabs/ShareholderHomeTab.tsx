@@ -11,12 +11,12 @@ import {
   View,
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
 import { SavedReport, deleteReport, listReports } from '../../services/analyticsService';
 import { SavedReportCard } from '../../components/ReportChart';
+import AppHeader from '../../components/AppHeader';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CHART_WIDTH = SCREEN_WIDTH - 48;
@@ -49,7 +49,6 @@ interface Analytics {
 }
 
 export default function ShareholderHomeTab() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -124,18 +123,15 @@ export default function ShareholderHomeTab() {
   }
 
   return (
+    <View style={styles.wrapper}>
+    <AppHeader />
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
     >
-      <View style={styles.headerRow}>
-        <Text style={styles.heading}>Analytics</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Account')} activeOpacity={0.7}>
-          <Ionicons name="person-circle-outline" size={28} color="#111827" />
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.heading}>Analytics</Text>
 
       <View style={styles.revenueCard}>
         <Text style={styles.revenueLabel}>Total Revenue</Text>
@@ -245,6 +241,16 @@ export default function ShareholderHomeTab() {
         ))
       }
 
+      <Text style={styles.sectionTitle}>Custom reports</Text>
+      <TouchableOpacity style={styles.exploreCard} onPress={() => navigation.navigate('Explore')} activeOpacity={0.85}>
+        <View style={styles.exploreIcon}><Ionicons name="construct-outline" size={20} color="#14532d" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.exploreTitle}>Build a custom report</Text>
+          <Text style={styles.exploreSub}>Pick measures, dimensions & chart type in Explore</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+      </TouchableOpacity>
+
       <Text style={styles.sectionTitle}>My Reports</Text>
       {reportsLoading
         ? <ActivityIndicator color="#16a34a" style={{ marginVertical: 16 }} />
@@ -262,16 +268,24 @@ export default function ShareholderHomeTab() {
 
       <View style={{ height: 24 }} />
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { flex: 1, backgroundColor: '#f9fafb' },
   scroll: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingHorizontal: 24, paddingBottom: 32 },
+  content: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   errorText: { color: '#dc2626', fontSize: 13 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  heading: { fontSize: 26, fontWeight: '700', color: '#111827' },
+  heading: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  exploreCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#ffffff', borderRadius: 12,
+    padding: 14, marginBottom: 16, borderWidth: 1.5, borderColor: '#bbf7d0',
+  },
+  exploreIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center' },
+  exploreTitle: { fontSize: 14.5, fontWeight: '700', color: '#111827' },
+  exploreSub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   revenueCard: { backgroundColor: '#14532d', borderRadius: 14, padding: 20, marginBottom: 20, alignItems: 'center' },
   revenueLabel: { color: '#bbf7d0', fontSize: 13, marginBottom: 6 },
   revenueValue: { color: '#ffffff', fontSize: 28, fontWeight: '700' },

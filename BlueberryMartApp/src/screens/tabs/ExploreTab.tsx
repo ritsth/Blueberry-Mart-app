@@ -197,6 +197,9 @@ export default function ExploreTab() {
   return (
     <View style={styles.wrapper}>
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginBottom: 6 }}>
+          <Ionicons name="chevron-back" size={26} color="#111827" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Explore</Text>
         <Text style={styles.headerSub}>Build a custom chart</Text>
       </View>
