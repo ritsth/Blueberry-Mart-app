@@ -8,7 +8,17 @@ namespace BlueberryMart.Api.Configuration;
 public class ChatOptions
 {
     public string? ApiKey { get; set; }
-    public string Model { get; set; } = "claude-haiku-4-5-20251001";
-    public string BaseUrl { get; set; } = "https://api.anthropic.com/v1/messages";
+
+    /// <summary>Any OpenAI-compatible chat-completions endpoint. Default: Groq (free tier).</summary>
+    public string BaseUrl { get; set; } = "https://api.groq.com/openai/v1/chat/completions";
+
+    /// <summary>
+    /// Model id for the chosen provider. Examples:
+    /// Groq <c>llama-3.3-70b-versatile</c>; Gemini <c>gemini-2.0-flash</c>
+    /// (BaseUrl <c>https://generativelanguage.googleapis.com/v1beta/openai/chat/completions</c>);
+    /// OpenRouter <c>meta-llama/llama-3.3-70b-instruct:free</c>; Ollama <c>llama3.2</c>.
+    /// </summary>
+    public string Model { get; set; } = "llama-3.3-70b-versatile";
+
     public int MaxTokens { get; set; } = 600;
 }

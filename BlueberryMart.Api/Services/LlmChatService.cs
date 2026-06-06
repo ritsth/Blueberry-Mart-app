@@ -10,11 +10,13 @@ using Microsoft.Extensions.Options;
 namespace BlueberryMart.Api.Services;
 
 /// <summary>
-/// Customer support assistant backed by the Anthropic Messages API. The system prompt
-/// scopes the bot to Blueberry Mart items + support and injects a live catalog snapshot
-/// so answers stay grounded.
+/// Customer support assistant backed by any <b>OpenAI-compatible</b> chat-completions
+/// endpoint — so you can use a free/cheap provider (Groq, Google Gemini, OpenRouter,
+/// a local Ollama, OpenAI, …) just by setting <c>Chat:BaseUrl</c>, <c>Chat:Model</c>
+/// and <c>Chat:ApiKey</c>. The system prompt scopes the bot to Blueberry Mart items +
+/// support and injects a live catalog snapshot so answers stay grounded.
 /// </summary>
-public sealed class ClaudeChatService : IChatService
+public sealed class LlmChatService : IChatService
 {
     private readonly HttpClient _http;
     private readonly ChatOptions _opts;
@@ -22,7 +24,7 @@ public sealed class ClaudeChatService : IChatService
 
     public bool Enabled => true;
 
-    public ClaudeChatService(HttpClient http, IOptions<ChatOptions> opts, BlueberryMartDbContext db)
+    public LlmChatService(HttpClient http, IOptions<ChatOptions> opts, BlueberryMartDbContext db)
     {
         _http = http;
         _opts = opts.Value;
@@ -33,21 +35,20 @@ public sealed class ClaudeChatService : IChatService
     {
         var system = await BuildSystemPromptAsync(ct);
 
+        // OpenAI-compatible: the system prompt is the first message with role "system".
+        var chatMessages = new List<object> { new { role = "system", content = system } };
+        foreach (var m in messages)
+            chatMessages.Add(new { role = m.Role == "assistant" ? "assistant" : "user", content = m.Content });
+
         var payload = new
         {
             model = _opts.Model,
             max_tokens = _opts.MaxTokens,
-            system,
-            messages = messages.Select(m => new
-            {
-                role = m.Role == "assistant" ? "assistant" : "user",
-                content = m.Content,
-            }).ToArray(),
+            messages = chatMessages,
         };
 
         using var req = new HttpRequestMessage(HttpMethod.Post, _opts.BaseUrl);
-        req.Headers.Add("x-api-key", _opts.ApiKey);
-        req.Headers.Add("anthropic-version", "2023-06-01");
+        req.Headers.Add("Authorization", $"Bearer {_opts.ApiKey}");
         req.Content = JsonContent.Create(payload);
 
         using var res = await _http.SendAsync(req, ct);
@@ -60,14 +61,13 @@ public sealed class ClaudeChatService : IChatService
         using var stream = await res.Content.ReadAsStreamAsync(ct);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-        // content is an array of blocks; concatenate any text blocks.
-        var sb = new StringBuilder();
-        foreach (var block in doc.RootElement.GetProperty("content").EnumerateArray())
-        {
-            if (block.TryGetProperty("type", out var t) && t.GetString() == "text")
-                sb.Append(block.GetProperty("text").GetString());
-        }
-        return sb.Length > 0 ? sb.ToString() : "Sorry, I couldn't come up with a reply.";
+        var content = doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+
+        return string.IsNullOrWhiteSpace(content) ? "Sorry, I couldn't come up with a reply." : content;
     }
 
     private async Task<string> BuildSystemPromptAsync(CancellationToken ct)

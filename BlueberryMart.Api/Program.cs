@@ -98,7 +98,7 @@ builder.Services.Configure<BlueberryMart.Api.Configuration.ChatOptions>(
     builder.Configuration.GetSection("Chat"));
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Chat:ApiKey"]))
     builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IChatService,
-        BlueberryMart.Api.Services.ClaudeChatService>();
+        BlueberryMart.Api.Services.LlmChatService>();
 else
     builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IChatService,
         BlueberryMart.Api.Services.DisabledChatService>();
