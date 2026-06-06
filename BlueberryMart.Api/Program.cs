@@ -92,6 +92,17 @@ else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IAnalyticsQueryService,
         BlueberryMart.Api.Services.DisabledAnalyticsQueryService>();
 
+// Customer support assistant: opt-in via Chat:ApiKey (Anthropic). A disabled (no-op)
+// implementation is used when no key is configured (e.g. production today).
+builder.Services.Configure<BlueberryMart.Api.Configuration.ChatOptions>(
+    builder.Configuration.GetSection("Chat"));
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Chat:ApiKey"]))
+    builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IChatService,
+        BlueberryMart.Api.Services.ClaudeChatService>();
+else
+    builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IChatService,
+        BlueberryMart.Api.Services.DisabledChatService>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
