@@ -4,8 +4,12 @@ import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTour } from '../context/TourContext';
+import { getStoredUserId } from '../services/authService';
 
-export const TOUR_SEEN_KEY = 'customer_tour_seen_v3';
+const TOUR_SEEN_KEY = 'customer_tour_seen_v3';
+
+/** Per-customer storage key, so each customer sees the tour at least once (even on a shared device). */
+export const tourKeyFor = (uid: string | null) => (uid ? `${TOUR_SEEN_KEY}_${uid}` : TOUR_SEEN_KEY);
 
 const TAB_COUNT = 5; // Shop · Bulk · Cart · Activity · Assistant
 const TAB_INDEX: Record<string, number> = { Shop: 0, Bulk: 1, Cart: 2, Activity: 3, Assistant: 4 };
@@ -35,16 +39,23 @@ export default function OnboardingTour() {
   const tour = useTour();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
+  const [seenKey, setSeenKey] = useState(tourKeyFor(null));
 
   useEffect(() => {
     let alive = true;
-    AsyncStorage.getItem(TOUR_SEEN_KEY).then(v => { if (alive && v == null) setVisible(true); });
+    (async () => {
+      const key = tourKeyFor(await getStoredUserId());
+      if (!alive) return;
+      setSeenKey(key);
+      const v = await AsyncStorage.getItem(key);
+      if (alive && v == null) setVisible(true);
+    })();
     return () => { alive = false; };
   }, []);
 
   async function finish() {
     setVisible(false);
-    try { await AsyncStorage.setItem(TOUR_SEEN_KEY, '1'); } catch { /* non-blocking */ }
+    try { await AsyncStorage.setItem(seenKey, '1'); } catch { /* non-blocking */ }
   }
 
   if (!visible) return null;

@@ -73,3 +73,21 @@ export async function getStoredRole(): Promise<UserRole | null> {
   const role = await AsyncStorage.getItem('user_role');
   return role as UserRole | null;
 }
+
+/** Stable identifier for the signed-in user (from the JWT), used e.g. to key the first-login tour per customer. */
+export async function getStoredUserId(): Promise<string | null> {
+  const token = await AsyncStorage.getItem('jwt_token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return (
+      payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/nameidentifier'] ??
+      payload['nameid'] ??
+      payload['sub'] ??
+      payload['email'] ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}

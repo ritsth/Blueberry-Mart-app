@@ -14,8 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getStoredToken, logout } from '../../services/authService';
-import { TOUR_SEEN_KEY } from '../../components/OnboardingTour';
+import { getStoredToken, getStoredUserId, logout } from '../../services/authService';
+import { tourKeyFor } from '../../components/OnboardingTour';
 import type { RootStackParamList } from '../../../App';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
@@ -122,7 +122,7 @@ export default function AccountTab() {
   }
 
   async function replayTour() {
-    await AsyncStorage.removeItem(TOUR_SEEN_KEY);
+    await AsyncStorage.removeItem(tourKeyFor(await getStoredUserId()));
     Alert.alert('Tour reset', 'The welcome tour will show next time you open the app.');
   }
 
