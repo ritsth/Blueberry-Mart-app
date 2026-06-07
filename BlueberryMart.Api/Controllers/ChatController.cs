@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -36,7 +37,8 @@ public class ChatController(IChatService chat) : ControllerBase
 
         try
         {
-            var reply = await chat.ReplyAsync(msgs, ct);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var reply = await chat.ReplyAsync(msgs, userId, ct);
             return Ok(new { enabled = true, reply });
         }
         catch

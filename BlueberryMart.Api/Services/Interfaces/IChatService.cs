@@ -9,5 +9,6 @@ public interface IChatService
     /// <summary><c>false</c> when no API key is configured (e.g. production today).</summary>
     bool Enabled { get; }
 
-    Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, CancellationToken ct = default);
+    /// <param name="userId">The signed-in customer; their own recent orders are injected for context.</param>
+    Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, Guid userId, CancellationToken ct = default);
 }

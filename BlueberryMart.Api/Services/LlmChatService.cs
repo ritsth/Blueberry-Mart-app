@@ -31,9 +31,9 @@ public sealed class LlmChatService : IChatService
         _db = db;
     }
 
-    public async Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, CancellationToken ct = default)
+    public async Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, Guid userId, CancellationToken ct = default)
     {
-        var system = await BuildSystemPromptAsync(ct);
+        var system = await BuildSystemPromptAsync(userId, ct);
 
         // OpenAI-compatible: the system prompt is the first message with role "system".
         var chatMessages = new List<object> { new { role = "system", content = system } };
@@ -70,7 +70,7 @@ public sealed class LlmChatService : IChatService
         return string.IsNullOrWhiteSpace(content) ? "Sorry, I couldn't come up with a reply." : content;
     }
 
-    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
+    private async Task<string> BuildSystemPromptAsync(Guid userId, CancellationToken ct)
     {
         var items = await _db.Inventory
             .Include(i => i.Branch)
@@ -98,6 +98,8 @@ public sealed class LlmChatService : IChatService
             }
         }
 
+        var ordersText = await BuildOrdersTextAsync(userId, ct);
+
         return
             "You are the Blueberry Mart shopping assistant — a friendly in-app helper for customers of the " +
             "Blueberry Mart grocery store (Nepal; prices in Rs / NPR).\n\n" +
@@ -116,7 +118,52 @@ public sealed class LlmChatService : IChatService
             "- Blueberry Plus (Rs 199/month): 5% off every order, free delivery, and bulk ordering.\n" +
             "- Loyalty: 1 point per Rs of goods; reviews earn 10 points (20 with a photo).\n" +
             "- For an out-of-stock item, tap \"Notify me\" to be alerted when it's back.\n\n" +
-            "Current catalog:\n" + catalog;
+            "Current catalog:\n" + catalog + "\n\n" +
+            "This customer's recent orders (most recent first; ONLY this customer's orders — never reveal anyone " +
+            "else's). Status meanings: pending = placed but not paid yet; confirmed = paid & being prepared / ready; " +
+            "completed = received; cancelled = cancelled. Use these to answer \"where's my order #N\" questions; if an " +
+            "order number isn't in this list, say you don't see it on their account.\n" + ordersText;
+    }
+
+    private async Task<string> BuildOrdersTextAsync(Guid userId, CancellationToken ct)
+    {
+        var orders = await _db.Orders
+            .Where(o => o.UserId == userId)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(10)
+            .Select(o => new
+            {
+                o.Id,
+                o.OrderNumber,
+                o.OrderType,
+                o.Status,
+                o.TotalAmount,
+                o.CreatedAt,
+                Branch = o.Branch.Name,
+                PaymentStatus = _db.Payments.Where(p => p.OrderId == o.Id).Select(p => p.Status).FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        if (orders.Count == 0) return "(This customer has no orders yet.)";
+
+        var orderIds = orders.Select(o => o.Id).ToList();
+        var itemsByOrder = (await _db.OrderItems
+                .Where(oi => orderIds.Contains(oi.OrderId))
+                .Select(oi => new { oi.OrderId, oi.Item.ItemName, oi.Quantity })
+                .ToListAsync(ct))
+            .GroupBy(x => x.OrderId)
+            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => $"{x.ItemName} x{x.Quantity}")));
+
+        var sb = new StringBuilder();
+        foreach (var o in orders)
+        {
+            var pay = string.IsNullOrEmpty(o.PaymentStatus) ? "no payment yet" : o.PaymentStatus;
+            var its = itemsByOrder.GetValueOrDefault(o.Id, "");
+            sb.AppendLine(
+                $"  - Order #{o.OrderNumber}: {o.CreatedAt:yyyy-MM-dd}, {o.Branch}, {o.OrderType}, " +
+                $"status {o.Status}, payment {pay}, total Rs {o.TotalAmount:0.##}. Items: {its}");
+        }
+        return sb.ToString();
     }
 }
 
@@ -125,6 +172,6 @@ public sealed class DisabledChatService : IChatService
 {
     public bool Enabled => false;
 
-    public Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, CancellationToken ct = default)
+    public Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, Guid userId, CancellationToken ct = default)
         => throw new InvalidOperationException("The assistant is not configured.");
 }
