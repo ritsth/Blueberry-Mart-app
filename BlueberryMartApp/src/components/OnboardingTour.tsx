@@ -107,9 +107,16 @@ export default function OnboardingTour() {
             <View style={styles.dots}>
               {STEPS.map((_, i) => <View key={i} style={[styles.dot, i === step && styles.dotActive]} />)}
             </View>
-            <TouchableOpacity style={styles.cta} onPress={() => (isLast ? finish() : setStep(step + 1))} activeOpacity={0.85}>
-              <Text style={styles.ctaText}>{isLast ? 'Get started' : 'Next'}</Text>
-            </TouchableOpacity>
+            <View style={styles.btnRow}>
+              {step > 0 && (
+                <TouchableOpacity style={styles.back} onPress={() => setStep(step - 1)} activeOpacity={0.7}>
+                  <Text style={styles.backText}>Back</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.cta} onPress={() => (isLast ? finish() : setStep(step + 1))} activeOpacity={0.85}>
+                <Text style={styles.ctaText}>{isLast ? 'Get started' : 'Next'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -127,9 +134,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 6, marginRight: 40 },
   body: { fontSize: 14, color: '#6b7280', lineHeight: 20, marginBottom: 16 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dots: { flexDirection: 'row', gap: 6 },
+  dots: { flexDirection: 'row', gap: 6, flexShrink: 1 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#e5e7eb' },
   dotActive: { backgroundColor: '#16a34a', width: 18 },
+  btnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  back: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: '#e5e7eb' },
+  backText: { color: '#6b7280', fontSize: 14, fontWeight: '700' },
   cta: { backgroundColor: '#16a34a', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 22 },
   ctaText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   pointerDown: {
