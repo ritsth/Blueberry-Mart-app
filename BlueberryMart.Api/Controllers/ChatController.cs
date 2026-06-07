@@ -41,9 +41,10 @@ public class ChatController(IChatService chat) : ControllerBase
             var reply = await chat.ReplyAsync(msgs, userId, ct);
             return Ok(new { enabled = true, reply });
         }
-        catch
+        catch (Exception ex)
         {
-            return StatusCode(502, new { error = "The assistant is temporarily unavailable. Please try again." });
+            // TEMP: surface the detail to diagnose the search_items 502; revert after.
+            return StatusCode(502, new { error = "The assistant is temporarily unavailable. Please try again.", detail = ex.Message });
         }
     }
 }
