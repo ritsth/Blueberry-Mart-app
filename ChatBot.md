@@ -32,10 +32,12 @@ Why not the heavier approaches:
   a trivial retrieval step — no vector DB needed. If the catalog ever grew huge, graduate to
   real RAG (e.g. **pgvector** in the existing Postgres) and inject only the top-k chunks.
 
-For **per-customer orders**, the assistant uses **tool-calling** (not injection). The model
-can call two functions on demand:
-- `get_order(order_number)` — one order's status, items, total, branch, date.
-- `list_my_orders()` — the customer's recent orders.
+For **per-customer data and actions**, the assistant uses **tool-calling** (not injection).
+The model can call these functions on demand:
+- `get_order(order_number)` — *(read)* one order's status, items, total, branch, date.
+- `list_my_orders()` — *(read)* the customer's recent orders.
+- `subscribe_back_in_stock(item_name, branch?)` — *(action)* sign the customer up for a
+  back-in-stock alert on an out-of-stock item (creates a `StockSubscription`).
 
 `LlmChatService` runs a **tool loop**: send messages + tool definitions → if the model
 returns `tool_calls`, execute them, append the results as `role:"tool"` messages, and call
@@ -54,7 +56,7 @@ tool-calling support; Groq's `llama-3.3-70b-versatile` has it.)
   (bound from the `"Chat"` section). **Defaults to Groq.**
 - `BlueberryMart.Api/Services/LlmChatService.cs` — calls an OpenAI-compatible
   `/chat/completions` endpoint; builds the scoped system prompt + live catalog, and runs the
-  **tool loop** for the `get_order` / `list_my_orders` functions (executed scoped to the user).
+  **tool loop** for the `get_order` / `list_my_orders` / `subscribe_back_in_stock` functions (executed scoped to the user).
   `DisabledChatService` is used when no key is set (`enabled:false`).
 - `BlueberryMart.Api/Controllers/ChatController.cs` — `POST /api/chat`
   (`Customer,Shareholder`). Caps history to 20 turns / 2000 chars, requires the last turn to
