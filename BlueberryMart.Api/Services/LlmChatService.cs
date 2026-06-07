@@ -1,6 +1,6 @@
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using BlueberryMart.Api.Configuration;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Services.Interfaces;
@@ -11,13 +11,18 @@ namespace BlueberryMart.Api.Services;
 
 /// <summary>
 /// Customer support assistant backed by any <b>OpenAI-compatible</b> chat-completions
-/// endpoint — so you can use a free/cheap provider (Groq, Google Gemini, OpenRouter,
-/// a local Ollama, OpenAI, …) just by setting <c>Chat:BaseUrl</c>, <c>Chat:Model</c>
-/// and <c>Chat:ApiKey</c>. The system prompt scopes the bot to Blueberry Mart items +
-/// support and injects a live catalog snapshot so answers stay grounded.
+/// endpoint (Groq by default; also Gemini/OpenRouter/Ollama/OpenAI via config).
+///
+/// Grounding strategy:
+/// - the small, mostly-static <b>catalog</b> is injected into the system prompt, and
+/// - per-customer <b>orders</b> are exposed as <b>tools</b> (<c>get_order</c>,
+///   <c>list_my_orders</c>) the model calls on demand. Tools execute scoped strictly to
+///   the signed-in customer, so one customer can never see another's orders.
 /// </summary>
 public sealed class LlmChatService : IChatService
 {
+    private const int MaxToolRounds = 5;
+
     private readonly HttpClient _http;
     private readonly ChatOptions _opts;
     private readonly BlueberryMartDbContext _db;
@@ -33,44 +38,187 @@ public sealed class LlmChatService : IChatService
 
     public async Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, Guid userId, CancellationToken ct = default)
     {
-        var system = await BuildSystemPromptAsync(userId, ct);
+        var system = await BuildSystemPromptAsync(ct);
 
-        // OpenAI-compatible: the system prompt is the first message with role "system".
-        var chatMessages = new List<object> { new { role = "system", content = system } };
+        var history = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = system } };
         foreach (var m in messages)
-            chatMessages.Add(new { role = m.Role == "assistant" ? "assistant" : "user", content = m.Content });
+            history.Add(new JsonObject { ["role"] = m.Role == "assistant" ? "assistant" : "user", ["content"] = m.Content });
 
-        var payload = new
+        // Tool-calling loop: call the model; if it asks for tools, run them (scoped to the
+        // user), append the results, and call again — until it returns a final answer.
+        for (var round = 0; round < MaxToolRounds; round++)
         {
-            model = _opts.Model,
-            max_tokens = _opts.MaxTokens,
-            messages = chatMessages,
-        };
+            var body = new JsonObject
+            {
+                ["model"] = _opts.Model,
+                ["max_tokens"] = _opts.MaxTokens,
+                ["messages"] = history.DeepClone(),
+                ["tools"] = BuildTools(),
+            };
 
-        using var req = new HttpRequestMessage(HttpMethod.Post, _opts.BaseUrl);
-        req.Headers.Add("Authorization", $"Bearer {_opts.ApiKey}");
-        req.Content = JsonContent.Create(payload);
+            var root = await PostAsync(body, ct);
+            var message = root?["choices"]?[0]?["message"];
+            if (message is null) return "Sorry, I couldn't come up with a reply.";
 
-        using var res = await _http.SendAsync(req, ct);
-        if (!res.IsSuccessStatusCode)
-        {
-            var body = await res.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Assistant API error {(int)res.StatusCode}: {body}");
+            var toolCalls = message["tool_calls"] as JsonArray;
+            if (toolCalls is null || toolCalls.Count == 0)
+                return message["content"]?.GetValue<string>() ?? "Sorry, I couldn't come up with a reply.";
+
+            // Echo the assistant's tool-call message back into the history…
+            history.Add(JsonNode.Parse(message.ToJsonString())!);
+
+            // …then run each requested tool and append its result as a "tool" message.
+            foreach (var call in toolCalls)
+            {
+                var fn = call?["function"];
+                var name = fn?["name"]?.GetValue<string>() ?? "";
+                var args = fn?["arguments"]?.GetValue<string>() ?? "{}";
+                var id = call?["id"]?.GetValue<string>() ?? "";
+                var result = await ExecuteToolAsync(name, args, userId, ct);
+                history.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = id, ["content"] = result });
+            }
         }
 
-        using var stream = await res.Content.ReadAsStreamAsync(ct);
-        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-
-        var content = doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString();
-
-        return string.IsNullOrWhiteSpace(content) ? "Sorry, I couldn't come up with a reply." : content;
+        return "Sorry, that took too many steps — please try rephrasing.";
     }
 
-    private async Task<string> BuildSystemPromptAsync(Guid userId, CancellationToken ct)
+    private async Task<JsonNode?> PostAsync(JsonObject body, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, _opts.BaseUrl);
+        req.Headers.Add("Authorization", $"Bearer {_opts.ApiKey}");
+        req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+
+        using var res = await _http.SendAsync(req, ct);
+        var text = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Assistant API error {(int)res.StatusCode}: {text}");
+        return JsonNode.Parse(text);
+    }
+
+    // --- tools --------------------------------------------------------------------
+    private static JsonArray BuildTools() => new()
+    {
+        new JsonObject
+        {
+            ["type"] = "function",
+            ["function"] = new JsonObject
+            {
+                ["name"] = "get_order",
+                ["description"] = "Look up ONE of the signed-in customer's orders by its order number. "
+                    + "Returns status, items, total, branch and date — or found:false if that order isn't on this customer's account.",
+                ["parameters"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["order_number"] = new JsonObject { ["type"] = "integer", ["description"] = "The order number, e.g. 1042" },
+                    },
+                    ["required"] = new JsonArray { "order_number" },
+                },
+            },
+        },
+        new JsonObject
+        {
+            ["type"] = "function",
+            ["function"] = new JsonObject
+            {
+                ["name"] = "list_my_orders",
+                ["description"] = "List the signed-in customer's recent orders (number, status, total, date, type).",
+                ["parameters"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() },
+            },
+        },
+    };
+
+    private async Task<string> ExecuteToolAsync(string name, string argsJson, Guid userId, CancellationToken ct)
+    {
+        try
+        {
+            switch (name)
+            {
+                case "get_order":
+                    {
+                        using var args = JsonDocument.Parse(string.IsNullOrWhiteSpace(argsJson) ? "{}" : argsJson);
+                        if (!args.RootElement.TryGetProperty("order_number", out var n))
+                            return Json(new { error = "order_number is required" });
+                        var orderNumber = n.ValueKind == JsonValueKind.Number ? n.GetInt32() : int.Parse(n.GetString() ?? "0");
+                        return await GetOrderAsync(orderNumber, userId, ct);
+                    }
+                case "list_my_orders":
+                    return await ListOrdersAsync(userId, ct);
+                default:
+                    return Json(new { error = $"unknown tool '{name}'" });
+            }
+        }
+        catch (Exception ex)
+        {
+            return Json(new { error = "tool failed", detail = ex.Message });
+        }
+    }
+
+    private async Task<string> GetOrderAsync(int orderNumber, Guid userId, CancellationToken ct)
+    {
+        var o = await _db.Orders
+            .Where(x => x.UserId == userId && x.OrderNumber == orderNumber)
+            .Select(x => new
+            {
+                x.Id,
+                x.OrderNumber,
+                x.OrderType,
+                x.Status,
+                x.TotalAmount,
+                x.CreatedAt,
+                Branch = x.Branch.Name,
+                PaymentStatus = _db.Payments.Where(p => p.OrderId == x.Id).Select(p => p.Status).FirstOrDefault(),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (o is null)
+            return Json(new { found = false, message = "No order with that number on this customer's account." });
+
+        var items = await _db.OrderItems
+            .Where(oi => oi.OrderId == o.Id)
+            .Select(oi => new { name = oi.Item.ItemName, quantity = oi.Quantity })
+            .ToListAsync(ct);
+
+        return Json(new
+        {
+            found = true,
+            order_number = o.OrderNumber,
+            status = o.Status,
+            type = o.OrderType,
+            payment = o.PaymentStatus ?? "none",
+            total = o.TotalAmount,
+            date = o.CreatedAt.ToString("yyyy-MM-dd"),
+            branch = o.Branch,
+            items,
+        });
+    }
+
+    private async Task<string> ListOrdersAsync(Guid userId, CancellationToken ct)
+    {
+        var raw = await _db.Orders
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(15)
+            .Select(x => new { x.OrderNumber, x.Status, x.OrderType, x.TotalAmount, x.CreatedAt })
+            .ToListAsync(ct);
+
+        var orders = raw.Select(x => new
+        {
+            order_number = x.OrderNumber,
+            status = x.Status,
+            type = x.OrderType,
+            total = x.TotalAmount,
+            date = x.CreatedAt.ToString("yyyy-MM-dd"),
+        });
+
+        return Json(new { count = raw.Count, orders });
+    }
+
+    private static string Json(object o) => JsonSerializer.Serialize(o);
+
+    // --- system prompt (catalog injected; orders handled via tools) ---------------
+    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
     {
         var items = await _db.Inventory
             .Include(i => i.Branch)
@@ -98,19 +246,20 @@ public sealed class LlmChatService : IChatService
             }
         }
 
-        var ordersText = await BuildOrdersTextAsync(userId, ct);
-
         return
             "You are the Blueberry Mart shopping assistant — a friendly in-app helper for customers of the " +
             "Blueberry Mart grocery store (Nepal; prices in Rs / NPR).\n\n" +
             "You ONLY help with two things:\n" +
             "1. Questions about Blueberry Mart's items — availability, price, which branch has them, stock, and bulk options.\n" +
-            "2. Customer issues & support — placing and paying for orders, pickup vs delivery, Blueberry Plus membership, " +
-            "loyalty points, reviews, and \"how do I…\" help for the app.\n\n" +
-            "If a question is outside these two topics (general knowledge, other stores, chit-chat, or anything unrelated to " +
-            "Blueberry Mart shopping/support), politely decline in one sentence and offer to help with an item or an order issue instead.\n\n" +
-            "Keep replies short, friendly and concrete. NEVER invent items, prices or stock — use only the catalog below. " +
-            "If an item isn't listed, say Blueberry Mart doesn't carry it.\n\n" +
+            "2. Customer issues & support — orders, paying, pickup vs delivery, Blueberry Plus membership, loyalty, reviews.\n\n" +
+            "If a question is outside these topics, politely decline in one sentence and offer to help with an item or an order.\n\n" +
+            "Keep replies short, friendly and concrete. NEVER invent items, prices or stock — use only the catalog below; " +
+            "if an item isn't listed, say Blueberry Mart doesn't carry it.\n\n" +
+            "ORDERS: to answer anything about THIS customer's orders (status, what's in one, totals, \"where's my order #N\"), " +
+            "call the tools `get_order` or `list_my_orders`. They're already scoped to the signed-in customer, so never ask " +
+            "who they are and never reveal other customers' data. Base order answers only on tool results — don't guess. " +
+            "Order status meanings: pending = placed but not paid yet; confirmed = paid & being prepared / ready; " +
+            "completed = received; cancelled = cancelled.\n\n" +
             "How the app works (for support answers):\n" +
             "- Order: pick a branch, add items, choose Pickup or Delivery, place the order, then pay with eSewa.\n" +
             "- Members get free delivery; non-members pay a flat Rs 100 delivery fee. Pickup is always free.\n" +
@@ -118,52 +267,7 @@ public sealed class LlmChatService : IChatService
             "- Blueberry Plus (Rs 199/month): 5% off every order, free delivery, and bulk ordering.\n" +
             "- Loyalty: 1 point per Rs of goods; reviews earn 10 points (20 with a photo).\n" +
             "- For an out-of-stock item, tap \"Notify me\" to be alerted when it's back.\n\n" +
-            "Current catalog:\n" + catalog + "\n\n" +
-            "This customer's recent orders (most recent first; ONLY this customer's orders — never reveal anyone " +
-            "else's). Status meanings: pending = placed but not paid yet; confirmed = paid & being prepared / ready; " +
-            "completed = received; cancelled = cancelled. Use these to answer \"where's my order #N\" questions; if an " +
-            "order number isn't in this list, say you don't see it on their account.\n" + ordersText;
-    }
-
-    private async Task<string> BuildOrdersTextAsync(Guid userId, CancellationToken ct)
-    {
-        var orders = await _db.Orders
-            .Where(o => o.UserId == userId)
-            .OrderByDescending(o => o.CreatedAt)
-            .Take(10)
-            .Select(o => new
-            {
-                o.Id,
-                o.OrderNumber,
-                o.OrderType,
-                o.Status,
-                o.TotalAmount,
-                o.CreatedAt,
-                Branch = o.Branch.Name,
-                PaymentStatus = _db.Payments.Where(p => p.OrderId == o.Id).Select(p => p.Status).FirstOrDefault(),
-            })
-            .ToListAsync(ct);
-
-        if (orders.Count == 0) return "(This customer has no orders yet.)";
-
-        var orderIds = orders.Select(o => o.Id).ToList();
-        var itemsByOrder = (await _db.OrderItems
-                .Where(oi => orderIds.Contains(oi.OrderId))
-                .Select(oi => new { oi.OrderId, oi.Item.ItemName, oi.Quantity })
-                .ToListAsync(ct))
-            .GroupBy(x => x.OrderId)
-            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => $"{x.ItemName} x{x.Quantity}")));
-
-        var sb = new StringBuilder();
-        foreach (var o in orders)
-        {
-            var pay = string.IsNullOrEmpty(o.PaymentStatus) ? "no payment yet" : o.PaymentStatus;
-            var its = itemsByOrder.GetValueOrDefault(o.Id, "");
-            sb.AppendLine(
-                $"  - Order #{o.OrderNumber}: {o.CreatedAt:yyyy-MM-dd}, {o.Branch}, {o.OrderType}, " +
-                $"status {o.Status}, payment {pay}, total Rs {o.TotalAmount:0.##}. Items: {its}");
-        }
-        return sb.ToString();
+            "Current catalog:\n" + catalog;
     }
 }
 
