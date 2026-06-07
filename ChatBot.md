@@ -32,8 +32,12 @@ Why not the heavier approaches:
   a trivial retrieval step — no vector DB needed. If the catalog ever grew huge, graduate to
   real RAG (e.g. **pgvector** in the existing Postgres) and inject only the top-k chunks.
 
-Current limitation: it doesn't see a specific user's orders ("where's order #1042?"). Add
-per-user order injection or a lookup tool later if wanted.
+It also injects the **signed-in customer's own recent orders** (last 10), so it can answer
+"where's my order #1042 / what was in it" with status, items and totals. This is **scoped
+strictly by the authenticated user id** in `ChatController` → `LlmChatService` — a customer
+only ever sees their own orders; an unknown number → "not on your account." (Verified: a
+customer asking about another customer's order is refused.) For very large per-user
+histories you'd switch from injecting all orders to a tool-call/lookup instead.
 
 ---
 
