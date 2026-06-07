@@ -13,7 +13,9 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStoredToken, logout } from '../../services/authService';
+import { TOUR_SEEN_KEY } from '../../components/OnboardingTour';
 import type { RootStackParamList } from '../../../App';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
@@ -119,6 +121,11 @@ export default function AccountTab() {
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   }
 
+  async function replayTour() {
+    await AsyncStorage.removeItem(TOUR_SEEN_KEY);
+    Alert.alert('Tour reset', 'The welcome tour will show next time you open the app.');
+  }
+
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#16a34a" /></View>;
   }
@@ -214,6 +221,7 @@ export default function AccountTab() {
 
       {/* Account rows */}
       <Text style={styles.sectionLabel}>Account</Text>
+      <Row icon="refresh-outline" label="Replay app tour" onPress={replayTour} />
       <Row icon="log-out-outline" label="Sign out" danger onPress={handleLogout} />
 
       <View style={{ height: 24 }} />

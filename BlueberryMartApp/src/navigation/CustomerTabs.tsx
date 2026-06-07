@@ -8,6 +8,7 @@ import BulkTab from '../screens/tabs/BulkTab';
 import CartScreen from '../screens/tabs/CartScreen';
 import ActivityTab from '../screens/tabs/ActivityTab';
 import ChatScreen from '../screens/tabs/ChatScreen';
+import OnboardingTour from '../components/OnboardingTour';
 import { useCart } from '../context/CartContext';
 
 const Tab = createBottomTabNavigator();
@@ -17,6 +18,7 @@ export default function CustomerTabs() {
   const { totalCount } = useCart();
 
   return (
+    <>
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -64,6 +66,8 @@ export default function CustomerTabs() {
       <Tab.Screen name="Activity" component={ActivityTab} />
       <Tab.Screen name="Assistant" component={ChatScreen} />
     </Tab.Navigator>
+    <OnboardingTour />
+    </>
   );
 }
 
