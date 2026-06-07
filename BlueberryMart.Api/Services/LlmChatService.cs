@@ -101,17 +101,6 @@ public sealed class LlmChatService : IChatService
     // --- tools --------------------------------------------------------------------
     private static JsonArray BuildTools() => new()
     {
-        Tool("search_items",
-            "Search Blueberry Mart's catalog for items (price, stock, branch, bulk-only). Pass a keyword to filter by "
-            + "name, or an empty query to list everything. This is the ONLY source of item facts.",
-            new JsonObject
-            {
-                ["type"] = "object",
-                ["properties"] = new JsonObject
-                {
-                    ["query"] = new JsonObject { ["type"] = "string", ["description"] = "Keyword to match item names; empty = all items" },
-                },
-            }),
         Tool("get_order",
             "Look up ONE of the signed-in customer's orders by its order number. Returns status, items, total, branch and "
             + "date — or found:false if that order isn't on this customer's account.",
@@ -156,8 +145,6 @@ public sealed class LlmChatService : IChatService
             var root = args.RootElement;
             switch (name)
             {
-                case "search_items":
-                    return await SearchItemsAsync(Str(root, "query") ?? "", ct);
                 case "get_order":
                     {
                         if (!root.TryGetProperty("order_number", out var n))
@@ -181,27 +168,6 @@ public sealed class LlmChatService : IChatService
 
     private static string? Str(JsonElement root, string prop) =>
         root.TryGetProperty(prop, out var v) ? v.GetString() : null;
-
-    private async Task<string> SearchItemsAsync(string query, CancellationToken ct)
-    {
-        var q = _db.Inventory.Include(i => i.Branch).AsQueryable();
-        if (!string.IsNullOrWhiteSpace(query))
-            q = q.Where(i => EF.Functions.ILike(i.ItemName, $"%{query}%"));
-
-        var rows = await q
-            .OrderBy(i => i.Branch.Name).ThenBy(i => i.ItemName)
-            .Select(i => new
-            {
-                item = i.ItemName,
-                branch = i.Branch.Name,
-                price = i.Price,
-                stock = i.StockQuantity,
-                bulk_only = i.IsBulkOnly,
-            })
-            .ToListAsync(ct);
-
-        return Json(new { count = rows.Count, items = rows });
-    }
 
     private async Task<string> GetOrderAsync(int orderNumber, Guid userId, CancellationToken ct)
     {
