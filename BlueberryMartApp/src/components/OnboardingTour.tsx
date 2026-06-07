@@ -17,6 +17,7 @@ const STEPS: Step[] = [
   { target: null, place: 'center', title: 'Welcome to Blueberry Mart', body: 'Fresh groceries from your nearby branches. Here’s a quick tour — tap Next.' },
   { target: 'header', place: 'bottom', title: 'Delivery, alerts & profile', body: 'Set your delivery address on the left; find notifications and your profile on the right.' },
   { target: 'Shop', place: 'top', title: 'Shop', body: 'Browse a branch or search for items across all branches.' },
+  { target: 'Bulk', place: 'top', title: 'Bulk orders', body: 'Buy business quantities (25kg rice, 20L oil…) at member pricing. Join Blueberry Plus to unlock bulk ordering and free delivery.' },
   { target: 'Cart', place: 'top', title: 'Your cart', body: 'Items from every branch collect here. Check out and pay with eSewa.' },
   { target: 'Activity', place: 'top', title: 'Activity', body: 'Track orders, pay pending ones, mark received, and leave reviews.' },
   { target: 'Assistant', place: 'top', title: 'Assistant', body: 'Ask about items, prices, or your orders anytime.' },
