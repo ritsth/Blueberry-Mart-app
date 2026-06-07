@@ -32,12 +32,19 @@ Why not the heavier approaches:
   a trivial retrieval step — no vector DB needed. If the catalog ever grew huge, graduate to
   real RAG (e.g. **pgvector** in the existing Postgres) and inject only the top-k chunks.
 
-It also injects the **signed-in customer's own recent orders** (last 10), so it can answer
-"where's my order #1042 / what was in it" with status, items and totals. This is **scoped
-strictly by the authenticated user id** in `ChatController` → `LlmChatService` — a customer
-only ever sees their own orders; an unknown number → "not on your account." (Verified: a
-customer asking about another customer's order is refused.) For very large per-user
-histories you'd switch from injecting all orders to a tool-call/lookup instead.
+For **per-customer orders**, the assistant uses **tool-calling** (not injection). The model
+can call two functions on demand:
+- `get_order(order_number)` — one order's status, items, total, branch, date.
+- `list_my_orders()` — the customer's recent orders.
+
+`LlmChatService` runs a **tool loop**: send messages + tool definitions → if the model
+returns `tool_calls`, execute them, append the results as `role:"tool"` messages, and call
+again until it produces a final answer (capped at 5 rounds). Tools execute **scoped strictly
+to the authenticated user id** (from the JWT in `ChatController`), so a customer only ever
+sees their own orders; an unknown number → "not on your account." (Verified live: asking
+about another customer's order is refused.) This scales to large histories — orders are
+fetched only when needed, not stuffed into every prompt. (Requires a provider with
+tool-calling support; Groq's `llama-3.3-70b-versatile` has it.)
 
 ---
 
@@ -46,7 +53,8 @@ histories you'd switch from injecting all orders to a tool-call/lookup instead.
 - `BlueberryMart.Api/Configuration/ChatOptions.cs` — `ApiKey`, `BaseUrl`, `Model`, `MaxTokens`
   (bound from the `"Chat"` section). **Defaults to Groq.**
 - `BlueberryMart.Api/Services/LlmChatService.cs` — calls an OpenAI-compatible
-  `/chat/completions` endpoint; builds the scoped system prompt + live catalog.
+  `/chat/completions` endpoint; builds the scoped system prompt + live catalog, and runs the
+  **tool loop** for the `get_order` / `list_my_orders` functions (executed scoped to the user).
   `DisabledChatService` is used when no key is set (`enabled:false`).
 - `BlueberryMart.Api/Controllers/ChatController.cs` — `POST /api/chat`
   (`Customer,Shareholder`). Caps history to 20 turns / 2000 chars, requires the last turn to
