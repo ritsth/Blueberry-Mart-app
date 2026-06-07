@@ -38,7 +38,7 @@ public sealed class LlmChatService : IChatService
 
     public async Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, Guid userId, CancellationToken ct = default)
     {
-        var history = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = BuildSystemPrompt() } };
+        var history = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = await BuildSystemPromptAsync(ct) } };
         foreach (var m in messages)
             history.Add(new JsonObject { ["role"] = m.Role == "assistant" ? "assistant" : "user", ["content"] = m.Content });
 
@@ -80,15 +80,22 @@ public sealed class LlmChatService : IChatService
 
     private async Task<JsonNode?> PostAsync(JsonObject body, CancellationToken ct)
     {
-        using var req = new HttpRequestMessage(HttpMethod.Post, _opts.BaseUrl);
-        req.Headers.Add("Authorization", $"Bearer {_opts.ApiKey}");
-        req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        var payload = body.ToJsonString();
+        // Retry on Groq/Llama's intermittent "tool_use_failed" (a malformed tool call).
+        for (var attempt = 0; ; attempt++)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, _opts.BaseUrl);
+            req.Headers.Add("Authorization", $"Bearer {_opts.ApiKey}");
+            req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        using var res = await _http.SendAsync(req, ct);
-        var text = await res.Content.ReadAsStringAsync(ct);
-        if (!res.IsSuccessStatusCode)
+            using var res = await _http.SendAsync(req, ct);
+            var text = await res.Content.ReadAsStringAsync(ct);
+            if (res.IsSuccessStatusCode) return JsonNode.Parse(text);
+
+            if (attempt < 2 && (int)res.StatusCode == 400 && text.Contains("tool_use_failed"))
+                continue;
             throw new InvalidOperationException($"Assistant API error {(int)res.StatusCode}: {text}");
-        return JsonNode.Parse(text);
+        }
     }
 
     // --- tools --------------------------------------------------------------------
@@ -292,31 +299,63 @@ public sealed class LlmChatService : IChatService
 
     private static string Json(object o) => JsonSerializer.Serialize(o);
 
-    // --- system prompt (everything is tool-driven; nothing injected) --------------
-    private static string BuildSystemPrompt() =>
-        "You are the Blueberry Mart shopping assistant — a friendly in-app helper for customers of the " +
-        "Blueberry Mart grocery store (Nepal; prices in Rs / NPR).\n\n" +
-        "You ONLY help with two things:\n" +
-        "1. Questions about Blueberry Mart's items — availability, price, which branch has them, stock, and bulk options.\n" +
-        "2. Customer issues & support — orders, paying, pickup vs delivery, Blueberry Plus membership, loyalty, reviews.\n\n" +
-        "If a question is outside these topics, politely decline in one sentence and offer to help with an item or an order.\n\n" +
-        "Keep replies short, friendly and concrete.\n\n" +
-        "ITEMS: to answer ANY question about products (price, stock, which branch, bulk), call the `search_items` tool — " +
-        "pass a keyword to filter, or an empty query to list everything. It is the ONLY source of item facts; never invent " +
-        "items, prices or stock. If a search returns nothing, say Blueberry Mart doesn't carry it.\n\n" +
-        "ORDERS: to answer anything about THIS customer's orders (status, contents, totals, \"where's my order #N\"), call " +
-        "`get_order` or `list_my_orders`. They're scoped to the signed-in customer — never ask who they are or reveal " +
-        "others' data, and base order answers only on tool results. Order status: pending = placed but not paid yet; " +
-        "confirmed = paid & being prepared / ready; completed = received; cancelled = cancelled.\n\n" +
-        "ACTIONS: if an item is out of stock and the customer wants to be told when it returns, call " +
-        "`subscribe_back_in_stock` with the item name to sign them up.\n\n" +
-        "How the app works (for support answers):\n" +
-        "- Order: pick a branch, add items, choose Pickup or Delivery, place the order, then pay with eSewa.\n" +
-        "- Members get free delivery; non-members pay a flat Rs 100 delivery fee. Pickup is always free.\n" +
-        "- After paying, the order is Confirmed; tap \"Mark as received\" when you get it, then you can leave a review.\n" +
-        "- Blueberry Plus (Rs 199/month): 5% off every order, free delivery, and bulk ordering.\n" +
-        "- Loyalty: 1 point per Rs of goods; reviews earn 10 points (20 with a photo).\n" +
-        "- For an out-of-stock item, tap \"Notify me\" (or just ask me) to be alerted when it's back.";
+    // --- system prompt (catalog injected; orders & actions via tools) -------------
+    // Item facts are injected so the common item path needs NO tool call (Groq/Llama
+    // tool-calling is intermittently unreliable); search_items remains available as a tool.
+    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
+    {
+        var items = await _db.Inventory
+            .Include(i => i.Branch)
+            .OrderBy(i => i.Branch.Name).ThenBy(i => i.ItemName)
+            .Select(i => new
+            {
+                i.ItemName,
+                i.Price,
+                i.StockQuantity,
+                i.IsBulkOnly,
+                Branch = i.Branch.Name,
+                City = i.Branch.LocationCity,
+            })
+            .ToListAsync(ct);
+
+        var catalog = new StringBuilder();
+        foreach (var grp in items.GroupBy(i => new { i.Branch, i.City }))
+        {
+            catalog.AppendLine($"{grp.Key.Branch} ({grp.Key.City}):");
+            foreach (var i in grp)
+            {
+                var stock = i.StockQuantity > 0 ? $"{i.StockQuantity} in stock" : "out of stock";
+                var bulk = i.IsBulkOnly ? ", bulk-only (members)" : "";
+                catalog.AppendLine($"  - {i.ItemName}: Rs {i.Price:0.##}, {stock}{bulk}");
+            }
+        }
+
+        return
+            "You are the Blueberry Mart shopping assistant — a friendly in-app helper for customers of the " +
+            "Blueberry Mart grocery store (Nepal; prices in Rs / NPR).\n\n" +
+            "You ONLY help with two things:\n" +
+            "1. Questions about Blueberry Mart's items — availability, price, which branch has them, stock, and bulk options.\n" +
+            "2. Customer issues & support — orders, paying, pickup vs delivery, Blueberry Plus membership, loyalty, reviews.\n\n" +
+            "If a question is outside these topics, politely decline in one sentence and offer to help with an item or an order.\n\n" +
+            "Keep replies short, friendly and concrete.\n\n" +
+            "ITEMS: item facts are in the CATALOG below — answer item questions (price, stock, branch, bulk) directly from it. " +
+            "Never invent items, prices or stock; if something isn't listed, say Blueberry Mart doesn't carry it. " +
+            "(A `search_items` tool is also available if you ever need a lookup.)\n\n" +
+            "ORDERS: to answer anything about THIS customer's orders (status, contents, totals, \"where's my order #N\"), call " +
+            "`get_order` or `list_my_orders`. They're scoped to the signed-in customer — never ask who they are or reveal " +
+            "others' data, and base order answers only on tool results. Order status: pending = placed but not paid yet; " +
+            "confirmed = paid & being prepared / ready; completed = received; cancelled = cancelled.\n\n" +
+            "ACTIONS: if an item is out of stock and the customer wants to be told when it returns, call " +
+            "`subscribe_back_in_stock` with the item name to sign them up.\n\n" +
+            "How the app works (for support answers):\n" +
+            "- Order: pick a branch, add items, choose Pickup or Delivery, place the order, then pay with eSewa.\n" +
+            "- Members get free delivery; non-members pay a flat Rs 100 delivery fee. Pickup is always free.\n" +
+            "- After paying, the order is Confirmed; tap \"Mark as received\" when you get it, then you can leave a review.\n" +
+            "- Blueberry Plus (Rs 199/month): 5% off every order, free delivery, and bulk ordering.\n" +
+            "- Loyalty: 1 point per Rs of goods; reviews earn 10 points (20 with a photo).\n" +
+            "- For an out-of-stock item, tap \"Notify me\" (or just ask me) to be alerted when it's back.\n\n" +
+            "Current catalog:\n" + catalog;
+    }
 }
 
 /// <summary>Used when no API key is configured — the assistant reports as unavailable.</summary>
