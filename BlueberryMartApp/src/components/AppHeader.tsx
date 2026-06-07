@@ -1,9 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../services/authService';
+import { useTour } from '../context/TourContext';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
@@ -16,6 +17,8 @@ interface Address { id: string; label: string; city: string; isDefault: boolean;
 export default function AppHeader() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const tour = useTour();
+  const ref = useRef<View>(null);
   const [address, setAddress] = useState<Address | null>(null);
   const [unread, setUnread] = useState(0);
 
@@ -43,7 +46,11 @@ export default function AppHeader() {
   }, []));
 
   return (
-    <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+    <View
+      ref={ref}
+      onLayout={() => ref.current?.measureInWindow?.((x, y, w, h) => tour?.register('header', { x, y, w, h }))}
+      style={[styles.header, { paddingTop: insets.top + 10 }]}
+    >
       <TouchableOpacity style={styles.location} onPress={() => navigation.navigate('AddressesScreen')} activeOpacity={0.7}>
         <Ionicons name="location-outline" size={18} color="#14532d" />
         <View style={{ maxWidth: 190 }}>

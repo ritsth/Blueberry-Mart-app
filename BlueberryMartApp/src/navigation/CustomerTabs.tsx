@@ -9,7 +9,9 @@ import CartScreen from '../screens/tabs/CartScreen';
 import ActivityTab from '../screens/tabs/ActivityTab';
 import ChatScreen from '../screens/tabs/ChatScreen';
 import OnboardingTour from '../components/OnboardingTour';
+import { tabButton } from '../components/MeasuredTabButton';
 import { useCart } from '../context/CartContext';
+import { TourProvider } from '../context/TourContext';
 
 const Tab = createBottomTabNavigator();
 
@@ -18,7 +20,7 @@ export default function CustomerTabs() {
   const { totalCount } = useCart();
 
   return (
-    <>
+    <TourProvider>
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -52,8 +54,8 @@ export default function CustomerTabs() {
         },
       })}
     >
-      <Tab.Screen name="Shop" component={CustomerShopTab} />
-      <Tab.Screen name="Bulk" component={BulkTab} />
+      <Tab.Screen name="Shop" component={CustomerShopTab} options={{ tabBarButton: tabButton('Shop') }} />
+      <Tab.Screen name="Bulk" component={BulkTab} options={{ tabBarButton: tabButton('Bulk') }} />
       <Tab.Screen
         name="Cart"
         component={CartScreen}
@@ -63,11 +65,11 @@ export default function CustomerTabs() {
           tabBarBadgeStyle: { backgroundColor: '#dc2626' },
         }}
       />
-      <Tab.Screen name="Activity" component={ActivityTab} />
-      <Tab.Screen name="Assistant" component={ChatScreen} />
+      <Tab.Screen name="Activity" component={ActivityTab} options={{ tabBarButton: tabButton('Activity') }} />
+      <Tab.Screen name="Assistant" component={ChatScreen} options={{ tabBarButton: tabButton('Assistant') }} />
     </Tab.Navigator>
     <OnboardingTour />
-    </>
+    </TourProvider>
   );
 }
 

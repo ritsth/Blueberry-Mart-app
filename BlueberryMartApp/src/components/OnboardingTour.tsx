@@ -3,31 +3,35 @@ import { Modal, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } 
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTour } from '../context/TourContext';
 
-export const TOUR_SEEN_KEY = 'customer_tour_seen_v2';
+export const TOUR_SEEN_KEY = 'customer_tour_seen_v3';
 
 const TAB_COUNT = 5; // Shop · Bulk · Cart · Activity · Assistant
+const TAB_INDEX: Record<string, number> = { Shop: 0, Bulk: 1, Cart: 2, Activity: 3, Assistant: 4 };
 
-type Target = { kind: 'header' } | { kind: 'tab'; index: number } | null;
-interface Step { target: Target; title: string; body: string; }
+type Hole = { x: number; y: number; w: number; h: number; cx: number };
+interface Step { target: string | null; place: 'top' | 'bottom' | 'center'; title: string; body: string; }
 
 const STEPS: Step[] = [
-  { target: null, title: 'Welcome to Blueberry Mart', body: 'Fresh groceries from your nearby branches. Here’s a 20-second tour — tap Next.' },
-  { target: { kind: 'header' }, title: 'Delivery, alerts & profile', body: 'Set your delivery address on the left; find notifications and your profile on the right.' },
-  { target: { kind: 'tab', index: 0 }, title: 'Shop', body: 'Browse a branch or search for items across all branches.' },
-  { target: { kind: 'tab', index: 2 }, title: 'Your cart', body: 'Items from every branch collect here. Check out and pay with eSewa.' },
-  { target: { kind: 'tab', index: 3 }, title: 'Activity', body: 'Track your orders, pay pending ones, mark received, and leave reviews.' },
-  { target: { kind: 'tab', index: 4 }, title: 'Assistant', body: 'Ask about items, prices, or your orders anytime.' },
+  { target: null, place: 'center', title: 'Welcome to Blueberry Mart', body: 'Fresh groceries from your nearby branches. Here’s a quick tour — tap Next.' },
+  { target: 'header', place: 'bottom', title: 'Delivery, alerts & profile', body: 'Set your delivery address on the left; find notifications and your profile on the right.' },
+  { target: 'Shop', place: 'top', title: 'Shop', body: 'Browse a branch or search for items across all branches.' },
+  { target: 'Cart', place: 'top', title: 'Your cart', body: 'Items from every branch collect here. Check out and pay with eSewa.' },
+  { target: 'Activity', place: 'top', title: 'Activity', body: 'Track orders, pay pending ones, mark received, and leave reviews.' },
+  { target: 'Assistant', place: 'top', title: 'Assistant', body: 'Ask about items, prices, or your orders anytime.' },
 ];
 
 /**
  * First-login spotlight tour for customers: dims the screen and cuts a highlight over
- * the actual tab / header being described, with a pointer + tooltip. Shows once
- * (persisted in AsyncStorage). Mounted in CustomerTabs so it overlays the app.
+ * the real element. Uses measured rects reported to the TourContext (header + tab
+ * buttons) and falls back to computed positions if a measurement isn't in yet.
+ * Shows once (persisted in AsyncStorage); replayable from Account.
  */
 export default function OnboardingTour() {
   const insets = useSafeAreaInsets();
   const { width: W, height: H } = useWindowDimensions();
+  const tour = useTour();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
 
@@ -46,32 +50,38 @@ export default function OnboardingTour() {
 
   const s = STEPS[step];
   const isLast = step === STEPS.length - 1;
-
   const tabBarH = 60 + insets.bottom;
   const tabBarTop = H - tabBarH;
 
-  // Compute the highlight rect (in screen coords) for the current target.
-  let hole: { x: number; y: number; w: number; h: number; cx: number } | null = null;
-  if (s.target?.kind === 'header') {
-    hole = { x: 8, y: insets.top + 2, w: W - 16, h: 52, cx: W / 2 };
-  } else if (s.target?.kind === 'tab') {
-    const tabW = W / TAB_COUNT;
-    const cx = tabW * s.target.index + tabW / 2;
-    const w = Math.min(tabW - 8, 64);
-    hole = { x: cx - w / 2, y: tabBarTop + 3, w, h: 54, cx };
+  function holeFor(target: string | null): Hole | null {
+    if (!target) return null;
+    const m = tour?.rects[target];
+    if (m && m.w > 0) {
+      const pad = 6; // breathing room around the measured element
+      return { x: m.x - pad, y: m.y - pad, w: m.w + pad * 2, h: m.h + pad * 2, cx: m.x + m.w / 2 };
+    }
+    // computed fallback (used until a measurement arrives, e.g. the Cart tab)
+    if (target === 'header') return { x: 8, y: insets.top + 2, w: W - 16, h: 52, cx: W / 2 };
+    const idx = TAB_INDEX[target];
+    if (idx != null) {
+      const tabW = W / TAB_COUNT;
+      const cx = tabW * idx + tabW / 2;
+      const w = Math.min(tabW - 8, 64);
+      return { x: cx - w / 2, y: tabBarTop + 3, w, h: 54, cx };
+    }
+    return null;
   }
 
-  // Tooltip placement: below the header, above the tab bar, or centered (welcome).
-  const tipStyle = !hole
+  const hole = holeFor(s.target);
+  const tip = !hole || s.place === 'center'
     ? { top: H * 0.3, left: 24, right: 24 }
-    : s.target?.kind === 'header'
-      ? { top: hole.y + hole.h + 16, left: 20, right: 20 }
-      : { bottom: tabBarH + 20, left: 20, right: 20 };
+    : s.place === 'bottom'
+      ? { top: hole.y + hole.h + 14, left: 20, right: 20 }
+      : { bottom: (H - hole.y) + 14, left: 20, right: 20 };
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={finish}>
       <View style={StyleSheet.absoluteFill}>
-        {/* Dim everything except the highlight hole */}
         <Svg width={W} height={H} style={StyleSheet.absoluteFill}>
           <Defs>
             <Mask id="spot">
@@ -83,13 +93,11 @@ export default function OnboardingTour() {
           {hole && <Rect x={hole.x} y={hole.y} width={hole.w} height={hole.h} rx={14} fill="none" stroke="#16a34a" strokeWidth={2} />}
         </Svg>
 
-        {/* Down-pointer toward a highlighted tab */}
-        {hole && s.target?.kind === 'tab' && (
-          <View style={[styles.pointerDown, { bottom: tabBarH + 10, left: hole.cx - 9 }]} />
+        {hole && s.place === 'top' && (
+          <View style={[styles.pointerDown, { top: hole.y - 10, left: hole.cx - 9 }]} />
         )}
 
-        {/* Tooltip card */}
-        <View style={[styles.tip, tipStyle]}>
+        <View style={[styles.tip, tip]}>
           <TouchableOpacity style={styles.skip} onPress={finish} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
