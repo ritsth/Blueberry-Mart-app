@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using BlueberryMart.Api.Configuration;
 using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -127,6 +128,26 @@ public sealed class LlmChatService : IChatService
                 ["parameters"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() },
             },
         },
+        new JsonObject
+        {
+            ["type"] = "function",
+            ["function"] = new JsonObject
+            {
+                ["name"] = "subscribe_back_in_stock",
+                ["description"] = "Subscribe the signed-in customer to a back-in-stock alert for an item that is "
+                    + "currently out of stock. Use when the customer asks to be notified when an item returns.",
+                ["parameters"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["item_name"] = new JsonObject { ["type"] = "string", ["description"] = "The item name, e.g. 'Organic Spinach'" },
+                        ["branch"] = new JsonObject { ["type"] = "string", ["description"] = "Optional branch name to narrow it down" },
+                    },
+                    ["required"] = new JsonArray { "item_name" },
+                },
+            },
+        },
     };
 
     private async Task<string> ExecuteToolAsync(string name, string argsJson, Guid userId, CancellationToken ct)
@@ -145,6 +166,13 @@ public sealed class LlmChatService : IChatService
                     }
                 case "list_my_orders":
                     return await ListOrdersAsync(userId, ct);
+                case "subscribe_back_in_stock":
+                    {
+                        using var args = JsonDocument.Parse(string.IsNullOrWhiteSpace(argsJson) ? "{}" : argsJson);
+                        var itemName = args.RootElement.TryGetProperty("item_name", out var it) ? it.GetString() ?? "" : "";
+                        var branch = args.RootElement.TryGetProperty("branch", out var br) ? br.GetString() : null;
+                        return await SubscribeBackInStockAsync(itemName, branch, userId, ct);
+                    }
                 default:
                     return Json(new { error = $"unknown tool '{name}'" });
             }
@@ -215,6 +243,40 @@ public sealed class LlmChatService : IChatService
         return Json(new { count = raw.Count, orders });
     }
 
+    private async Task<string> SubscribeBackInStockAsync(string itemName, string? branch, Guid userId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(itemName)) return Json(new { subscribed = false, message = "item_name is required" });
+
+        var query = _db.Inventory.Include(i => i.Branch)
+            .Where(i => EF.Functions.ILike(i.ItemName, $"%{itemName}%"));
+        if (!string.IsNullOrWhiteSpace(branch))
+            query = query.Where(i => EF.Functions.ILike(i.Branch.Name, $"%{branch}%"));
+
+        var matches = await query
+            .Select(i => new { i.Id, i.ItemName, i.StockQuantity, Branch = i.Branch.Name })
+            .ToListAsync(ct);
+
+        if (matches.Count == 0)
+            return Json(new { subscribed = false, message = "No matching item found in the catalog." });
+
+        var outOfStock = matches.Where(m => m.StockQuantity <= 0).ToList();
+        if (outOfStock.Count == 0)
+            return Json(new { subscribed = false, message = "That item is currently in stock — no alert needed." });
+
+        var done = new List<object>();
+        foreach (var m in outOfStock)
+        {
+            var already = await _db.StockSubscriptions
+                .AnyAsync(s => s.UserId == userId && s.InventoryId == m.Id && s.NotifiedAt == null, ct);
+            if (!already)
+                _db.StockSubscriptions.Add(new StockSubscription { UserId = userId, InventoryId = m.Id });
+            done.Add(new { item = m.ItemName, branch = m.Branch, newly_subscribed = !already });
+        }
+        await _db.SaveChangesAsync(ct);
+
+        return Json(new { subscribed = true, items = done });
+    }
+
     private static string Json(object o) => JsonSerializer.Serialize(o);
 
     // --- system prompt (catalog injected; orders handled via tools) ---------------
@@ -260,6 +322,8 @@ public sealed class LlmChatService : IChatService
             "who they are and never reveal other customers' data. Base order answers only on tool results — don't guess. " +
             "Order status meanings: pending = placed but not paid yet; confirmed = paid & being prepared / ready; " +
             "completed = received; cancelled = cancelled.\n\n" +
+            "ACTIONS: if an item is out of stock and the customer wants to be told when it returns, call " +
+            "`subscribe_back_in_stock` with the item name to sign them up (scoped to the signed-in customer).\n\n" +
             "How the app works (for support answers):\n" +
             "- Order: pick a branch, add items, choose Pickup or Delivery, place the order, then pay with eSewa.\n" +
             "- Members get free delivery; non-members pay a flat Rs 100 delivery fee. Pickup is always free.\n" +
