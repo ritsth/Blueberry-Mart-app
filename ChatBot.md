@@ -144,6 +144,13 @@ packs available, and they cost Rs 180."* — grounded in the live catalog.
   - provider quota exhausted (e.g. Gemini's `free_tier limit: 0` in unsupported regions),
   - secret holds the wrong value — remember `gcloud secrets create` fails if the secret exists;
     use `versions add`, then redeploy so `:latest` is re-read.
+- **Groq free-tier quirks (and how we handle them):**
+  - `400 tool_use_failed` — Groq's Llama intermittently emits a malformed tool call. `LlmChatService`
+    retries up to 2× on this. (This is also why **items are injected, not a tool** — the common path
+    needs no tool call. A `search_items` tool was tried and removed because the model kept botching it.)
+  - `429 rate_limit_exceeded` — the free tier is ~12k tokens/min; bursts (or many tool rounds) can hit
+    it, surfacing as the generic 502. Fine for light use; for heavier traffic switch to a paid tier or a
+    higher-limit model.
 - **Key hygiene:** never paste keys in chat/commits/the frontend. To rotate: create a new key,
   add a new secret version, redeploy; destroy the old version with
   `gcloud secrets versions destroy <N> --secret=<name> --project=…`.
