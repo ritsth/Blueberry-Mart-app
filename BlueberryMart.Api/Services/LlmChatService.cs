@@ -12,13 +12,12 @@ namespace BlueberryMart.Api.Services;
 
 /// <summary>
 /// Customer support assistant backed by any <b>OpenAI-compatible</b> chat-completions
-/// endpoint (Groq by default; also Gemini/OpenRouter/Ollama/OpenAI via config).
+/// endpoint (Groq by default; Gemini/OpenRouter/Ollama/OpenAI via config).
 ///
-/// Grounding strategy:
-/// - the small, mostly-static <b>catalog</b> is injected into the system prompt, and
-/// - per-customer <b>orders</b> are exposed as <b>tools</b> (<c>get_order</c>,
-///   <c>list_my_orders</c>) the model calls on demand. Tools execute scoped strictly to
-///   the signed-in customer, so one customer can never see another's orders.
+/// Fully tool-driven: the model calls tools on demand for items and orders, executed
+/// scoped strictly to the signed-in customer, so one customer can never see another's data.
+/// Tools: <c>search_items</c> (catalog), <c>get_order</c> / <c>list_my_orders</c> (the
+/// customer's orders), <c>subscribe_back_in_stock</c> (action).
 /// </summary>
 public sealed class LlmChatService : IChatService
 {
@@ -39,9 +38,7 @@ public sealed class LlmChatService : IChatService
 
     public async Task<string> ReplyAsync(IReadOnlyList<(string Role, string Content)> messages, Guid userId, CancellationToken ct = default)
     {
-        var system = await BuildSystemPromptAsync(ct);
-
-        var history = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = system } };
+        var history = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = BuildSystemPrompt() } };
         foreach (var m in messages)
             history.Add(new JsonObject { ["role"] = m.Role == "assistant" ? "assistant" : "user", ["content"] = m.Content });
 
@@ -65,10 +62,8 @@ public sealed class LlmChatService : IChatService
             if (toolCalls is null || toolCalls.Count == 0)
                 return message["content"]?.GetValue<string>() ?? "Sorry, I couldn't come up with a reply.";
 
-            // Echo the assistant's tool-call message back into the history…
             history.Add(JsonNode.Parse(message.ToJsonString())!);
 
-            // …then run each requested tool and append its result as a "tool" message.
             foreach (var call in toolCalls)
             {
                 var fn = call?["function"];
@@ -99,80 +94,74 @@ public sealed class LlmChatService : IChatService
     // --- tools --------------------------------------------------------------------
     private static JsonArray BuildTools() => new()
     {
-        new JsonObject
-        {
-            ["type"] = "function",
-            ["function"] = new JsonObject
+        Tool("search_items",
+            "Search Blueberry Mart's catalog for items (price, stock, branch, bulk-only). Pass a keyword to filter by "
+            + "name, or an empty query to list everything. This is the ONLY source of item facts.",
+            new JsonObject
             {
-                ["name"] = "get_order",
-                ["description"] = "Look up ONE of the signed-in customer's orders by its order number. "
-                    + "Returns status, items, total, branch and date — or found:false if that order isn't on this customer's account.",
-                ["parameters"] = new JsonObject
+                ["type"] = "object",
+                ["properties"] = new JsonObject
                 {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject
-                    {
-                        ["order_number"] = new JsonObject { ["type"] = "integer", ["description"] = "The order number, e.g. 1042" },
-                    },
-                    ["required"] = new JsonArray { "order_number" },
+                    ["query"] = new JsonObject { ["type"] = "string", ["description"] = "Keyword to match item names; empty = all items" },
                 },
-            },
-        },
-        new JsonObject
-        {
-            ["type"] = "function",
-            ["function"] = new JsonObject
+            }),
+        Tool("get_order",
+            "Look up ONE of the signed-in customer's orders by its order number. Returns status, items, total, branch and "
+            + "date — or found:false if that order isn't on this customer's account.",
+            new JsonObject
             {
-                ["name"] = "list_my_orders",
-                ["description"] = "List the signed-in customer's recent orders (number, status, total, date, type).",
-                ["parameters"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() },
-            },
-        },
-        new JsonObject
-        {
-            ["type"] = "function",
-            ["function"] = new JsonObject
-            {
-                ["name"] = "subscribe_back_in_stock",
-                ["description"] = "Subscribe the signed-in customer to a back-in-stock alert for an item that is "
-                    + "currently out of stock. Use when the customer asks to be notified when an item returns.",
-                ["parameters"] = new JsonObject
+                ["type"] = "object",
+                ["properties"] = new JsonObject
                 {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject
-                    {
-                        ["item_name"] = new JsonObject { ["type"] = "string", ["description"] = "The item name, e.g. 'Organic Spinach'" },
-                        ["branch"] = new JsonObject { ["type"] = "string", ["description"] = "Optional branch name to narrow it down" },
-                    },
-                    ["required"] = new JsonArray { "item_name" },
+                    ["order_number"] = new JsonObject { ["type"] = "integer", ["description"] = "The order number, e.g. 1042" },
                 },
-            },
-        },
+                ["required"] = new JsonArray { "order_number" },
+            }),
+        Tool("list_my_orders",
+            "List the signed-in customer's recent orders (number, status, total, date, type).",
+            new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
+        Tool("subscribe_back_in_stock",
+            "Subscribe the signed-in customer to a back-in-stock alert for an item that is currently out of stock. Use when "
+            + "the customer asks to be notified when an item returns.",
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["item_name"] = new JsonObject { ["type"] = "string", ["description"] = "The item name, e.g. 'Organic Spinach'" },
+                    ["branch"] = new JsonObject { ["type"] = "string", ["description"] = "Optional branch name to narrow it down" },
+                },
+                ["required"] = new JsonArray { "item_name" },
+            }),
+    };
+
+    private static JsonObject Tool(string name, string description, JsonObject parameters) => new()
+    {
+        ["type"] = "function",
+        ["function"] = new JsonObject { ["name"] = name, ["description"] = description, ["parameters"] = parameters },
     };
 
     private async Task<string> ExecuteToolAsync(string name, string argsJson, Guid userId, CancellationToken ct)
     {
         try
         {
+            using var args = JsonDocument.Parse(string.IsNullOrWhiteSpace(argsJson) ? "{}" : argsJson);
+            var root = args.RootElement;
             switch (name)
             {
+                case "search_items":
+                    return await SearchItemsAsync(Str(root, "query") ?? "", ct);
                 case "get_order":
                     {
-                        using var args = JsonDocument.Parse(string.IsNullOrWhiteSpace(argsJson) ? "{}" : argsJson);
-                        if (!args.RootElement.TryGetProperty("order_number", out var n))
+                        if (!root.TryGetProperty("order_number", out var n))
                             return Json(new { error = "order_number is required" });
-                        var orderNumber = n.ValueKind == JsonValueKind.Number ? n.GetInt32() : int.Parse(n.GetString() ?? "0");
-                        return await GetOrderAsync(orderNumber, userId, ct);
+                        var num = n.ValueKind == JsonValueKind.Number ? n.GetInt32() : int.Parse(n.GetString() ?? "0");
+                        return await GetOrderAsync(num, userId, ct);
                     }
                 case "list_my_orders":
                     return await ListOrdersAsync(userId, ct);
                 case "subscribe_back_in_stock":
-                    {
-                        using var args = JsonDocument.Parse(string.IsNullOrWhiteSpace(argsJson) ? "{}" : argsJson);
-                        var itemName = args.RootElement.TryGetProperty("item_name", out var it) ? it.GetString() ?? "" : "";
-                        var branch = args.RootElement.TryGetProperty("branch", out var br) ? br.GetString() : null;
-                        return await SubscribeBackInStockAsync(itemName, branch, userId, ct);
-                    }
+                    return await SubscribeBackInStockAsync(Str(root, "item_name") ?? "", Str(root, "branch"), userId, ct);
                 default:
                     return Json(new { error = $"unknown tool '{name}'" });
             }
@@ -181,6 +170,30 @@ public sealed class LlmChatService : IChatService
         {
             return Json(new { error = "tool failed", detail = ex.Message });
         }
+    }
+
+    private static string? Str(JsonElement root, string prop) =>
+        root.TryGetProperty(prop, out var v) ? v.GetString() : null;
+
+    private async Task<string> SearchItemsAsync(string query, CancellationToken ct)
+    {
+        var q = _db.Inventory.Include(i => i.Branch).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(query))
+            q = q.Where(i => EF.Functions.ILike(i.ItemName, $"%{query}%"));
+
+        var rows = await q
+            .OrderBy(i => i.Branch.Name).ThenBy(i => i.ItemName)
+            .Select(i => new
+            {
+                item = i.ItemName,
+                branch = i.Branch.Name,
+                price = i.Price,
+                stock = i.StockQuantity,
+                bulk_only = i.IsBulkOnly,
+            })
+            .ToListAsync(ct);
+
+        return Json(new { count = rows.Count, items = rows });
     }
 
     private async Task<string> GetOrderAsync(int orderNumber, Guid userId, CancellationToken ct)
@@ -279,60 +292,31 @@ public sealed class LlmChatService : IChatService
 
     private static string Json(object o) => JsonSerializer.Serialize(o);
 
-    // --- system prompt (catalog injected; orders handled via tools) ---------------
-    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
-    {
-        var items = await _db.Inventory
-            .Include(i => i.Branch)
-            .OrderBy(i => i.Branch.Name).ThenBy(i => i.ItemName)
-            .Select(i => new
-            {
-                i.ItemName,
-                i.Price,
-                i.StockQuantity,
-                i.IsBulkOnly,
-                Branch = i.Branch.Name,
-                City = i.Branch.LocationCity,
-            })
-            .ToListAsync(ct);
-
-        var catalog = new StringBuilder();
-        foreach (var grp in items.GroupBy(i => new { i.Branch, i.City }))
-        {
-            catalog.AppendLine($"{grp.Key.Branch} ({grp.Key.City}):");
-            foreach (var i in grp)
-            {
-                var stock = i.StockQuantity > 0 ? $"{i.StockQuantity} in stock" : "out of stock";
-                var bulk = i.IsBulkOnly ? ", bulk-only (members)" : "";
-                catalog.AppendLine($"  - {i.ItemName}: Rs {i.Price:0.##}, {stock}{bulk}");
-            }
-        }
-
-        return
-            "You are the Blueberry Mart shopping assistant — a friendly in-app helper for customers of the " +
-            "Blueberry Mart grocery store (Nepal; prices in Rs / NPR).\n\n" +
-            "You ONLY help with two things:\n" +
-            "1. Questions about Blueberry Mart's items — availability, price, which branch has them, stock, and bulk options.\n" +
-            "2. Customer issues & support — orders, paying, pickup vs delivery, Blueberry Plus membership, loyalty, reviews.\n\n" +
-            "If a question is outside these topics, politely decline in one sentence and offer to help with an item or an order.\n\n" +
-            "Keep replies short, friendly and concrete. NEVER invent items, prices or stock — use only the catalog below; " +
-            "if an item isn't listed, say Blueberry Mart doesn't carry it.\n\n" +
-            "ORDERS: to answer anything about THIS customer's orders (status, what's in one, totals, \"where's my order #N\"), " +
-            "call the tools `get_order` or `list_my_orders`. They're already scoped to the signed-in customer, so never ask " +
-            "who they are and never reveal other customers' data. Base order answers only on tool results — don't guess. " +
-            "Order status meanings: pending = placed but not paid yet; confirmed = paid & being prepared / ready; " +
-            "completed = received; cancelled = cancelled.\n\n" +
-            "ACTIONS: if an item is out of stock and the customer wants to be told when it returns, call " +
-            "`subscribe_back_in_stock` with the item name to sign them up (scoped to the signed-in customer).\n\n" +
-            "How the app works (for support answers):\n" +
-            "- Order: pick a branch, add items, choose Pickup or Delivery, place the order, then pay with eSewa.\n" +
-            "- Members get free delivery; non-members pay a flat Rs 100 delivery fee. Pickup is always free.\n" +
-            "- After paying, the order is Confirmed; tap \"Mark as received\" when you get it, then you can leave a review.\n" +
-            "- Blueberry Plus (Rs 199/month): 5% off every order, free delivery, and bulk ordering.\n" +
-            "- Loyalty: 1 point per Rs of goods; reviews earn 10 points (20 with a photo).\n" +
-            "- For an out-of-stock item, tap \"Notify me\" to be alerted when it's back.\n\n" +
-            "Current catalog:\n" + catalog;
-    }
+    // --- system prompt (everything is tool-driven; nothing injected) --------------
+    private static string BuildSystemPrompt() =>
+        "You are the Blueberry Mart shopping assistant — a friendly in-app helper for customers of the " +
+        "Blueberry Mart grocery store (Nepal; prices in Rs / NPR).\n\n" +
+        "You ONLY help with two things:\n" +
+        "1. Questions about Blueberry Mart's items — availability, price, which branch has them, stock, and bulk options.\n" +
+        "2. Customer issues & support — orders, paying, pickup vs delivery, Blueberry Plus membership, loyalty, reviews.\n\n" +
+        "If a question is outside these topics, politely decline in one sentence and offer to help with an item or an order.\n\n" +
+        "Keep replies short, friendly and concrete.\n\n" +
+        "ITEMS: to answer ANY question about products (price, stock, which branch, bulk), call the `search_items` tool — " +
+        "pass a keyword to filter, or an empty query to list everything. It is the ONLY source of item facts; never invent " +
+        "items, prices or stock. If a search returns nothing, say Blueberry Mart doesn't carry it.\n\n" +
+        "ORDERS: to answer anything about THIS customer's orders (status, contents, totals, \"where's my order #N\"), call " +
+        "`get_order` or `list_my_orders`. They're scoped to the signed-in customer — never ask who they are or reveal " +
+        "others' data, and base order answers only on tool results. Order status: pending = placed but not paid yet; " +
+        "confirmed = paid & being prepared / ready; completed = received; cancelled = cancelled.\n\n" +
+        "ACTIONS: if an item is out of stock and the customer wants to be told when it returns, call " +
+        "`subscribe_back_in_stock` with the item name to sign them up.\n\n" +
+        "How the app works (for support answers):\n" +
+        "- Order: pick a branch, add items, choose Pickup or Delivery, place the order, then pay with eSewa.\n" +
+        "- Members get free delivery; non-members pay a flat Rs 100 delivery fee. Pickup is always free.\n" +
+        "- After paying, the order is Confirmed; tap \"Mark as received\" when you get it, then you can leave a review.\n" +
+        "- Blueberry Plus (Rs 199/month): 5% off every order, free delivery, and bulk ordering.\n" +
+        "- Loyalty: 1 point per Rs of goods; reviews earn 10 points (20 with a photo).\n" +
+        "- For an out-of-stock item, tap \"Notify me\" (or just ask me) to be alerted when it's back.";
 }
 
 /// <summary>Used when no API key is configured — the assistant reports as unavailable.</summary>
