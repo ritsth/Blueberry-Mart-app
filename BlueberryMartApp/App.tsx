@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -33,26 +34,28 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <StatusBar style="dark" />
-      <CartProvider>
-        <View style={{ flex: 1 }}>
-          <MaintenanceBanner />
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <CartProvider>
           <View style={{ flex: 1 }}>
-            <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="Login"           component={LoginScreen} />
-              <Stack.Screen name="Register"        component={RegisterScreen} />
-              <Stack.Screen name="CustomerTabs"    component={CustomerTabs} />
-              <Stack.Screen name="ShareholderTabs" component={ShareholderTabs} />
-              <Stack.Screen name="ReviewScreen"    component={ReviewScreen} />
-              <Stack.Screen name="AddressesScreen" component={AddressesScreen} />
-              <Stack.Screen name="AlertsScreen"    component={AlertsScreen} />
-              <Stack.Screen name="Account"         component={AccountTab} />
-              <Stack.Screen name="Explore"         component={ExploreTab} />
-            </Stack.Navigator>
+            <MaintenanceBanner />
+            <View style={{ flex: 1 }}>
+              <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="Login"           component={LoginScreen} />
+                <Stack.Screen name="Register"        component={RegisterScreen} />
+                <Stack.Screen name="CustomerTabs"    component={CustomerTabs} />
+                <Stack.Screen name="ShareholderTabs" component={ShareholderTabs} />
+                <Stack.Screen name="ReviewScreen"    component={ReviewScreen} />
+                <Stack.Screen name="AddressesScreen" component={AddressesScreen} />
+                <Stack.Screen name="AlertsScreen"    component={AlertsScreen} />
+                <Stack.Screen name="Account"         component={AccountTab} />
+                <Stack.Screen name="Explore"         component={ExploreTab} />
+              </Stack.Navigator>
+            </View>
           </View>
-        </View>
-      </CartProvider>
-    </NavigationContainer>
+        </CartProvider>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
