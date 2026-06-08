@@ -1,0 +1,36 @@
+# EditorConfig — makes the formatting rules the CI `dotnet format` gate enforces
+# explicit and reviewable. Values are kept behaviour-neutral: they document the
+# conventions the codebase already follows, so adding this file does not change
+# what currently passes the gate.
+# https://editorconfig.org  /  https://learn.microsoft.com/dotnet/fundamentals/code-analysis/code-style-rule-options
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+# Hand-written code uses file-scoped namespaces; left non-enforcing so the
+# auto-generated EF migrations (which use block namespaces) don't fail the gate.
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_prefer_braces = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+
+# New lines (Allman braces — matches the codebase).
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.{ts,tsx,js,jsx}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
