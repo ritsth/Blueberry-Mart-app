@@ -15,11 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStoredToken, getStoredUserId, logout } from '../../services/authService';
+import { fetchStoreSettings } from '../../services/storeSettings';
 import { tourKeyFor } from '../../components/OnboardingTour';
 import type { RootStackParamList } from '../../../App';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
-const MONTHLY_FEE = 199;
+const DEFAULT_MONTHLY_FEE = 199;
 
 interface ProfileSummary {
   email: string;
@@ -38,6 +39,7 @@ export default function AccountTab() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const [monthlyFee, setMonthlyFee] = useState(DEFAULT_MONTHLY_FEE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -52,8 +54,12 @@ export default function AccountTab() {
   async function fetchProfile() {
     try {
       const token = await getStoredToken();
-      const res = await fetch(`${API_BASE}/api/profile`, { headers: { Authorization: `Bearer ${token}` } });
+      const [res, settings] = await Promise.all([
+        fetch(`${API_BASE}/api/profile`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetchStoreSettings(),
+      ]);
       if (res.ok) setProfile(await res.json());
+      if (settings) setMonthlyFee(settings.membershipMonthlyFee);
     } finally {
       setLoading(false);
     }
@@ -62,13 +68,13 @@ export default function AccountTab() {
   function confirmJoin() {
     Alert.alert(
       'Join Blueberry Plus?',
-      `You'll be charged Rs ${MONTHLY_FEE}/month for:\n\n` +
+      `You'll be charged Rs ${monthlyFee}/month for:\n\n` +
         '•  5% off every order\n•  Free delivery\n•  Bulk ordering\n\n' +
         'Your membership stays active for a full month and keeps its benefits ' +
         'even if you cancel before then. It renews monthly until you cancel.',
       [
         { text: 'Not now', style: 'cancel' },
-        { text: `Join · Rs ${MONTHLY_FEE}/mo`, onPress: activateMembership },
+        { text: `Join · Rs ${monthlyFee}/mo`, onPress: activateMembership },
       ],
     );
   }
@@ -211,7 +217,7 @@ export default function AccountTab() {
             <Text style={styles.joinTitle}>Join Blueberry Plus</Text>
           </View>
           <Text style={styles.joinSubtitle}>
-            Rs {MONTHLY_FEE}/month · 5% off every order, free delivery, and bulk ordering.
+            Rs {monthlyFee}/month · 5% off every order, free delivery, and bulk ordering.
           </Text>
           <TouchableOpacity style={[styles.greenBtn, activating && styles.disabled]} onPress={confirmJoin} disabled={activating} activeOpacity={0.85}>
             {activating ? <ActivityIndicator color="#fff" /> : <Text style={styles.greenBtnText}>Become a member</Text>}

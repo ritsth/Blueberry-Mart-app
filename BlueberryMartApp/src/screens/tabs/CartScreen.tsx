@@ -6,11 +6,12 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
+import { fetchStoreSettings } from '../../services/storeSettings';
 import { useCart } from '../../context/CartContext';
 import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
-const DELIVERY_FEE = 100;
+const DEFAULT_DELIVERY_FEE = 100;
 
 type OrderMode = 'pickup' | 'delivery';
 interface Address { id: string; label: string; addressLine: string; city: string; isDefault: boolean; }
@@ -29,6 +30,7 @@ export default function CartScreen() {
 
   const [isMember, setIsMember] = useState(false);
   const [discountRate, setDiscountRate] = useState(0);
+  const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(DEFAULT_DELIVERY_FEE);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [orderModes, setOrderModes] = useState<Record<string, OrderMode>>({});
   const [selectedAddressId, setSelectedAddressId] = useState<Record<string, string>>({});
@@ -46,6 +48,8 @@ export default function CartScreen() {
       const data = await res.json();
       setIsMember(data.isMember);
       setDiscountRate(data.discountRate ?? 0);
+      const settings = await fetchStoreSettings();
+      if (settings) setDeliveryFeeSetting(settings.deliveryFee);
     } catch { /* non-blocking */ }
   }
 
@@ -161,7 +165,7 @@ export default function CartScreen() {
             const subtotal = bc.items.reduce((s, i) => s + i.price * i.quantity, 0);
             const discount = isMember ? Math.round(subtotal * discountRate * 100) / 100 : 0;
             const mode = orderModes[bc.branch.id] ?? 'pickup';
-            const deliveryFee = mode === 'delivery' ? (isMember ? 0 : DELIVERY_FEE) : 0;
+            const deliveryFee = mode === 'delivery' ? (isMember ? 0 : deliveryFeeSetting) : 0;
             const total = subtotal - discount + deliveryFee;
             const count = bc.items.reduce((s, i) => s + i.quantity, 0);
             const color = branchColor(bc.branch.name);

@@ -14,10 +14,11 @@ import AppHeader from '../../components/AppHeader';
 import ShoppingView from '../../components/ShoppingView';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
-const MONTHLY_FEE = 199;
+const DEFAULT_MONTHLY_FEE = 199;
 
 export default function BulkTab() {
   const [isMember, setIsMember] = useState(false);
+  const [monthlyFee, setMonthlyFee] = useState(DEFAULT_MONTHLY_FEE);
   const [loading, setLoading]   = useState(true);
   const [activating, setActivating] = useState(false);
 
@@ -32,6 +33,7 @@ export default function BulkTab() {
       if (res.ok) {
         const data = await res.json();
         setIsMember(data.isMember);
+        if (typeof data.monthlyFee === 'number') setMonthlyFee(data.monthlyFee);
       }
     } finally {
       setLoading(false);
@@ -42,7 +44,7 @@ export default function BulkTab() {
   function confirmJoin() {
     Alert.alert(
       'Join Blueberry Plus?',
-      `You'll be charged Rs ${MONTHLY_FEE}/month for:\n\n` +
+      `You'll be charged Rs ${monthlyFee}/month for:\n\n` +
         '•  5% off every order\n' +
         '•  Free delivery\n' +
         '•  Bulk ordering\n\n' +
@@ -50,7 +52,7 @@ export default function BulkTab() {
         'even if you cancel before then. It renews monthly until you cancel.',
       [
         { text: 'Not now', style: 'cancel' },
-        { text: `Join · Rs ${MONTHLY_FEE}/mo`, onPress: activateMembership },
+        { text: `Join · Rs ${monthlyFee}/mo`, onPress: activateMembership },
       ],
     );
   }
@@ -116,7 +118,7 @@ export default function BulkTab() {
       >
         {activating
           ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.ctaText}>Join Plus · Rs {MONTHLY_FEE}/mo</Text>}
+          : <Text style={styles.ctaText}>Join Plus · Rs {monthlyFee}/mo</Text>}
       </TouchableOpacity>
       </View>
     </View>
