@@ -51,7 +51,7 @@ firebase login               # run yourself: ! firebase login
 ```bash
 npm run deploy               # = npm run build && firebase deploy --only hosting
 ```
-This publishes to `https://project-76ca6efe-7878-4dc8-bff.web.app`
+This publishes to `https://blueberrymart-admin.web.app`
 (and `…firebaseapp.com`).
 
 ### Wire the prod API to the portal (run once, after first deploy)
@@ -63,7 +63,7 @@ in Secret Manager, never in git):
 ```bash
 # 1) Allow the portal origins (CORS)
 gcloud run services update blueberrymart-api --region us-central1 \
-  --update-env-vars '^@^Cors__PortalOrigins__0=https://project-76ca6efe-7878-4dc8-bff.web.app@Cors__PortalOrigins__1=https://project-76ca6efe-7878-4dc8-bff.firebaseapp.com'
+  --update-env-vars '^@^Cors__PortalOrigins__0=https://blueberrymart-admin.web.app@Cors__PortalOrigins__1=https://blueberrymart-admin.firebaseapp.com'
 
 # 2) Bootstrap admin — email as env, password as a Secret Manager secret
 echo -n 'A_STRONG_PASSWORD' | gcloud secrets create admin-password --data-file=-   # first time

@@ -97,14 +97,14 @@ npm run dev                   # http://localhost:5173  (allowed by the API's COR
 npm run deploy                # build + firebase deploy --only hosting
 ```
 
-Production URL: `https://project-76ca6efe-7878-4dc8-bff.web.app`.
+Production URL: `https://blueberrymart-admin.web.app`.
 
 ## Production wiring (Cloud Run env)
 
 ```bash
 # CORS — both Firebase URLs
-Cors__PortalOrigins__0=https://project-76ca6efe-7878-4dc8-bff.web.app
-Cors__PortalOrigins__1=https://project-76ca6efe-7878-4dc8-bff.firebaseapp.com
+Cors__PortalOrigins__0=https://blueberrymart-admin.web.app
+Cors__PortalOrigins__1=https://blueberrymart-admin.firebaseapp.com
 # Admin bootstrap
 ADMIN__EMAIL=admin@firebase.com
 ADMIN__PASSWORD  → Secret Manager secret `admin-password:latest`
