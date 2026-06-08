@@ -146,6 +146,7 @@ export default function AccountTab() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      alwaysBounceVertical
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
     >
       <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -270,7 +271,7 @@ const card = {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingHorizontal: 24, paddingBottom: 40 },
+  content: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
   back: { alignSelf: 'flex-start', marginBottom: 8, paddingVertical: 2 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
 
