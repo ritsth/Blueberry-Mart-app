@@ -1,0 +1,35 @@
+name: Admin Portal Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'BlueberryMartAdmin/**'
+      - '.github/workflows/admin-build.yml'
+
+jobs:
+  build:
+    name: Type Check & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: BlueberryMartAdmin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: BlueberryMartAdmin
+
+      # `npm run build` runs `tsc -b` (type check) then `vite build` (production
+      # bundle) — so this catches both type errors and build-breaking changes
+      # before the portal is deployed to Firebase Hosting.
+      - name: Build
+        run: npm run build
+        working-directory: BlueberryMartAdmin
