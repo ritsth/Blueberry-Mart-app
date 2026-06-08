@@ -3,6 +3,13 @@ import { AdminReview, apiBase, deleteReview, listReviews, Page } from '../api';
 
 const PAGE_SIZE = 25;
 
+// Image paths are absolute URLs when stored in GCS (production) but relative
+// (/images/reviews/…) when served by the API locally. Only prefix the API base
+// for the relative case, otherwise the two URLs get concatenated into garbage.
+function photoUrl(imagePath: string): string {
+  return /^https?:\/\//i.test(imagePath) ? imagePath : `${apiBase}${imagePath}`;
+}
+
 export default function ReviewsPage() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Page<AdminReview> | null>(null);
@@ -59,7 +66,7 @@ export default function ReviewsPage() {
               <td className="comment">{r.comment}</td>
               <td>
                 {r.imagePath
-                  ? <a href={`${apiBase}${r.imagePath}`} target="_blank" rel="noreferrer">view</a>
+                  ? <a href={photoUrl(r.imagePath)} target="_blank" rel="noreferrer">view</a>
                   : '—'}
               </td>
               <td>{new Date(r.createdAt).toLocaleDateString()}</td>
