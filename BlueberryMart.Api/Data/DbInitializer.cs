@@ -1,16 +1,67 @@
 using BlueberryMart.Api.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace BlueberryMart.Api.Data;
 
 public static class DbInitializer
 {
-    public static void Initialize(BlueberryMartDbContext context)
+    public static void Initialize(BlueberryMartDbContext context, IConfiguration config)
     {
         // Apply any pending EF Core migrations (creates the schema on a fresh DB,
         // brings an existing DB up to date). Replaces the old EnsureCreated().
         context.Database.Migrate();
 
+        SeedDemoData(context);
+        EnsureAdmin(context, config);
+        EnsureSettings(context);
+    }
+
+    /// <summary>Ensures the single store-settings row exists (with the former hardcoded defaults).</summary>
+    private static void EnsureSettings(BlueberryMartDbContext context)
+    {
+        if (context.StoreSettings.Any()) return;
+        context.StoreSettings.Add(new StoreSettings { UpdatedAt = DateTime.UtcNow });
+        context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Ensures a single bootstrap admin exists. Runs on every startup but is a no-op
+    /// once an admin is present. Credentials come from the Admin config section
+    /// (Secret Manager in prod, gitignored dev settings locally).
+    /// </summary>
+    private static void EnsureAdmin(BlueberryMartDbContext context, IConfiguration config)
+    {
+        if (context.Users.Any(u => u.Role == "admin")) return;
+
+        var email = config["Admin:Email"]?.Trim().ToLower();
+        var password = config["Admin:Password"];
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password)) return;
+
+        var existing = context.Users.FirstOrDefault(u => u.Email == email);
+        if (existing is not null)
+        {
+            // Promote an existing account rather than failing on the unique email.
+            existing.Role = "admin";
+            existing.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            context.Users.Add(new User
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                PasswordHash = BCrypt(password),
+                Role = "admin",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        context.SaveChanges();
+    }
+
+    private static void SeedDemoData(BlueberryMartDbContext context)
+    {
         if (context.Branches.Any() || context.Users.Any()) return;
 
         var downtown = new Branch

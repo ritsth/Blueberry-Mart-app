@@ -3,6 +3,7 @@ using System;
 using BlueberryMart.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlueberryMart.Api.Migrations
 {
     [DbContext(typeof(BlueberryMartDbContext))]
-    partial class BlueberryMartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260607193235_AddUserBan")]
+    partial class AddUserBan
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -512,47 +515,6 @@ namespace BlueberryMart.Api.Migrations
                     b.HasIndex("UserId", "InventoryId");
 
                     b.ToTable("stock_subscriptions", (string)null);
-                });
-
-            modelBuilder.Entity("BlueberryMart.Api.Models.Entities.StoreSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal>("DeliveryFee")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("delivery_fee");
-
-                    b.Property<string>("MaintenanceMessage")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("maintenance_message");
-
-                    b.Property<bool>("MaintenanceMode")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("maintenance_mode");
-
-                    b.Property<decimal>("MemberDiscountRate")
-                        .HasColumnType("numeric(5,4)")
-                        .HasColumnName("member_discount_rate");
-
-                    b.Property<decimal>("MembershipMonthlyFee")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("membership_monthly_fee");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("store_settings", (string)null);
                 });
 
             modelBuilder.Entity("BlueberryMart.Api.Models.Entities.User", b =>
