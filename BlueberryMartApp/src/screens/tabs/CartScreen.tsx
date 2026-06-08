@@ -3,11 +3,11 @@ import {
   ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../../services/authService';
 import { fetchStoreSettings } from '../../services/storeSettings';
 import { useCart } from '../../context/CartContext';
+import AppHeader from '../../components/AppHeader';
 import EsewaCheckout, { PaymentOutcome } from '../../components/EsewaCheckout';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
@@ -24,7 +24,6 @@ function branchColor(name: string) {
 }
 
 export default function CartScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { carts, updateQty, clearBranch } = useCart();
 
@@ -147,7 +146,9 @@ export default function CartScreen() {
   const branchCarts = Object.values(carts);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+    <View style={styles.screen}>
+      <AppHeader />
+      <View style={styles.container}>
       <Text style={styles.heading}>Cart</Text>
 
       {branchCarts.length === 0 ? (
@@ -251,6 +252,7 @@ export default function CartScreen() {
           }}
         />
       )}
+      </View>
 
       <EsewaCheckout orderId={payOrder?.id ?? null} onClose={onPaymentClose} />
     </View>
@@ -258,7 +260,8 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 24 },
+  screen: { flex: 1, backgroundColor: '#f9fafb' },
+  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 24, paddingTop: 16 },
   heading: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 16 },
   list: { paddingBottom: 32 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
