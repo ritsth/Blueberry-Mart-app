@@ -33,3 +33,10 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: BlueberryMartAdmin
+
+      # Non-blocking dependency vulnerability surface. Promote to blocking once
+      # it runs clean.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+        working-directory: BlueberryMartAdmin
+        continue-on-error: true

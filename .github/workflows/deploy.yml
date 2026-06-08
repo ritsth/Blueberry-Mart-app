@@ -47,6 +47,17 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlueberryMart.Api
 
+      # Fail the build if any NuGet package (direct or transitive) has a known
+      # vulnerability. `dotnet list --vulnerable` exits 0 regardless, so we grep
+      # its output and fail explicitly when a finding is reported.
+      - name: Scan for vulnerable NuGet packages
+        run: |
+          dotnet list BlueberryMart.Api package --vulnerable --include-transitive 2>&1 | tee vuln.log
+          if grep -q "has the following vulnerable" vuln.log; then
+            echo "::error::Vulnerable NuGet packages found — see the list above."
+            exit 1
+          fi
+
       - name: Check formatting
         run: dotnet format BlueberryMart.Api --verify-no-changes
 
