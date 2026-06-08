@@ -80,6 +80,19 @@ public class MembershipControllerTests
     }
 
     [Fact]
+    public async Task MembershipStatus_Shareholder_IsMemberWithoutActivation()
+    {
+        // Shareholders (and admins) get Blueberry Plus automatically — no paid period.
+        var token = await TestHelpers.GetShareholderTokenAsync(_client);
+
+        var status = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, "/api/membership/status").WithBearer(token));
+        var json = await status.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.True(json.GetProperty("isMember").GetBoolean());
+    }
+
+    [Fact]
     public async Task PlaceOrder_AsMember_Applies5PercentDiscount()
     {
         var token = await GetCustomer2TokenAsync();

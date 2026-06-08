@@ -16,9 +16,14 @@ public class User
     public DateTime? MemberUntil { get; set; }
     public bool MembershipCancelled { get; set; }
 
-    /// <summary>True while the current membership period is still active.</summary>
+    /// <summary>
+    /// True while the user has Blueberry Plus benefits — either an active paid period,
+    /// or a role that includes membership automatically (shareholders and admins).
+    /// </summary>
     [NotMapped]
-    public bool IsMember => MemberUntil.HasValue && MemberUntil.Value > DateTime.UtcNow;
+    public bool IsMember =>
+        Role is "shareholder" or "admin"
+        || (MemberUntil.HasValue && MemberUntil.Value > DateTime.UtcNow);
 
     // Moderation: an admin can ban a user. Enforced per-request (a banned user is
     // rejected even with a still-valid token) — see the JwtBearer OnTokenValidated hook.

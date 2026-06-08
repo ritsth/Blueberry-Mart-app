@@ -141,6 +141,8 @@ export default function AccountTab() {
   const subtitle = profile
     ? `${profile.loyaltyPoints} points · ${profile.isMember ? 'Blueberry Plus member' : 'Free account'}`
     : '';
+  // Shareholders/admins get Plus automatically (no paid period to renew or cancel).
+  const complimentaryMember = !!profile?.isMember && !profile?.memberUntil;
 
   return (
     <ScrollView
@@ -185,7 +187,9 @@ export default function AccountTab() {
             <Text style={styles.memberTitle}>Blueberry Plus</Text>
           </View>
           <Text style={styles.memberStatus}>
-            {profile.membershipCancelled ? 'Cancelled · benefits until period ends' : 'Active membership'}
+            {profile.membershipCancelled ? 'Cancelled · benefits until period ends'
+              : complimentaryMember ? 'Included with your account'
+              : 'Active membership'}
           </Text>
           <View style={styles.perks}>
             {['5% off every order', 'Free delivery', 'Bulk ordering'].map(p => (
@@ -201,7 +205,7 @@ export default function AccountTab() {
               {new Date(profile.memberUntil).toLocaleDateString('en-NP', { day: 'numeric', month: 'short', year: 'numeric' })}
             </Text>
           )}
-          {profile.membershipCancelled ? (
+          {complimentaryMember ? null : profile.membershipCancelled ? (
             <TouchableOpacity style={[styles.lightBtn, activating && styles.disabled]} onPress={confirmJoin} disabled={activating} activeOpacity={0.85}>
               {activating ? <ActivityIndicator color="#14532d" /> : <Text style={styles.lightBtnText}>Resume Membership</Text>}
             </TouchableOpacity>

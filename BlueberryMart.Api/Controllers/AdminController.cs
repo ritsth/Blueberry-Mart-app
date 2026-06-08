@@ -56,7 +56,8 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
                 Id = u.Id,
                 Email = u.Email,
                 Role = u.Role,
-                IsMember = u.MemberUntil.HasValue && u.MemberUntil.Value > DateTime.UtcNow,
+                IsMember = u.Role == "shareholder" || u.Role == "admin"
+                    || (u.MemberUntil.HasValue && u.MemberUntil.Value > DateTime.UtcNow),
                 LoyaltyPoints = u.LoyaltyPoints,
                 IsBanned = u.IsBanned,
                 BannedAt = u.BannedAt,
