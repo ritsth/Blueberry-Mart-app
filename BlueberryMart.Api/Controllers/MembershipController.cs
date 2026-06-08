@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,11 +9,8 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/membership")]
 [Authorize]
-public class MembershipController(BlueberryMartDbContext context) : ControllerBase
+public class MembershipController(BlueberryMartDbContext context, ISettingsService settings) : ControllerBase
 {
-    public const decimal MemberDiscountRate = 0.05m; // 5% off
-    public const decimal MonthlyFee = 199m;          // Rs per month
-
     // GET /api/membership/status
     [HttpGet("status")]
     public async Task<IActionResult> GetStatus()
@@ -21,14 +19,15 @@ public class MembershipController(BlueberryMartDbContext context) : ControllerBa
         var user = await context.Users.FindAsync(userId);
         if (user is null) return NotFound();
 
+        var s = await settings.GetAsync();
         return Ok(new
         {
             IsMember = user.IsMember,
             MemberSince = user.MemberSince,
             MemberUntil = user.MemberUntil,
             Cancelled = user.MembershipCancelled,
-            DiscountRate = MemberDiscountRate,
-            MonthlyFee = MonthlyFee,
+            DiscountRate = s.MemberDiscountRate,
+            MonthlyFee = s.MembershipMonthlyFee,
         });
     }
 
@@ -47,13 +46,15 @@ public class MembershipController(BlueberryMartDbContext context) : ControllerBa
         user.UpdatedAt = now;
         await context.SaveChangesAsync();
 
+        var s = await settings.GetAsync();
+        var pct = (s.MemberDiscountRate * 100).ToString("0.#");
         return Ok(new
         {
             IsMember = true,
             user.MemberSince,
             user.MemberUntil,
             Cancelled = false,
-            message = "Membership active. You get 5% off and free delivery for a month.",
+            message = $"Membership active. You get {pct}% off and free delivery for a month.",
         });
     }
 

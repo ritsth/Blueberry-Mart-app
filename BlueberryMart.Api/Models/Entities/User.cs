@@ -20,6 +20,12 @@ public class User
     [NotMapped]
     public bool IsMember => MemberUntil.HasValue && MemberUntil.Value > DateTime.UtcNow;
 
+    // Moderation: an admin can ban a user. Enforced per-request (a banned user is
+    // rejected even with a still-valid token) — see the JwtBearer OnTokenValidated hook.
+    public bool IsBanned { get; set; }
+    public DateTime? BannedAt { get; set; }
+    public string? BanReason { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

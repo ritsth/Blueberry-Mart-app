@@ -103,6 +103,12 @@ else
     builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IChatService,
         BlueberryMart.Api.Services.DisabledChatService>();
 
+// Admin-editable global settings (delivery fee, membership fee, maintenance mode…),
+// cached in memory and read on every checkout.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.ISettingsService,
+    BlueberryMart.Api.Services.SettingsService>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
@@ -117,9 +123,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]!))
         };
+
+        // Per-request ban enforcement: even a still-valid token is rejected the
+        // moment a user is banned. One indexed lookup per authenticated request.
+        o.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async ctx =>
+            {
+                var sub = ctx.Principal?.FindFirst(
+                    System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!Guid.TryParse(sub, out var userId)) { ctx.Fail("Invalid subject."); return; }
+
+                var db = ctx.HttpContext.RequestServices
+                    .GetRequiredService<BlueberryMartDbContext>();
+                var banned = await db.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => (bool?)u.IsBanned)
+                    .FirstOrDefaultAsync();
+
+                if (banned is null) ctx.Fail("Account no longer exists.");
+                else if (banned.Value) ctx.Fail("Account is banned.");
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
+
+// CORS for the separate admin web portal (static SPA on a different origin).
+const string PortalCors = "AdminPortal";
+var portalOrigins = builder.Configuration.GetSection("Cors:PortalOrigins").Get<string[]>()
+    ?? ["http://localhost:5173"];
+builder.Services.AddCors(o => o.AddPolicy(PortalCors, p => p
+    .WithOrigins(portalOrigins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 
 var app = builder.Build();
 
@@ -134,7 +171,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
-    DbInitializer.Initialize(context);
+    DbInitializer.Initialize(context, app.Configuration);
 }
 
 if (app.Environment.IsDevelopment())
@@ -148,6 +185,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseCors(PortalCors);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

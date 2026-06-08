@@ -16,6 +16,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<StockSubscription> StockSubscriptions => Set<StockSubscription>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SavedReport> SavedReports => Set<SavedReport>();
+    public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,9 +40,25 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.MemberSince).HasColumnName("member_since");
             e.Property(u => u.MemberUntil).HasColumnName("member_until");
             e.Property(u => u.MembershipCancelled).HasColumnName("membership_cancelled").HasDefaultValue(false);
+            e.Property(u => u.IsBanned).HasColumnName("is_banned").HasDefaultValue(false);
+            e.Property(u => u.BannedAt).HasColumnName("banned_at");
+            e.Property(u => u.BanReason).HasColumnName("ban_reason").HasMaxLength(500);
             e.Property(u => u.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(u => u.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<StoreSettings>(e =>
+        {
+            e.ToTable("store_settings");
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasColumnName("id");
+            e.Property(s => s.DeliveryFee).HasColumnName("delivery_fee").HasColumnType("numeric(12,2)");
+            e.Property(s => s.MembershipMonthlyFee).HasColumnName("membership_monthly_fee").HasColumnType("numeric(12,2)");
+            e.Property(s => s.MemberDiscountRate).HasColumnName("member_discount_rate").HasColumnType("numeric(5,4)");
+            e.Property(s => s.MaintenanceMode).HasColumnName("maintenance_mode").HasDefaultValue(false);
+            e.Property(s => s.MaintenanceMessage).HasColumnName("maintenance_message").HasMaxLength(500);
+            e.Property(s => s.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
         });
 
         modelBuilder.Entity<Branch>(e =>

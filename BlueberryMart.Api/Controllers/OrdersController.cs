@@ -13,9 +13,11 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/orders")]
 [Authorize(Roles = "Customer,Shareholder")]
-public class OrdersController(BlueberryMartDbContext context, IStockEventProducer stockEvents) : ControllerBase
+public class OrdersController(
+    BlueberryMartDbContext context,
+    IStockEventProducer stockEvents,
+    ISettingsService settings) : ControllerBase
 {
-    public const decimal DeliveryFee = 100m; // flat delivery fee, waived for members
 
     // GET /api/orders/{id}
     // Lets the app read an order's current state — including payment status — after
@@ -83,6 +85,15 @@ public class OrdersController(BlueberryMartDbContext context, IStockEventProduce
         if (request.Items is null || request.Items.Count == 0)
             return BadRequest(new { message = "Order must contain at least one item." });
 
+        var config = await settings.GetAsync();
+        if (config.MaintenanceMode)
+            return StatusCode(503, new
+            {
+                message = string.IsNullOrWhiteSpace(config.MaintenanceMessage)
+                    ? "Ordering is temporarily paused for maintenance. Please try again soon."
+                    : config.MaintenanceMessage
+            });
+
         var validOrderTypes = new[] { "pickup", "delivery" };
         if (!validOrderTypes.Contains(request.OrderType?.ToLower()))
             return BadRequest(new { message = "OrderType must be 'Pickup' or 'Delivery'." });
@@ -128,7 +139,7 @@ public class OrdersController(BlueberryMartDbContext context, IStockEventProduce
             var user = await context.Users.FindAsync(userId);
             var isMember = user is { IsMember: true };
             var discount = isMember
-                ? Math.Round(subtotal * MembershipController.MemberDiscountRate, 2)
+                ? Math.Round(subtotal * config.MemberDiscountRate, 2)
                 : 0m;
 
             // Resolve delivery details
@@ -150,7 +161,7 @@ public class OrdersController(BlueberryMartDbContext context, IStockEventProduce
                     : $"{address.Label}: {address.AddressLine}, {address.City} (Phone: {address.Phone})";
 
                 // Members get free delivery
-                deliveryFee = isMember ? 0m : DeliveryFee;
+                deliveryFee = isMember ? 0m : config.DeliveryFee;
             }
 
             var goodsTotal = subtotal - discount;   // loyalty points earned on this

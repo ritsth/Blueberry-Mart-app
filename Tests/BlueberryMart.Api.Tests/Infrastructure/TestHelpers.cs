@@ -61,6 +61,51 @@ public static class TestHelpers
         return json.GetProperty("token").GetString()!;
     }
 
+    public static async Task<string> GetAdminTokenAsync(HttpClient client)
+        => await GetTokenAsync(client, BlueberryMartApiFactory.AdminEmail, BlueberryMartApiFactory.AdminPassword);
+
+    public static async Task<string> GetTokenAsync(HttpClient client, string email, string password)
+    {
+        var resp = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return json.GetProperty("token").GetString()!;
+    }
+
+    /// <summary>Creates a throwaway user (default customer) so ban tests don't disturb seeded accounts.</summary>
+    public static async Task<Guid> CreateUserAsync(
+        BlueberryMartApiFactory factory, string email, string password, string role = "customer")
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email.ToLower(),
+            // Matches AuthController's SHA256-base64 hashing so the user can log in.
+            PasswordHash = Convert.ToBase64String(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password))),
+            Role = role,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+        return user.Id;
+    }
+
+    /// <summary>Demotes every admin except the given email — makes "last admin" assertions deterministic
+    /// despite other tests creating admins in the shared DB.</summary>
+    public static async Task DemoteOtherAdminsAsync(BlueberryMartApiFactory factory, string keepEmail)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var others = await ctx.Users
+            .Where(u => u.Role == "admin" && u.Email != keepEmail.ToLower())
+            .ToListAsync();
+        foreach (var u in others) u.Role = "customer";
+        await ctx.SaveChangesAsync();
+    }
+
     public static async Task<Guid> PlaceOrderAsync(
         HttpClient client, string token, Guid branchId, Guid itemId, int quantity = 1)
     {

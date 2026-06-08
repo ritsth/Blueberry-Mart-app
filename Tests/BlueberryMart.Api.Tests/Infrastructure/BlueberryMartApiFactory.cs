@@ -12,6 +12,9 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
     private const string TestConnectionString =
         "Host=localhost;Database=blueberry_mart_test;Username=postgres;Password=ritsth";
 
+    public const string AdminEmail = "admin@blueberrymart.com";
+    public const string AdminPassword = "admin_test_password";
+
     public Guid DowntownBranchId { get; private set; }
     public Guid SuburbsBranchId  { get; private set; }
     public Guid EggsItemId       { get; private set; }
@@ -31,7 +34,9 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
             cfg.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
-                ["Jwt:Secret"] = "test-only-secret-key-not-used-in-production-32x"
+                ["Jwt:Secret"] = "test-only-secret-key-not-used-in-production-32x",
+                ["Admin:Email"] = AdminEmail,
+                ["Admin:Password"] = AdminPassword
             }));
     }
 
@@ -42,7 +47,8 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
 
         await context.Database.EnsureDeletedAsync();
         // DbInitializer.Initialize runs Migrate() to build the schema from migrations, then seeds
-        DbInitializer.Initialize(context);
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        DbInitializer.Initialize(context, config);
 
         DowntownBranchId = (await context.Branches.FirstAsync(b => b.Name == "Blueberry Mart Downtown")).Id;
         SuburbsBranchId  = (await context.Branches.FirstAsync(b => b.Name == "Blueberry Mart Suburbs")).Id;
