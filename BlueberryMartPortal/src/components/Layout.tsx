@@ -15,6 +15,8 @@ export default function Layout() {
         <div className="brand">🫐 Blueberry Mart<span>Portal</span></div>
         <nav>
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>Dashboard</NavLink>
+          <div className="nav-section">Operations</div>
+          <NavLink to="/items" className={({ isActive }) => (isActive ? 'active' : '')}>Items</NavLink>
           {isAdmin() && (
             <>
               <div className="nav-section">Admin</div>

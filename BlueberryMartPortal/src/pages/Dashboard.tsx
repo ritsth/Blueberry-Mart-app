@@ -29,10 +29,9 @@ export default function Dashboard() {
         )}
       </div>
 
-      {role === 'admin' ? (
-        <p className="muted">Use the sidebar to manage users, reviews, and store settings.</p>
-      ) : (
-        <p className="muted">Items &amp; stock management is coming to this portal shortly.</p>
+      <p className="muted">Use <strong>Items</strong> in the sidebar to manage your catalogue and stock.</p>
+      {role === 'admin' && (
+        <p className="muted">As an admin you can also manage users, reviews, and store settings.</p>
       )}
     </section>
   );

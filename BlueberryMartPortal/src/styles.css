@@ -96,6 +96,37 @@ a { color: var(--green); }
 .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; max-width: 420px; }
 .card p { margin: 8px 0; display: flex; align-items: center; gap: 8px; }
 
+/* Items page bits */
+.push-right { margin-left: auto; }
+.filters .check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.filters .check input { width: 15px; height: 15px; }
+.stock-low { color: var(--red); font-weight: 800; }
+.pill.banned { background: #fee2e2; color: var(--red); }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(17,24,39,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+}
+.modal { background: #fff; border-radius: 16px; width: 380px; max-width: calc(100vw - 32px); box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { font-size: 16px; margin: 0; }
+.modal-x { border: none; background: none; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; }
+.modal-body { padding: 18px 20px; }
+.modal-form { display: flex; flex-direction: column; gap: 12px; }
+.modal-form label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.modal-form input, .modal-form select { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 14px; }
+.modal-form input:disabled { background: var(--bg); color: var(--muted); }
+.modal-form label.check { flex-direction: row; align-items: center; gap: 8px; }
+.modal-form label.check input { width: 16px; height: 16px; }
+.modal-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+/* Add / Remove segmented toggle */
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; }
+.seg button { border: none; background: #fff; padding: 7px 18px; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--muted); }
+.seg button.on { background: var(--green); color: #fff; }
+.actions .btn.small { margin-left: 6px; }
+
 .btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 14px; }
 .btn:hover { background: var(--bg); }
 .btn.small { padding: 6px 12px; font-size: 13px; }

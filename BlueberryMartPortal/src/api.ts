@@ -50,6 +50,57 @@ export function getBranches(): Promise<Branch[]> {
   return request<Branch[]>('/api/branches');
 }
 
+// ---- Inventory management (staff/manager/admin) ----
+export interface InventoryItem {
+  id: string;
+  branchId: string;
+  branchName: string;
+  itemName: string;
+  price: number;
+  stockQuantity: number;
+  isBulkOnly: boolean;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export function listManagedItems(params: {
+  branchId?: string; search?: string; lowStock?: boolean; includeInactive?: boolean;
+  page?: number; pageSize?: number;
+}): Promise<Page<InventoryItem>> {
+  const q = new URLSearchParams();
+  if (params.branchId) q.set('branchId', params.branchId);
+  if (params.search) q.set('search', params.search);
+  if (params.lowStock) q.set('lowStock', 'true');
+  if (params.includeInactive) q.set('includeInactive', 'true');
+  if (params.page) q.set('page', String(params.page));
+  if (params.pageSize) q.set('pageSize', String(params.pageSize));
+  return request<Page<InventoryItem>>(`/api/inventory/manage?${q.toString()}`);
+}
+
+export function createItem(body: {
+  branchId: string; itemName: string; price: number; stockQuantity: number; isBulkOnly: boolean;
+}): Promise<InventoryItem> {
+  return request<InventoryItem>('/api/inventory/manage', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateItem(id: string, body: {
+  itemName: string; price: number; isBulkOnly: boolean;
+}): Promise<InventoryItem> {
+  return request<InventoryItem>(`/api/inventory/manage/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function adjustStock(id: string, delta: number, reason: string): Promise<InventoryItem> {
+  return request<InventoryItem>(`/api/inventory/manage/${id}/adjust`, {
+    method: 'POST', body: JSON.stringify({ delta, reason }),
+  });
+}
+
+export function setItemActive(id: string, active: boolean): Promise<InventoryItem> {
+  return request<InventoryItem>(`/api/inventory/manage/${id}/${active ? 'activate' : 'deactivate'}`, {
+    method: 'POST',
+  });
+}
+
 export interface AdminReview {
   id: string;
   userEmail: string;
