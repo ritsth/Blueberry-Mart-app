@@ -11,7 +11,7 @@ export default function Layout() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">🫐 Blueberry Mart<span>Admin</span></div>
+        <div className="brand">🫐 Blueberry Mart<span>Portal</span></div>
         <nav>
           <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>Users</NavLink>
           <NavLink to="/reviews" className={({ isActive }) => (isActive ? 'active' : '')}>Reviews</NavLink>

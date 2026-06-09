@@ -1,9 +1,9 @@
 {
-  "name": "blueberrymart-admin",
+  "name": "blueberrymart-portal",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Admin web portal for Blueberry Mart (separate from the mobile app; talks to the same .NET API).",
+  "description": "Back-office web portal for Blueberry Mart (admin/manager/staff; separate from the customer mobile app; talks to the same .NET API).",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

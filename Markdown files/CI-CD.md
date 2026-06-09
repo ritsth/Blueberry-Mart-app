@@ -10,7 +10,7 @@ GitHub Advanced Security (CodeQL) and Actions minutes are free.
 |---|---|---|---|
 | **Test & Deploy to Cloud Run** | `deploy.yml` | `BlueberryMart.Api/**`, `Tests/**`, self | tests · format gate · NuGet vuln scan · cached Docker build → Cloud Run |
 | **Mobile App CI** | `frontend-typecheck.yml` | `BlueberryMartApp/**`, self | `ESLint` · `TypeScript Type Check` (+ npm audit, non-blocking) |
-| **Admin Portal CI** | `admin-build.yml` | `BlueberryMartAdmin/**`, self | `ESLint` · `Type Check & Build` (+ npm audit) · `Deploy to Firebase Hosting` |
+| **Portal CI** | `portal-ci.yml` | `BlueberryMartPortal/**`, self | `ESLint` · `Type Check & Build` (+ npm audit) · `Deploy to Firebase Hosting` |
 | **CodeQL** | `codeql.yml` | every push/PR to `main` + weekly | SAST: `csharp` + `javascript-typescript` |
 
 Path filters mean a backend-only change doesn't run the frontend workflows and
@@ -55,9 +55,11 @@ Two **parallel jobs**, each its own status check:
   --audit-level=high` (Expo/RN pull in transitive advisories we often can't fix
   directly).
 
-## Admin portal — `admin-build.yml` (React / Vite)
+## Back-office portal — `portal-ci.yml` (React / Vite)
 
-Three jobs — two parallel checks, then deploy:
+The `BlueberryMartPortal/` app — the role-aware back office for admin/manager/
+staff (formerly `BlueberryMartAdmin`). Three jobs — two parallel checks, then
+deploy:
 - **ESLint** — `npm run lint` (`typescript-eslint` + `react-hooks` +
   `react-refresh`). Blocking.
 - **Type Check & Build** — `npm run build` (`tsc -b && vite build`), then a
@@ -109,6 +111,7 @@ gatekeeper:
 | `e2fded5` | Split frontend lint into its own parallel job |
 | `1b258d0` | Added CodeQL static analysis |
 | `c6ed293` | Auto-deploy the admin portal to Firebase Hosting (keyless WIF) |
+| — | Renamed `BlueberryMartAdmin` → `BlueberryMartPortal` and `admin-build.yml` → `portal-ci.yml` (now serves admin/manager/staff); Firebase hosting site id kept |
 
 ## Open items / how to extend
 
