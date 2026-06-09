@@ -241,7 +241,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
           keyExtractor={g => g.branchId}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
-          ListEmptyComponent={!searching ? <Text style={styles.emptyNote}>No items found for "{query}"</Text> : null}
+          ListEmptyComponent={!searching ? <Text style={styles.emptyNote}>No items found for &quot;{query}&quot;</Text> : null}
           renderItem={({ item: group }) => {
             const color = branchColor(group.branchName);
             return (

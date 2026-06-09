@@ -31,6 +31,12 @@ jobs:
         run: ./node_modules/.bin/tsc --noEmit
         working-directory: BlueberryMartApp
 
+      # Fails on lint errors; the existing exhaustive-deps warnings don't fail
+      # the build (eslint exits 0 on warnings), so this gates new errors only.
+      - name: ESLint
+        run: npm run lint
+        working-directory: BlueberryMartApp
+
       # Non-blocking: surfaces known vulnerabilities without failing the build,
       # since Expo/React Native pull in transitive advisories we often can't fix
       # directly. Review the summary; promote to blocking once it runs clean.

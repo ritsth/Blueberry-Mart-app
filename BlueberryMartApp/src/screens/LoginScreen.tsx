@@ -98,7 +98,7 @@ export default function LoginScreen({ navigation }: Props) {
           disabled={loading}
         >
           <Text style={styles.linkText}>
-            Don't have an account? <Text style={styles.linkAccent}>Sign up</Text>
+            Don&apos;t have an account? <Text style={styles.linkAccent}>Sign up</Text>
           </Text>
         </TouchableOpacity>
       </View>

@@ -23,5 +23,8 @@ function MeasuredTabButton({ tourKey, ...props }: any) {
 }
 
 /** Factory for use as `options={{ tabBarButton: tabButton('Shop') }}`. */
-export const tabButton = (tourKey: string) => (props: any) =>
-  <MeasuredTabButton tourKey={tourKey} {...props} />;
+export const tabButton = (tourKey: string) => {
+  const TabButton = (props: any) => <MeasuredTabButton tourKey={tourKey} {...props} />;
+  TabButton.displayName = `TabButton(${tourKey})`;
+  return TabButton;
+};
