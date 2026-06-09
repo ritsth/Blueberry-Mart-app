@@ -101,6 +101,65 @@ export function setItemActive(id: string, active: boolean): Promise<InventoryIte
   });
 }
 
+// ---- Order fulfillment (staff/manager/admin) ----
+export interface ManagedOrder {
+  id: string;
+  orderNumber: number;
+  customerEmail: string;
+  branchId: string;
+  branchName: string;
+  orderType: string;
+  status: string;
+  totalAmount: number;
+  paymentStatus: string;
+  createdAt: string;
+}
+
+export interface ManagedOrderLine { itemName: string; quantity: number; unitPrice: number; }
+
+export interface ManagedOrderDetail extends ManagedOrder {
+  discountAmount: number;
+  deliveryFee: number;
+  deliveryAddress: string | null;
+  paymentRef: string | null;
+  items: ManagedOrderLine[];
+}
+
+// confirmed → processing → ready → completed
+export const NEXT_STATUS: Record<string, string> = {
+  confirmed: 'processing',
+  processing: 'ready',
+  ready: 'completed',
+};
+
+export function listOrders(params: {
+  branchId?: string; status?: string; search?: string; page?: number; pageSize?: number;
+}): Promise<Page<ManagedOrder>> {
+  const q = new URLSearchParams();
+  if (params.branchId) q.set('branchId', params.branchId);
+  if (params.status) q.set('status', params.status);
+  if (params.search) q.set('search', params.search);
+  if (params.page) q.set('page', String(params.page));
+  if (params.pageSize) q.set('pageSize', String(params.pageSize));
+  return request<Page<ManagedOrder>>(`/api/orders/manage?${q.toString()}`);
+}
+
+export function getOrder(id: string): Promise<ManagedOrderDetail> {
+  return request<ManagedOrderDetail>(`/api/orders/manage/${id}`);
+}
+
+export function advanceOrderStatus(id: string, status: string): Promise<unknown> {
+  return request(`/api/orders/manage/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+}
+
+export function recordPayment(id: string, method: string): Promise<unknown> {
+  return request(`/api/orders/manage/${id}/record-payment`, { method: 'POST', body: JSON.stringify({ method }) });
+}
+
+export function cancelOrder(id: string): Promise<unknown> {
+  return request(`/api/orders/manage/${id}/cancel`, { method: 'POST' });
+}
+
 export interface AdminReview {
   id: string;
   userEmail: string;

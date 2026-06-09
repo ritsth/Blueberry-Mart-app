@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ItemsPage from './pages/ItemsPage';
+import OrdersPage from './pages/OrdersPage';
 import UsersPage from './pages/UsersPage';
 import ReviewsPage from './pages/ReviewsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -31,6 +32,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="items" element={<ItemsPage />} />
+        <Route path="orders" element={<OrdersPage />} />
         <Route path="users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
         <Route path="reviews" element={<RequireAdmin><ReviewsPage /></RequireAdmin>} />
         <Route path="settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
