@@ -10,7 +10,7 @@ GitHub Advanced Security (CodeQL) and Actions minutes are free.
 |---|---|---|---|
 | **Test & Deploy to Cloud Run** | `deploy.yml` | `BlueberryMart.Api/**`, `Tests/**`, self | tests · format gate · NuGet vuln scan · cached Docker build → Cloud Run |
 | **Mobile App CI** | `frontend-typecheck.yml` | `BlueberryMartApp/**`, self | `ESLint` · `TypeScript Type Check` (+ npm audit, non-blocking) |
-| **Admin Portal CI** | `admin-build.yml` | `BlueberryMartAdmin/**`, self | `ESLint` · `Type Check & Build` (+ npm audit, non-blocking) |
+| **Admin Portal CI** | `admin-build.yml` | `BlueberryMartAdmin/**`, self | `ESLint` · `Type Check & Build` (+ npm audit) · `Deploy to Firebase Hosting` |
 | **CodeQL** | `codeql.yml` | every push/PR to `main` + weekly | SAST: `csharp` + `javascript-typescript` |
 
 Path filters mean a backend-only change doesn't run the frontend workflows and
@@ -57,12 +57,19 @@ Two **parallel jobs**, each its own status check:
 
 ## Admin portal — `admin-build.yml` (React / Vite)
 
-Two **parallel jobs**:
+Three jobs — two parallel checks, then deploy:
 - **ESLint** — `npm run lint` (`typescript-eslint` + `react-hooks` +
   `react-refresh`). Blocking.
 - **Type Check & Build** — `npm run build` (`tsc -b && vite build`), then a
-  non-blocking `npm audit`. This catches type errors and build breaks before
-  the manual `npm run deploy` to Firebase Hosting.
+  non-blocking `npm audit`. Uploads the built `dist/` as an artifact.
+- **Deploy to Firebase Hosting** (`needs: [lint, build]`, `main` only) —
+  downloads the build artifact (no second build), authenticates with the same
+  **keyless WIF** identity the backend uses, and runs `firebase deploy --only
+  hosting` to the `blueberrymart-admin` site
+  (https://blueberrymart-admin.web.app).
+
+  The WIF service account (`github-actions-deployer@…`) was granted
+  `roles/firebasehosting.admin` for this. No service-account JSON key is stored.
 
 ## Security — `codeql.yml`
 
@@ -101,12 +108,10 @@ gatekeeper:
 | `1b11062` | Added ESLint to the mobile app (+ fixed the 4 errors it surfaced) |
 | `e2fded5` | Split frontend lint into its own parallel job |
 | `1b258d0` | Added CodeQL static analysis |
+| `c6ed293` | Auto-deploy the admin portal to Firebase Hosting (keyless WIF) |
 
 ## Open items / how to extend
 
-- **Admin → Firebase auto-deploy:** currently manual (`npm run deploy`). To
-  automate, add a deploy job to `admin-build.yml` gated on the build job, using
-  a Firebase service-account stored as a GitHub secret.
 - **`exhaustive-deps` warnings (app):** `ReportChart.tsx:149`,
   `ShoppingView.tsx:77`, `ExploreTab.tsx:80` & `:89`. Fix case by case (changing
   dependency arrays can alter runtime behaviour), then the rule can go blocking.
