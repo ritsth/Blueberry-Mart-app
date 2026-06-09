@@ -73,7 +73,8 @@ public static class TestHelpers
 
     /// <summary>Creates a throwaway user (default customer) so ban tests don't disturb seeded accounts.</summary>
     public static async Task<Guid> CreateUserAsync(
-        BlueberryMartApiFactory factory, string email, string password, string role = "customer")
+        BlueberryMartApiFactory factory, string email, string password, string role = "customer",
+        Guid? branchId = null)
     {
         using var scope = factory.Services.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
@@ -85,6 +86,7 @@ public static class TestHelpers
             PasswordHash = Convert.ToBase64String(
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password))),
             Role = role,
+            BranchId = branchId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

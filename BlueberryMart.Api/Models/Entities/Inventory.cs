@@ -8,6 +8,11 @@ public class Inventory
     public int StockQuantity { get; set; }
     public decimal Price { get; set; }
     public bool IsBulkOnly { get; set; }
+
+    // Soft-delete: deactivated items are hidden from customers but kept because
+    // orders reference them (FK Restrict). Managers/admins can deactivate/restore.
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

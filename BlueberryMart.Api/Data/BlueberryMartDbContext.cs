@@ -86,6 +86,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(i => i.StockQuantity).HasColumnName("stock_quantity").HasDefaultValue(0);
             e.Property(i => i.Price).HasColumnName("price").HasColumnType("numeric(12,2)");
             e.Property(i => i.IsBulkOnly).HasColumnName("is_bulk_only").HasDefaultValue(false);
+            e.Property(i => i.IsActive).HasColumnName("is_active").HasDefaultValue(true);
             e.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(i => i.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(i => i.Branch).WithMany(b => b.Inventory).HasForeignKey(i => i.BranchId).OnDelete(DeleteBehavior.Restrict);

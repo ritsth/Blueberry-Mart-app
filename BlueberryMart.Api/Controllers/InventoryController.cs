@@ -19,7 +19,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
     public async Task<ActionResult<IEnumerable<Inventory>>> GetForCustomer(
         [FromQuery] Guid branchId, [FromQuery] bool includeOutOfStock = false)
     {
-        var query = context.Inventory.Where(i => i.BranchId == branchId && !i.IsBulkOnly);
+        var query = context.Inventory.Where(i => i.BranchId == branchId && i.IsActive && !i.IsBulkOnly);
         if (!includeOutOfStock)   // default keeps sold-out items hidden
             query = query.Where(i => i.StockQuantity > 0);
 
@@ -39,7 +39,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
                 new { message = "Bulk ordering is available to Blueberry Plus members only." });
 
         var items = await context.Inventory
-            .Where(i => i.BranchId == branchId && i.StockQuantity > 0 && i.IsBulkOnly)
+            .Where(i => i.BranchId == branchId && i.IsActive && i.StockQuantity > 0 && i.IsBulkOnly)
             .ToListAsync();
 
         return Ok(items);
@@ -67,7 +67,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
 
         // bulk=false → regular (non-bulk) catalogue; bulk=true → bulk-only items.
         var matches = await context.Inventory
-            .Where(i => i.StockQuantity > 0 && i.IsBulkOnly == bulk &&
+            .Where(i => i.IsActive && i.StockQuantity > 0 && i.IsBulkOnly == bulk &&
                         EF.Functions.ILike(i.ItemName, $"%{term}%"))
             .Include(i => i.Branch)
             .OrderBy(i => i.Branch.Name)
