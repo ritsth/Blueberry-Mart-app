@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AdminUser, ASSIGNABLE_ROLES, assignRole, banUser, listUsers, Page, Role, unbanUser } from '../api';
+import {
+  AdminUser, ASSIGNABLE_ROLES, assignRole, banUser, Branch, getBranches,
+  listUsers, Page, Role, unbanUser,
+} from '../api';
 
 const PAGE_SIZE = 25;
+const FIELD_ROLES = ['staff', 'manager'];
 
 export default function UsersPage() {
   const [search, setSearch] = useState('');
@@ -9,6 +13,7 @@ export default function UsersPage() {
   const [banned, setBanned] = useState<'' | 'true' | 'false'>('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Page<AdminUser> | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +37,7 @@ export default function UsersPage() {
   }, [search, role, banned, page]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { getBranches().then(setBranches).catch(() => setBranches([])); }, []);
 
   async function onBan(u: AdminUser) {
     const reason = window.prompt(`Ban ${u.email}?\nOptional reason:`, '');
@@ -54,15 +60,39 @@ export default function UsersPage() {
     }
   }
 
-  async function onRoleChange(u: AdminUser, role: Role) {
-    if (role === u.role) return;
-    if (!window.confirm(`Change ${u.email} from "${u.role}" to "${role}"?`)) return;
+  async function onRoleChange(u: AdminUser, newRole: Role) {
+    if (newRole === u.role) return;
+    // Staff/manager need a branch — default to their current one or the first branch.
+    let branchId: string | undefined;
+    if (FIELD_ROLES.includes(newRole)) {
+      if (branches.length === 0) {
+        alert('No branches exist yet — create a branch before assigning staff or manager.');
+        await load();
+        return;
+      }
+      branchId = u.branchId ?? branches[0].id;
+    }
+    if (!window.confirm(`Change ${u.email} from "${u.role}" to "${newRole}"?`)) {
+      await load(); // revert the select to the real value
+      return;
+    }
     try {
-      await assignRole(u.id, role);
+      await assignRole(u.id, newRole, branchId);
       await load();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Role change failed.');
-      await load(); // revert the select to the real value
+      await load();
+    }
+  }
+
+  async function onBranchChange(u: AdminUser, branchId: string) {
+    if (branchId === u.branchId) return;
+    try {
+      await assignRole(u.id, u.role as Role, branchId);
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Branch change failed.');
+      await load();
     }
   }
 
@@ -85,6 +115,8 @@ export default function UsersPage() {
           <option value="">All roles</option>
           <option value="customer">Customer</option>
           <option value="shareholder">Shareholder</option>
+          <option value="staff">Staff</option>
+          <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
         <select value={banned} onChange={(e) => { setPage(1); setBanned(e.target.value as '' | 'true' | 'false'); }}>
@@ -99,7 +131,7 @@ export default function UsersPage() {
       <table className="grid">
         <thead>
           <tr>
-            <th>Email</th><th>Role</th><th>Member</th><th>Points</th>
+            <th>Email</th><th>Role</th><th>Branch</th><th>Member</th><th>Points</th>
             <th>Status</th><th>Joined</th><th></th>
           </tr>
         </thead>
@@ -115,6 +147,19 @@ export default function UsersPage() {
                 >
                   {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
+              </td>
+              <td>
+                {FIELD_ROLES.includes(u.role) ? (
+                  <select
+                    className="branch-select"
+                    value={u.branchId ?? ''}
+                    onChange={(e) => onBranchChange(u, e.target.value)}
+                  >
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                ) : (
+                  <span className="muted">—</span>
+                )}
               </td>
               <td>{u.isMember ? '✓' : '—'}</td>
               <td>{u.loyaltyPoints}</td>
@@ -134,7 +179,7 @@ export default function UsersPage() {
             </tr>
           ))}
           {!loading && data?.items.length === 0 && (
-            <tr><td colSpan={7} className="empty">No users match.</td></tr>
+            <tr><td colSpan={8} className="empty">No users match.</td></tr>
           )}
         </tbody>
       </table>

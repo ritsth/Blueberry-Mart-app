@@ -82,7 +82,19 @@ a { color: var(--green); }
 .pill.banned { background: #fee2e2; color: var(--red); }
 .role-customer { background: #eff6ff; color: #1d4ed8; }
 .role-shareholder { background: #f5f3ff; color: #6d28d9; }
+.role-staff { background: #ecfeff; color: #0e7490; }
+.role-manager { background: #fff7ed; color: #c2410c; }
 .role-admin { background: #fef3c7; color: #92400e; }
+
+/* Sidebar role tag + section label */
+.nav-section { margin-top: 16px; padding: 0 12px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+.role-tag { align-self: flex-start; margin-bottom: 12px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+
+.branch-select { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
+
+/* Dashboard card */
+.card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; max-width: 420px; }
+.card p { margin: 8px 0; display: flex; align-items: center; gap: 8px; }
 
 .btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 14px; }
 .btn:hover { background: var(--bg); }

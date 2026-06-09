@@ -1,13 +1,19 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { isAuthed } from './auth';
+import { isAdmin, isAuthed } from './auth';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/UsersPage';
 import ReviewsPage from './pages/ReviewsPage';
 import SettingsPage from './pages/SettingsPage';
 
-function RequireAdmin({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   return isAuthed() ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+// Admin-only pages: anyone else signed in is sent back to the dashboard.
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  return isAdmin() ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -17,15 +23,15 @@ export default function App() {
       <Route
         path="/"
         element={
-          <RequireAdmin>
+          <RequireAuth>
             <Layout />
-          </RequireAdmin>
+          </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/users" replace />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="reviews" element={<ReviewsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route index element={<Dashboard />} />
+        <Route path="users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
+        <Route path="reviews" element={<RequireAdmin><ReviewsPage /></RequireAdmin>} />
+        <Route path="settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

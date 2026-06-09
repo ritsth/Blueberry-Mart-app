@@ -33,6 +33,8 @@ export interface AdminUser {
   id: string;
   email: string;
   role: string;
+  branchId: string | null;
+  branchName: string | null;
   isMember: boolean;
   loyaltyPoints: number;
   isBanned: boolean;
@@ -41,6 +43,12 @@ export interface AdminUser {
   createdAt: string;
 }
 export interface Page<T> { items: T[]; total: number; page: number; pageSize: number; }
+
+export interface Branch { id: string; name: string; city: string; }
+
+export function getBranches(): Promise<Branch[]> {
+  return request<Branch[]>('/api/branches');
+}
 
 export interface AdminReview {
   id: string;
@@ -89,10 +97,10 @@ export function deleteReview(id: string): Promise<unknown> {
 export const ASSIGNABLE_ROLES = ['customer', 'shareholder', 'staff', 'manager', 'admin'] as const;
 export type Role = (typeof ASSIGNABLE_ROLES)[number];
 
-export function assignRole(id: string, role: Role): Promise<unknown> {
+export function assignRole(id: string, role: Role, branchId?: string): Promise<unknown> {
   return request(`/api/admin/users/${id}/role`, {
     method: 'POST',
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, branchId: branchId ?? null }),
   });
 }
 
