@@ -6,6 +6,8 @@ public class AdminUserResponse
     public Guid Id { get; set; }
     public string Email { get; set; } = null!;
     public string Role { get; set; } = null!;
+    public Guid? BranchId { get; set; }
+    public string? BranchName { get; set; }
     public bool IsMember { get; set; }
     public int LoyaltyPoints { get; set; }
     public bool IsBanned { get; set; }

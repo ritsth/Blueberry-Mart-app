@@ -56,6 +56,8 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
                 Id = u.Id,
                 Email = u.Email,
                 Role = u.Role,
+                BranchId = u.BranchId,
+                BranchName = u.BranchId != null ? u.Branch!.Name : null,
                 IsMember = u.Role == "shareholder" || u.Role == "admin"
                     || (u.MemberUntil.HasValue && u.MemberUntil.Value > DateTime.UtcNow),
                 LoyaltyPoints = u.LoyaltyPoints,
@@ -158,14 +160,28 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
                 return BadRequest(new { message = "Cannot demote the last remaining admin." });
         }
 
-        if (user.Role != role)
+        // Staff and managers operate a single branch; everyone else is branch-agnostic.
+        if (role is "staff" or "manager")
         {
-            user.Role = role;
+            if (request.BranchId is not { } branchId)
+                return BadRequest(new { message = "Staff and manager accounts must be assigned a branch." });
+            if (!await context.Branches.AnyAsync(b => b.Id == branchId && b.IsActive))
+                return BadRequest(new { message = "The selected branch does not exist." });
+            user.BranchId = branchId;
+        }
+        else
+        {
+            user.BranchId = null;
+        }
+
+        user.Role = role;
+        if (context.ChangeTracker.HasChanges())
+        {
             user.UpdatedAt = DateTime.UtcNow;
             await context.SaveChangesAsync();
         }
 
-        return Ok(new { user.Id, user.Role });
+        return Ok(new { user.Id, user.Role, user.BranchId });
     }
 
     [HttpGet("settings")]

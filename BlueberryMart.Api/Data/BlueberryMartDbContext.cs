@@ -36,6 +36,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
             e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
             e.Property(u => u.Role).HasColumnName("role").HasDefaultValue("customer");
+            e.Property(u => u.BranchId).HasColumnName("branch_id");
             e.Property(u => u.LoyaltyPoints).HasColumnName("loyalty_points").HasDefaultValue(0);
             e.Property(u => u.MemberSince).HasColumnName("member_since");
             e.Property(u => u.MemberUntil).HasColumnName("member_until");
@@ -45,7 +46,9 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.BanReason).HasColumnName("ban_reason").HasMaxLength(500);
             e.Property(u => u.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(u => u.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
+            e.HasOne(u => u.Branch).WithMany().HasForeignKey(u => u.BranchId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(u => u.Email).IsUnique();
+            e.HasIndex(u => u.BranchId);
         });
 
         modelBuilder.Entity<StoreSettings>(e =>

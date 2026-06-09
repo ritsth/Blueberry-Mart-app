@@ -8,6 +8,12 @@ public class User
     public string Email { get; set; } = null!;
     public string PasswordHash { get; set; } = null!;
     public string Role { get; set; } = "customer";
+
+    // For back-office field roles (staff/manager): the branch they operate.
+    // Null for customers, shareholders, and admins, who aren't tied to one branch.
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+
     public int LoyaltyPoints { get; set; }
 
     // Membership: a paid period that runs until MemberUntil. Cancelling stops

@@ -24,7 +24,7 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         if (user is null || !VerifyPassword(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid email or password." });
 
-        var token = GenerateToken(user.Id, user.Email, user.Role);
+        var token = GenerateToken(user.Id, user.Email, user.Role, user.BranchId);
         return Ok(new { token });
     }
 
@@ -54,11 +54,12 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
-        var token = GenerateToken(user.Id, user.Email, user.Role);
+        // Public sign-up always creates a customer, who is never tied to a branch.
+        var token = GenerateToken(user.Id, user.Email, user.Role, branchId: null);
         return Ok(new { token });
     }
 
-    private string GenerateToken(Guid userId, string email, string role)
+    private string GenerateToken(Guid userId, string email, string role, Guid? branchId)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Secret"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -66,13 +67,17 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         // Capitalize first letter to match ASP.NET Core role policy ("Customer", "Shareholder")
         var normalizedRole = char.ToUpper(role[0]) + role[1..];
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, email),
-            new Claim(ClaimTypes.Role, normalizedRole),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email),
+            new(ClaimTypes.Role, normalizedRole),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        // Branch claim drives back-office branch scoping (staff/manager).
+        if (branchId.HasValue)
+            claims.Add(new Claim("branch", branchId.Value.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: config["Jwt:Issuer"],
