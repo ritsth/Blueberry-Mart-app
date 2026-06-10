@@ -174,6 +174,17 @@ if (!app.Environment.IsEnvironment("Testing"))
     DbInitializer.Initialize(context, app.Configuration);
 }
 
+// One-off data seeding: `dotnet run --project BlueberryMart.Api -- seed [--orders N …]`
+// (or `… -- seed clear`). Runs against the configured connection, then exits without
+// starting the web host. Never triggered by a normal container start (no `seed` arg).
+if (args.Contains("seed"))
+{
+    using var seedScope = app.Services.CreateScope();
+    var seedCtx = seedScope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+    await DataSeeder.RunAsync(seedCtx, args);
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
