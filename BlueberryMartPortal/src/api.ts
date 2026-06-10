@@ -183,6 +183,27 @@ export function getDashboardSummary(): Promise<DashboardSummary> {
   return request<DashboardSummary>('/api/dashboard/summary');
 }
 
+// ---- Reports (manager/admin) ----
+export interface StatusCount { status: string; count: number; }
+export interface TopItem { itemName: string; quantitySold: number; revenue: number; }
+export interface SalesReport {
+  from: string;
+  to: string;
+  totalRevenue: number;
+  orderCount: number;
+  averageOrderValue: number;
+  byStatus: StatusCount[];
+  topItems: TopItem[];
+}
+
+export function getSalesReport(params: { from?: string; to?: string; branchId?: string }): Promise<SalesReport> {
+  const q = new URLSearchParams();
+  if (params.from) q.set('from', params.from);
+  if (params.to) q.set('to', params.to);
+  if (params.branchId) q.set('branchId', params.branchId);
+  return request<SalesReport>(`/api/reports/sales?${q.toString()}`);
+}
+
 export interface AdminReview {
   id: string;
   userEmail: string;

@@ -168,6 +168,11 @@ a { color: var(--green); }
 .delta-pos { color: #166534; font-weight: 800; }
 .delta-neg { color: var(--red); font-weight: 800; }
 
+/* Reports */
+.report-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+.report-card { flex: 1; min-width: 260px; max-width: none; }
+.report-card h3 { margin: 0 0 10px; font-size: 14px; }
+
 .btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 14px; }
 .btn:hover { background: var(--bg); }
 .btn.small { padding: 6px 12px; font-size: 13px; }

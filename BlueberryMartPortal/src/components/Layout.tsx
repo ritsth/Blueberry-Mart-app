@@ -18,6 +18,9 @@ export default function Layout() {
           <div className="nav-section">Operations</div>
           <NavLink to="/items" className={({ isActive }) => (isActive ? 'active' : '')}>Items</NavLink>
           <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>Orders</NavLink>
+          {(role === 'manager' || role === 'admin') && (
+            <NavLink to="/reports" className={({ isActive }) => (isActive ? 'active' : '')}>Reports</NavLink>
+          )}
           {isAdmin() && (
             <>
               <div className="nav-section">Admin</div>

@@ -1,10 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { isAdmin, isAuthed } from './auth';
+import { getRole, isAdmin, isAuthed } from './auth';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ItemsPage from './pages/ItemsPage';
 import OrdersPage from './pages/OrdersPage';
+import ReportsPage from './pages/ReportsPage';
 import UsersPage from './pages/UsersPage';
 import ReviewsPage from './pages/ReviewsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -16,6 +17,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 // Admin-only pages: anyone else signed in is sent back to the dashboard.
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   return isAdmin() ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+// Manager or admin (e.g. reports): staff are sent back to the dashboard.
+function RequireManager({ children }: { children: React.ReactNode }) {
+  const role = getRole();
+  return role === 'manager' || role === 'admin' ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -33,6 +40,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="items" element={<ItemsPage />} />
         <Route path="orders" element={<OrdersPage />} />
+        <Route path="reports" element={<RequireManager><ReportsPage /></RequireManager>} />
         <Route path="users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
         <Route path="reviews" element={<RequireAdmin><ReviewsPage /></RequireAdmin>} />
         <Route path="settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
