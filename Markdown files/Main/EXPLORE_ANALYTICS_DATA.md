@@ -74,4 +74,4 @@ learning, not for getting numbers on a screen. Concrete checklist:
 5. **A transactional outbox** so events aren't lost between DB commit and publish.
 6. **A one-time backfill** — Kafka only carries new orders.
 
-If pursued, it would *replace* the hourly scheduled query as the feed into `sales_fact`. See `KAFKA.md`.
+If pursued, it would *replace* the hourly scheduled query as the feed into `sales_fact`. See `KAFKA_LOCAL.md`.

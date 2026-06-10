@@ -1,6 +1,6 @@
 # Kafka in Production — Confluent Cloud + Cloud Run worker
 
-Runbook for taking the local-only inventory event pipeline (`KAFKA.md`) live, using
+Runbook for taking the local-only inventory event pipeline (`KAFKA_LOCAL.md`) live, using
 **Confluent Cloud** as the managed broker and a **dedicated Cloud Run worker** for the
 consumers. The application code already supports this — no code changes are needed to
 provision it.
@@ -63,7 +63,7 @@ gcloud projects add-iam-policy-binding project-76ca6efe-7878-4dc8-bff \
 ```
 
 (The dataset `blueberrymart` + table `stock_events` already exist from local runs; recreate
-with `bq` if missing — see `KAFKA.md`.)
+with `bq` if missing — see `KAFKA_LOCAL.md`.)
 
 ## 4. Deploy the worker
 
