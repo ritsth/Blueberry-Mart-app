@@ -117,7 +117,9 @@ a { color: var(--green); }
 /* Items page bits */
 .push-right { margin-left: auto; }
 .filters .check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
-.filters .check input { width: 15px; height: 15px; }
+/* Scope the small sizing to checkboxes only — date inputs in .check labels must not shrink. */
+.filters .check input[type="checkbox"] { width: 15px; height: 15px; }
+.filters input[type="date"] { flex: 0 0 auto; width: 160px; color: var(--ink); font-weight: 500; }
 .stock-low { color: var(--red); font-weight: 800; }
 .pill.banned { background: #fee2e2; color: var(--red); }
 
