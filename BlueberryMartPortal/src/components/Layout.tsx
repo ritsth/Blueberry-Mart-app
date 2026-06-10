@@ -13,6 +13,7 @@ export default function Layout() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">🫐 Blueberry Mart<span>Portal</span></div>
+        <div className={`role-tag role-${role}`}>{role}</div>
         <nav>
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>Dashboard</NavLink>
           <div className="nav-section">Operations</div>
@@ -30,7 +31,6 @@ export default function Layout() {
             </>
           )}
         </nav>
-        <div className={`role-tag role-${role}`}>{role}</div>
         <button className="signout" onClick={signOut}>Sign out</button>
       </aside>
       <main className="content">

@@ -94,7 +94,7 @@ a { color: var(--green); }
   font-size: 10px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 1.6px; color: #b3b9c2;
 }
-.role-tag { align-self: flex-start; margin-bottom: 12px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.role-tag { align-self: flex-start; margin: 10px 0 2px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
 
 .branch-select { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
 
