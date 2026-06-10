@@ -24,7 +24,7 @@ a { color: var(--green); }
 }
 .sidebar nav { display: flex; flex-direction: column; gap: 4px; margin-top: 24px; flex: 1; }
 .sidebar nav a {
-  text-decoration: none; color: var(--muted); font-weight: 600; font-size: 14px;
+  text-decoration: none; color: #1f2937; font-weight: 600; font-size: 14px;
   padding: 10px 12px; border-radius: 8px;
 }
 .sidebar nav a:hover { background: var(--bg); }
@@ -86,8 +86,13 @@ a { color: var(--green); }
 .role-manager { background: #fff7ed; color: #c2410c; }
 .role-admin { background: #fef3c7; color: #92400e; }
 
-/* Sidebar role tag + section label */
-.nav-section { margin-top: 16px; padding: 0 12px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+/* Sidebar role tag + section label (a faint divider, clearly not clickable) */
+.nav-section {
+  margin: 18px 4px 4px; padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: #9ca3af;
+}
 .role-tag { align-self: flex-start; margin-bottom: 12px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
 
 .branch-select { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
