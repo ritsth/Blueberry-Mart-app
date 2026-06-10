@@ -1,11 +1,51 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Branch, getBranches, getSalesReport, SalesReport } from '../api';
-import { isAdmin } from '../auth';
+import { getBranchId, isAdmin } from '../auth';
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return d.toISOString().slice(0, 10);
+}
+
+function csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildCsv(report: SalesReport, branchLabel: string): string {
+  const from = report.from.slice(0, 10);
+  const to = report.to.slice(0, 10);
+  const rows: (string | number)[][] = [
+    ['Blueberry Mart — Sales report'],
+    ['Branch', branchLabel],
+    ['From', from, 'To', to],
+    [],
+    ['Total revenue', report.totalRevenue],
+    ['Paid orders', report.orderCount],
+    ['Average order value', report.averageOrderValue],
+    [],
+    ['Orders by status'],
+    ['Status', 'Count'],
+    ...report.byStatus.map((s) => [s.status, s.count]),
+    [],
+    ['Top items'],
+    ['Item', 'Quantity sold', 'Revenue'],
+    ...report.topItems.map((t) => [t.itemName, t.quantitySold, t.revenue]),
+  ];
+  return rows.map((r) => r.map(csvCell).join(',')).join('\n');
+}
+
+function downloadCsv(filename: string, content: string): void {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export default function ReportsPage() {
@@ -36,12 +76,22 @@ export default function ReportsPage() {
   }, [from, to, branchFilter, admin]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (admin) getBranches().then(setBranches).catch(() => setBranches([])); }, [admin]);
+  useEffect(() => { getBranches().then(setBranches).catch(() => setBranches([])); }, []);
+
+  const branchLabel = admin
+    ? (branchFilter ? (branches.find((b) => b.id === branchFilter)?.name ?? 'Selected branch') : 'All branches')
+    : (branches.find((b) => b.id === getBranchId())?.name ?? 'Your branch');
+
+  function onExport() {
+    if (!report) return;
+    downloadCsv(`sales-report_${report.from.slice(0, 10)}_${report.to.slice(0, 10)}.csv`, buildCsv(report, branchLabel));
+  }
 
   return (
     <section>
       <header className="page-head">
         <h1>Reports</h1>
+        <button className="btn push-right" disabled={!report} onClick={onExport}>Export CSV</button>
       </header>
 
       <div className="filters">
