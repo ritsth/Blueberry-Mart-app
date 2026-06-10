@@ -17,6 +17,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SavedReport> SavedReports => Set<SavedReport>();
     public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
+    public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -215,6 +216,24 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.HasOne(n => n.User).WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(n => n.UserId);
+        });
+
+        modelBuilder.Entity<StockAdjustment>(e =>
+        {
+            e.ToTable("stock_adjustments");
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(s => s.InventoryId).HasColumnName("inventory_id");
+            e.Property(s => s.BranchId).HasColumnName("branch_id");
+            e.Property(s => s.UserId).HasColumnName("user_id");
+            e.Property(s => s.Delta).HasColumnName("delta");
+            e.Property(s => s.NewQuantity).HasColumnName("new_quantity");
+            e.Property(s => s.Reason).HasColumnName("reason").HasMaxLength(200).IsRequired();
+            e.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.HasOne(s => s.Item).WithMany().HasForeignKey(s => s.InventoryId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(s => s.InventoryId);
+            e.HasIndex(s => s.BranchId);
         });
 
         modelBuilder.Entity<SavedReport>(e =>

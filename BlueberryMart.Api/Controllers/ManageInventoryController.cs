@@ -25,6 +25,8 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
 
     private bool IsAdmin => User.IsInRole("Admin");
 
+    private Guid CallerId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
     private Guid? CallerBranch() =>
         Guid.TryParse(User.FindFirstValue("branch"), out var b) ? b : null;
 
@@ -168,8 +170,23 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
             return BadRequest(new { message = $"Adjustment would make stock negative (current {item.StockQuantity})." });
 
         var oldQty = item.StockQuantity;
+        var reason = string.IsNullOrWhiteSpace(request.Reason) ? "adjustment" : request.Reason!.Trim();
+        var now = DateTime.UtcNow;
         item.StockQuantity = newQty;
-        item.UpdatedAt = DateTime.UtcNow;
+        item.UpdatedAt = now;
+
+        // Audit row: who adjusted, by how much, why, and the resulting quantity.
+        context.StockAdjustments.Add(new StockAdjustment
+        {
+            Id = Guid.NewGuid(),
+            InventoryId = item.Id,
+            BranchId = item.BranchId,
+            UserId = CallerId(),
+            Delta = request.Delta,
+            NewQuantity = newQty,
+            Reason = reason,
+            CreatedAt = now,
+        });
         await context.SaveChangesAsync();
 
         // Feeds the Kafka stock pipeline / back-in-stock notifications, like restock.
@@ -179,10 +196,34 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
             ItemName: item.ItemName,
             OldQuantity: oldQty,
             NewQuantity: newQty,
-            Reason: string.IsNullOrWhiteSpace(request.Reason) ? "adjustment" : request.Reason!.Trim(),
-            OccurredAt: DateTime.UtcNow));
+            Reason: reason,
+            OccurredAt: now));
 
         return Ok(Map(item, item.Branch.Name));
+    }
+
+    [HttpGet("{id:guid}/history")]
+    public async Task<ActionResult<List<StockAdjustmentResponse>>> History(Guid id)
+    {
+        var item = await context.Inventory.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null) return NotFound(new { message = "Item not found." });
+        if (GuardBranch(item.BranchId) is { } denied) return denied;
+
+        var rows = await context.StockAdjustments.AsNoTracking()
+            .Where(s => s.InventoryId == id)
+            .OrderByDescending(s => s.CreatedAt)
+            .Take(50)
+            .Select(s => new StockAdjustmentResponse
+            {
+                CreatedAt = s.CreatedAt,
+                UserEmail = s.User.Email,
+                Delta = s.Delta,
+                NewQuantity = s.NewQuantity,
+                Reason = s.Reason,
+            })
+            .ToListAsync();
+
+        return Ok(rows);
     }
 
     [HttpPost("{id:guid}/deactivate")]

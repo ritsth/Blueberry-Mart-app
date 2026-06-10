@@ -93,6 +93,27 @@ public class ManageInventoryControllerTests
     }
 
     [Fact]
+    public async Task Adjust_RecordsHistoryRow()
+    {
+        var token = await StaffTokenAsync(_downtown);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Hist {Guid.NewGuid():N}", stock: 2);
+
+        await _client.SendAsync(new HttpRequestMessage(HttpMethod.Post, $"/api/inventory/manage/{itemId}/adjust")
+        {
+            Content = JsonContent.Create(new { delta = 5, reason = "delivery" }),
+        }.WithBearer(token));
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/manage/{itemId}/history").WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(json.GetArrayLength() >= 1);
+        Assert.Equal(5, json[0].GetProperty("delta").GetInt32());
+        Assert.Equal("delivery", json[0].GetProperty("reason").GetString());
+    }
+
+    [Fact]
     public async Task Staff_CannotDeactivate_ManagerOnly()
     {
         var token = await StaffTokenAsync(_downtown);
