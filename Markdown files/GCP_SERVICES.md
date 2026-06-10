@@ -176,7 +176,7 @@ gcloud projects get-iam-policy project-76ca6efe-7878-4dc8-bff \
 
 - Hosts the back-office portal (`BlueberryMartPortal/`) at **https://blueberrymart-admin.web.app**
   (site id `blueberrymart-admin`). Auto-deployed by `portal-ci.yml` via the same WIF identity.
-  Same GCP project as everything else. See [CI-CD.md](CI-CD.md).
+  Same GCP project as everything else. See [CICD_pipeline.md](CICD_pipeline.md).
 
 ## 8. BigQuery
 

@@ -143,7 +143,7 @@ npm run lint                  # ESLint (flat config)
 Firebase Hosting** (keyless Workload Identity Federation, same SA as the backend deploy,
 granted `roles/firebasehosting.admin`). `npm run deploy` still works for manual one-offs.
 The backend deploys via the **Test & Deploy** workflow; EF migrations apply on boot. See
-[CI-CD.md](../CI-CD.md) and [GCP-SERVICES.md](../GCP-SERVICES.md).
+[CICD_pipeline.md](../CICD_pipeline.md) and [GCP_SERVICES.md](../GCP_SERVICES.md).
 
 Production Cloud Run wiring (CORS + admin bootstrap):
 ```

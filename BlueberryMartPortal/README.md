@@ -6,7 +6,7 @@ the back office for running the store. It is deliberately **separate from the mo
 the API's `[Authorize(Roles = …)]` on the management endpoints, plus per-request ban
 enforcement. This portal is just the UI.
 
-> Full feature + endpoint reference: **`Markdown files/Main/BACK-OFFICE-PORTAL.md`**.
+> Full feature + endpoint reference: **`Markdown files/Main/BACK_OFFICE_PORTAL.md`**.
 
 ## What it does
 
@@ -51,5 +51,5 @@ For a manual one-off:
 npm run deploy            # = npm run build && firebase deploy --only hosting
 ```
 
-See `Markdown files/CI-CD.md` and `Markdown files/GCP-SERVICES.md` for the pipeline and
+See `Markdown files/CICD_pipeline.md` and `Markdown files/GCP_SERVICES.md` for the pipeline and
 cloud setup (CORS origins, admin bootstrap, secrets).

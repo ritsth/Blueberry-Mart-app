@@ -1,7 +1,7 @@
 # Explore analytics — how `sales_fact` gets its data
 
 Reference for the data behind the shareholder **Explore** tab. The analytics *engine*
-(catalog + query + saved reports) is in `CUSTOM-ANALYTICS-PLAN.md`; this doc is about
+(catalog + query + saved reports) is in `CUSTOM_ANALYTICS_PLAN.md`; this doc is about
 **where the numbers come from**.
 
 ---
