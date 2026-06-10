@@ -63,8 +63,8 @@ export default function ReportsPage() {
     setError('');
     try {
       const res = await getSalesReport({
-        from: `${from}T00:00:00`,
-        to: `${to}T23:59:59`,
+        from,
+        to,
         branchId: admin ? (branchFilter || undefined) : undefined,
       });
       setReport(res);

@@ -28,12 +28,15 @@ public class ReportsController(BlueberryMartDbContext context) : ControllerBase
         if (!isAdmin && mine is null)
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Your account is not assigned to a branch." });
 
-        // Bind dates as UTC so Npgsql can compare them to the timestamptz column.
-        var toDate = DateTime.SpecifyKind(to ?? DateTime.UtcNow, DateTimeKind.Utc);
-        var fromDate = DateTime.SpecifyKind(from ?? toDate.AddDays(-30), DateTimeKind.Utc);
+        // Treat from/to as whole UTC days: from = start-of-day inclusive,
+        // to = end of that day (next day, exclusive). `.Date` drops any time part the
+        // client may send, and `SpecifyKind(Utc)` lets Npgsql compare to timestamptz.
+        var toInclusive = DateTime.SpecifyKind((to ?? DateTime.UtcNow).Date, DateTimeKind.Utc);
+        var fromDate = DateTime.SpecifyKind((from ?? toInclusive.AddDays(-30)).Date, DateTimeKind.Utc);
+        var toExclusive = toInclusive.AddDays(1);
 
         var orders = context.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt <= toDate);
+            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt < toExclusive);
         if (!isAdmin)
             orders = orders.Where(o => o.BranchId == mine!.Value);
         else if (branchId.HasValue)
@@ -66,7 +69,7 @@ public class ReportsController(BlueberryMartDbContext context) : ControllerBase
         return Ok(new SalesReportResponse
         {
             From = fromDate,
-            To = toDate,
+            To = toInclusive,
             TotalRevenue = totalRevenue,
             OrderCount = orderCount,
             AverageOrderValue = orderCount > 0 ? Math.Round(totalRevenue / orderCount, 2) : 0m,
