@@ -35,7 +35,7 @@ public sealed class StockEventConsumer(
             GroupId = _options.ConsumerGroup,
             AutoOffsetReset = AutoOffsetReset.Earliest,   // read from the start on a fresh group
             EnableAutoCommit = false,                     // we commit manually after processing
-        };
+        }.WithSecurity(_options);   // SASL_SSL for a managed broker; no-op locally
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe(_options.StockChangedTopic);

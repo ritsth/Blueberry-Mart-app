@@ -58,16 +58,23 @@ else
 // otherwise a no-op so the app runs without Kafka (production today, and tests).
 builder.Services.Configure<BlueberryMart.Api.Configuration.KafkaOptions>(
     builder.Configuration.GetSection("Kafka"));
-if (!string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]))
-{
+var kafkaEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]);
+// Consumers run in-process locally (local Redpanda, no API key) and on the dedicated
+// Cloud Run worker (Kafka:RunConsumers=true). The prod API service only *produces* —
+// RunConsumers defaults false once a Confluent API key is configured.
+var kafkaHasApiKey = !string.IsNullOrWhiteSpace(builder.Configuration["Kafka:ApiKey"]);
+var runConsumers = kafkaEnabled && builder.Configuration.GetValue("Kafka:RunConsumers", !kafkaHasApiKey);
+
+if (kafkaEnabled)
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
         BlueberryMart.Api.Services.KafkaStockEventProducer>();
-    // Consumer turns stock-changed events into back-in-stock notifications.
-    builder.Services.AddHostedService<BlueberryMart.Api.Services.StockEventConsumer>();
-}
 else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
         BlueberryMart.Api.Services.NoOpStockEventProducer>();
+
+// Consumer turns stock-changed events into back-in-stock notifications.
+if (runConsumers)
+    builder.Services.AddHostedService<BlueberryMart.Api.Services.StockEventConsumer>();
 
 // BigQuery analytics warehouse: opt-in via BigQuery:ProjectId. The sink (Kafka ->
 // BigQuery) runs only when both Kafka and BigQuery are configured.
@@ -80,7 +87,7 @@ if (bigQueryConfigured)
 else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IInventoryAnalytics,
         BlueberryMart.Api.Services.DisabledInventoryAnalytics>();
-if (bigQueryConfigured && !string.IsNullOrWhiteSpace(builder.Configuration["Kafka:BootstrapServers"]))
+if (bigQueryConfigured && runConsumers)
     builder.Services.AddHostedService<BlueberryMart.Api.Services.BigQueryStockSink>();
 
 // Self-service "Explore" analytics over the sales_fact warehouse: opt-in via the same

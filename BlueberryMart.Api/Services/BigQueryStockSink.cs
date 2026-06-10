@@ -37,7 +37,7 @@ public sealed class BigQueryStockSink(
             GroupId = _bq.ConsumerGroup,
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = false,
-        };
+        }.WithSecurity(_kafka);   // SASL_SSL for a managed broker; no-op locally
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe(_kafka.StockChangedTopic);

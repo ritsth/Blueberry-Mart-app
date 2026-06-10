@@ -28,7 +28,7 @@ public sealed class KafkaStockEventProducer : IStockEventProducer, IDisposable
         {
             BootstrapServers = opts.BootstrapServers,
             AllowAutoCreateTopics = true,   // let the dev broker create the topic on first publish
-        };
+        }.WithSecurity(opts);   // SASL_SSL for a managed broker; no-op locally
         _producer = new ProducerBuilder<string, string>(config).Build();
     }
 
