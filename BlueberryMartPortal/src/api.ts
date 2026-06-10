@@ -101,6 +101,18 @@ export function setItemActive(id: string, active: boolean): Promise<InventoryIte
   });
 }
 
+export interface StockAdjustment {
+  createdAt: string;
+  userEmail: string;
+  delta: number;
+  newQuantity: number;
+  reason: string;
+}
+
+export function getItemHistory(id: string): Promise<StockAdjustment[]> {
+  return request<StockAdjustment[]>(`/api/inventory/manage/${id}/history`);
+}
+
 // ---- Order fulfillment (staff/manager/admin) ----
 export interface ManagedOrder {
   id: string;

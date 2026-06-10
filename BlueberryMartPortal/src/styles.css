@@ -163,6 +163,11 @@ a { color: var(--green); }
 .pay-row { display: flex; gap: 8px; }
 .pay-row select { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
 
+/* Stock history */
+.small { font-size: 11px; }
+.delta-pos { color: #166534; font-weight: 800; }
+.delta-neg { color: var(--red); font-weight: 800; }
+
 .btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 14px; }
 .btn:hover { background: var(--bg); }
 .btn.small { padding: 6px 12px; font-size: 13px; }

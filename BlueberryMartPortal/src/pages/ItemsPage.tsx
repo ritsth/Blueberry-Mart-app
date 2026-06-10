@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import {
-  adjustStock, Branch, createItem, getBranches, InventoryItem,
-  listManagedItems, Page, setItemActive, updateItem,
+  adjustStock, Branch, createItem, getBranches, getItemHistory, InventoryItem,
+  listManagedItems, Page, setItemActive, StockAdjustment, updateItem,
 } from '../api';
 import { getBranchId, getRole, isAdmin } from '../auth';
 import Modal from '../components/Modal';
@@ -13,6 +13,7 @@ type ModalState =
   | { kind: 'create' }
   | { kind: 'edit'; item: InventoryItem }
   | { kind: 'adjust'; item: InventoryItem }
+  | { kind: 'history'; item: InventoryItem }
   | null;
 
 export default function ItemsPage() {
@@ -127,6 +128,7 @@ export default function ItemsPage() {
               <td className="actions">
                 <button className="btn small" onClick={() => setModal({ kind: 'edit', item: it })}>Edit</button>
                 <button className="btn small" onClick={() => setModal({ kind: 'adjust', item: it })}>Stock</button>
+                <button className="btn small" onClick={() => setModal({ kind: 'history', item: it })}>History</button>
                 {canDeactivate && (
                   <button className={`btn small ${it.isActive ? 'danger' : ''}`} onClick={() => onToggleActive(it)}>
                     {it.isActive ? 'Deactivate' : 'Restore'}
@@ -168,7 +170,45 @@ export default function ItemsPage() {
           <AdjustForm item={modal.item} onDone={closeAndReload} />
         </Modal>
       )}
+      {modal?.kind === 'history' && (
+        <Modal title={`History · ${modal.item.itemName}`} onClose={() => setModal(null)}>
+          <HistoryView itemId={modal.item.id} />
+        </Modal>
+      )}
     </section>
+  );
+}
+
+function HistoryView({ itemId }: { itemId: string }) {
+  const [rows, setRows] = useState<StockAdjustment[] | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    getItemHistory(itemId)
+      .then(setRows)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load history.'));
+  }, [itemId]);
+
+  if (error) return <p className="error">{error}</p>;
+  if (!rows) return <p className="muted">Loading…</p>;
+  if (rows.length === 0) return <p className="muted">No adjustments recorded yet.</p>;
+
+  return (
+    <table className="od-items">
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td>
+              <div>{new Date(r.createdAt).toLocaleString()}</div>
+              <div className="muted small">{r.userEmail}</div>
+            </td>
+            <td className={r.delta >= 0 ? 'delta-pos' : 'delta-neg'}>{r.delta >= 0 ? `+${r.delta}` : r.delta}</td>
+            <td className="muted">→ {r.newQuantity}</td>
+            <td className="muted">{r.reason}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
