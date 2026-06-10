@@ -96,6 +96,18 @@ a { color: var(--green); }
 .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; max-width: 420px; }
 .card p { margin: 8px 0; display: flex; align-items: center; gap: 8px; }
 
+/* Dashboard stat cards */
+.stats { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+.stat {
+  display: flex; flex-direction: column; gap: 6px; text-decoration: none;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 22px; min-width: 160px; transition: box-shadow 0.15s, border-color 0.15s;
+}
+.stat:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.06); border-color: #d1d5db; }
+.stat-num { font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1; }
+.stat-num.warn { color: #c2410c; }
+.stat-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+
 /* Items page bits */
 .push-right { margin-left: auto; }
 .filters .check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }

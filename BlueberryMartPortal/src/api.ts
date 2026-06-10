@@ -160,6 +160,17 @@ export function cancelOrder(id: string): Promise<unknown> {
   return request(`/api/orders/manage/${id}/cancel`, { method: 'POST' });
 }
 
+// ---- Dashboard ----
+export interface DashboardSummary {
+  lowStockItems: number;
+  pendingOrders: number;
+  activeOrders: number;
+}
+
+export function getDashboardSummary(): Promise<DashboardSummary> {
+  return request<DashboardSummary>('/api/dashboard/summary');
+}
+
 export interface AdminReview {
   id: string;
   userEmail: string;
