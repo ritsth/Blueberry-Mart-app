@@ -1,84 +1,55 @@
-# Blueberry Mart — Admin Portal
+# Blueberry Mart — Back-Office Portal
 
-A standalone **React + Vite + TypeScript** web app for administrators. It is
-deliberately **separate from the mobile app** so admin code never ships in the public
-mobile binary. It talks to the **same .NET API** as the mobile app; the real security
-boundary is the API's `[Authorize(Roles = "Admin")]` on `/api/admin/*`, plus
-per-request ban enforcement — this portal is just a convenient UI.
+A standalone **React + Vite + TypeScript** web app for **admin, manager, and staff** —
+the back office for running the store. It is deliberately **separate from the mobile app**
+(customers never see it) and talks to the **same .NET API**; the real security boundary is
+the API's `[Authorize(Roles = …)]` on the management endpoints, plus per-request ban
+enforcement. This portal is just the UI.
 
-## What it does (v1)
+> Full feature + endpoint reference: **`Markdown files/Main/BACK-OFFICE-PORTAL.md`**.
 
-- **Login** — uses the shared `/api/auth/login`; only accounts with the `admin` role
-  are allowed in.
-- **Users** — search/filter, **ban / unban** (takes effect immediately — the API
-  rejects the banned user's existing token on the next request), and **change a user's
-  role** (customer/shareholder/admin; staff/manager are accepted but inert until the
-  Wave 2 roles ship). The last remaining admin can't be demoted.
-- **Reviews** — list recent reviews and **delete** inappropriate ones.
-- **Settings** — edit formerly-hardcoded values (delivery fee, membership fee, member
-  discount) and toggle **maintenance mode**, which pauses customer ordering (the API
-  returns 503; the app can read `/api/system/status` for a banner).
+## What it does
+
+- **Login** — shared `/api/auth/login`; only `admin`/`manager`/`staff` accounts are let in.
+- **Dashboard** — branch-scoped counts (low stock, orders awaiting payment, in fulfillment).
+- **Items** — create/edit items, adjust stock (with reason), deactivate/restore
+  (manager/admin), and a per-item **stock history** (audit log).
+- **Orders** — record cash/card payment, advance fulfillment status, cancel (manager/admin).
+- **Reports** (manager/admin) — revenue, order counts, top items over a date range.
+- **Admin** (admin only) — users (ban/unban, assign role + branch), reviews, settings,
+  maintenance mode.
+
+**Roles are branch-scoped:** staff/manager act only on their assigned branch (enforced via
+the JWT `branch` claim, server-side); admins act on any branch. An admin assigns a user's
+role and branch from the Users page.
 
 ## Run locally
 
 ```bash
-cp .env.example .env      # point VITE_API_URL at your API (default http://localhost:5027)
+cp .env.example .env      # VITE_API_URL → your API (default http://localhost:5027)
 npm install
-npm run dev               # http://localhost:5173
+npm run dev               # http://localhost:5173  (allowed by the API's CORS)
+npm run lint              # ESLint (flat config)
 ```
 
-The API allows `http://localhost:5173` via CORS (`Cors:PortalOrigins` in
-`appsettings.json`). You need an admin account — the API auto-creates one on startup
-from `Admin:Email` / `Admin:Password` (set those in the API's
-`appsettings.Development.json` locally, or Secret Manager in prod).
+You need a back-office account. The API auto-creates an **admin** on startup from
+`Admin:Email` / `Admin:Password` (`appsettings.Development.json` locally, Secret Manager in
+prod); from there, promote others to staff/manager (with a branch) via the Users page.
 
 ## Build & deploy (Firebase Hosting)
 
-The portal deploys as a static site to **Firebase Hosting** (same GCP project as the
-API: `project-76ca6efe-7878-4dc8-bff`). Config is in `firebase.json` (SPA rewrite +
-asset caching) and `.firebaserc` (default project). The prod API URL is baked in from
-`.env.production` at build time.
+Deploys as a static site to **Firebase Hosting** (same GCP project as the API). Config:
+`firebase.json` (SPA rewrite + asset caching), `.firebaserc`, and `.env.production` (prod
+API URL baked in at build time).
 
-**One-time setup** (per machine):
+**Deploy is automated:** pushing to `main` with changes under `BlueberryMartPortal/**`
+runs the **Portal CI** workflow, which lints, builds, and deploys to Firebase via keyless
+Workload Identity Federation. URL: **https://blueberrymart-admin.web.app**.
+
+For a manual one-off:
 ```bash
-npm i -g firebase-tools      # or rely on npx (the deploy script uses npx)
-firebase login               # run yourself: ! firebase login
-# Ensure Firebase is enabled on the project (once):
-#   https://console.firebase.google.com  -> Add project -> pick the existing GCP project
+npm run deploy            # = npm run build && firebase deploy --only hosting
 ```
 
-**Deploy:**
-```bash
-npm run deploy               # = npm run build && firebase deploy --only hosting
-```
-This publishes to `https://blueberrymart-admin.web.app`
-(and `…firebaseapp.com`).
-
-### Wire the prod API to the portal (run once, after first deploy)
-
-The API must (a) allow the portal's origin via CORS and (b) have a bootstrap admin.
-These set secrets/config on Cloud Run — **run them yourself** (the password lives only
-in Secret Manager, never in git):
-
-```bash
-# 1) Allow the portal origins (CORS)
-gcloud run services update blueberrymart-api --region us-central1 \
-  --update-env-vars '^@^Cors__PortalOrigins__0=https://blueberrymart-admin.web.app@Cors__PortalOrigins__1=https://blueberrymart-admin.firebaseapp.com'
-
-# 2) Bootstrap admin — email as env, password as a Secret Manager secret
-echo -n 'A_STRONG_PASSWORD' | gcloud secrets create admin-password --data-file=-   # first time
-# (later rotations: gcloud secrets versions add admin-password --data-file=-)
-gcloud run services update blueberrymart-api --region us-central1 \
-  --update-env-vars ADMIN__EMAIL=you@yourdomain.com \
-  --update-secrets ADMIN__PASSWORD=admin-password:latest
-```
-
-On the next request the API creates the admin (or promotes the existing email). Log
-into the portal with that email + the secret password.
-
-## Roles roadmap
-
-v1 ships the global **admin** role only. Branch-scoped **staff** / **manager** roles
-(and the operations screens they need) are a deliberate later wave — they require a
-branch association on users and scope-enforcing authorization, built when there are
-actually store staff to onboard.
+See `Markdown files/CI-CD.md` and `Markdown files/GCP-SERVICES.md` for the pipeline and
+cloud setup (CORS origins, admin bootstrap, secrets).
