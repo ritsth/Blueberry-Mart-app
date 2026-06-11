@@ -24,25 +24,35 @@ export default function AppHeader() {
 
   useFocusEffect(useCallback(() => {
     let alive = true;
-    (async () => {
+
+    async function loadAddress() {
       try {
         const token = await getStoredToken();
-        const auth = { headers: { Authorization: `Bearer ${token}` } };
-        const [aRes, nRes] = await Promise.all([
-          fetch(`${API_BASE}/api/addresses`, auth),
-          fetch(`${API_BASE}/api/notifications`, auth),
-        ]);
-        if (aRes.ok && alive) {
-          const list: Address[] = await aRes.json();
+        const res = await fetch(`${API_BASE}/api/addresses`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok && alive) {
+          const list: Address[] = await res.json();
           setAddress(list.find(a => a.isDefault) ?? list[0] ?? null);
         }
-        if (nRes.ok && alive) {
-          const n = await nRes.json();
+      } catch { /* non-blocking */ }
+    }
+
+    async function loadUnread() {
+      try {
+        const token = await getStoredToken();
+        const res = await fetch(`${API_BASE}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok && alive) {
+          const n = await res.json();
           setUnread(n.unread ?? 0);
         }
       } catch { /* non-blocking */ }
-    })();
-    return () => { alive = false; };
+    }
+
+    loadAddress();
+    loadUnread();
+    // Poll the unread badge so back-in-stock notifications show up without
+    // navigating away and back (e.g. while watching for a restock).
+    const id = setInterval(loadUnread, 30000);
+    return () => { alive = false; clearInterval(id); };
   }, []));
 
   return (
