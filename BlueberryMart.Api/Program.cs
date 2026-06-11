@@ -76,6 +76,11 @@ else
 if (runConsumers)
     builder.Services.AddHostedService<BlueberryMart.Api.Services.StockEventConsumer>();
 
+// Unpaid-order expiry sweeper — worker-only (a single always-on instance), so it never
+// races multiple API instances or vanishes when the API scales to zero.
+if (runConsumers)
+    builder.Services.AddHostedService<BlueberryMart.Api.Services.OrderExpirySweeper>();
+
 // BigQuery analytics warehouse: opt-in via BigQuery:ProjectId. The sink (Kafka ->
 // BigQuery) runs only when both Kafka and BigQuery are configured.
 builder.Services.Configure<BlueberryMart.Api.Configuration.BigQueryOptions>(
@@ -115,6 +120,11 @@ else
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.ISettingsService,
     BlueberryMart.Api.Services.SettingsService>();
+
+// Releases stock reserved by unpaid orders after a hold window. The periodic sweeper
+// (OrderExpirySweeper) runs only on the worker; this service holds the logic so it's testable.
+builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IOrderExpiryService,
+    BlueberryMart.Api.Services.OrderExpiryService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
