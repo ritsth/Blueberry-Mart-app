@@ -60,7 +60,25 @@ export interface InventoryItem {
   stockQuantity: number;
   isBulkOnly: boolean;
   isActive: boolean;
+  imageUrl: string | null;
   updatedAt: string;
+}
+
+// Uploads an item photo (multipart) and returns its public URL.
+export async function uploadItemImage(file: File): Promise<string> {
+  const token = getToken();
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch(`${API}/api/inventory/manage/image`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { message?: string }).message ?? `Upload failed (${res.status}).`);
+  }
+  return ((await res.json()) as { url: string }).url;
 }
 
 export function listManagedItems(params: {
@@ -78,13 +96,13 @@ export function listManagedItems(params: {
 }
 
 export function createItem(body: {
-  branchId: string; itemName: string; price: number; stockQuantity: number; isBulkOnly: boolean;
+  branchId: string; itemName: string; price: number; stockQuantity: number; isBulkOnly: boolean; imageUrl?: string | null;
 }): Promise<InventoryItem> {
   return request<InventoryItem>('/api/inventory/manage', { method: 'POST', body: JSON.stringify(body) });
 }
 
 export function updateItem(id: string, body: {
-  itemName: string; price: number; isBulkOnly: boolean;
+  itemName: string; price: number; isBulkOnly: boolean; imageUrl?: string | null;
 }): Promise<InventoryItem> {
   return request<InventoryItem>(`/api/inventory/manage/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 }

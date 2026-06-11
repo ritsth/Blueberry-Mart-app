@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import {
   adjustStock, Branch, createItem, getBranches, getItemHistory, InventoryItem,
-  listManagedItems, Page, setItemActive, StockAdjustment, updateItem,
+  listManagedItems, Page, setItemActive, StockAdjustment, updateItem, uploadItemImage,
 } from '../api';
 import { getBranchId, getRole, isAdmin } from '../auth';
 import Modal from '../components/Modal';
@@ -115,7 +115,14 @@ export default function ItemsPage() {
         <tbody>
           {data?.items.map((it) => (
             <tr key={it.id} className={it.isActive ? '' : 'banned-row'}>
-              <td>{it.itemName}</td>
+              <td>
+                <div className="item-cell">
+                  {it.imageUrl
+                    ? <img src={it.imageUrl} className="item-thumb" alt="" />
+                    : <span className="item-thumb placeholder">{it.itemName.charAt(0).toUpperCase()}</span>}
+                  <span>{it.itemName}</span>
+                </div>
+              </td>
               {admin && <td>{it.branchName}</td>}
               <td>Rs {it.price.toFixed(2)}</td>
               <td className={it.stockQuantity <= LOW_STOCK ? 'stock-low' : ''}>{it.stockQuantity}</td>
@@ -212,6 +219,41 @@ function HistoryView({ itemId }: { itemId: string }) {
   );
 }
 
+function ImageField({ url, onChange }: { url: string | null; onChange: (url: string | null) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setErr('');
+    setUploading(true);
+    try {
+      onChange(await uploadItemImage(file));
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <label>Photo
+      <div className="img-field">
+        {url
+          ? <img src={url} className="img-preview" alt="" />
+          : <div className="img-preview placeholder">no photo</div>}
+        <div className="img-field-actions">
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPick} disabled={uploading} />
+          {url && <button type="button" className="btn small" onClick={() => onChange(null)}>Remove</button>}
+        </div>
+      </div>
+      {uploading && <small className="muted">Uploading…</small>}
+      {err && <span className="error">{err}</span>}
+    </label>
+  );
+}
+
 function CreateForm({
   admin, branches, myBranchId, myBranchName, onDone,
 }: {
@@ -223,6 +265,7 @@ function CreateForm({
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('0');
   const [bulk, setBulk] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -238,6 +281,7 @@ function CreateForm({
         price: Number(price),
         stockQuantity: Number(stock),
         isBulkOnly: bulk,
+        imageUrl,
       });
       onDone();
     } catch (err) {
@@ -263,6 +307,7 @@ function CreateForm({
       <label>Price (Rs)<input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required /></label>
       <label>Initial stock<input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} required /></label>
       <label className="check"><input type="checkbox" checked={bulk} onChange={(e) => setBulk(e.target.checked)} /> Bulk-only (members)</label>
+      <ImageField url={imageUrl} onChange={setImageUrl} />
       {error && <p className="error">{error}</p>}
       <div className="modal-actions">
         <button type="submit" className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Create item'}</button>
@@ -275,6 +320,7 @@ function EditForm({ item, onDone }: { item: InventoryItem; onDone: () => void })
   const [itemName, setItemName] = useState(item.itemName);
   const [price, setPrice] = useState(String(item.price));
   const [bulk, setBulk] = useState(item.isBulkOnly);
+  const [imageUrl, setImageUrl] = useState<string | null>(item.imageUrl);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -283,7 +329,7 @@ function EditForm({ item, onDone }: { item: InventoryItem; onDone: () => void })
     setError('');
     setBusy(true);
     try {
-      await updateItem(item.id, { itemName: itemName.trim(), price: Number(price), isBulkOnly: bulk });
+      await updateItem(item.id, { itemName: itemName.trim(), price: Number(price), isBulkOnly: bulk, imageUrl });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed.');
@@ -297,6 +343,7 @@ function EditForm({ item, onDone }: { item: InventoryItem; onDone: () => void })
       <label>Name<input value={itemName} onChange={(e) => setItemName(e.target.value)} autoFocus required /></label>
       <label>Price (Rs)<input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required /></label>
       <label className="check"><input type="checkbox" checked={bulk} onChange={(e) => setBulk(e.target.checked)} /> Bulk-only (members)</label>
+      <ImageField url={imageUrl} onChange={setImageUrl} />
       {error && <p className="error">{error}</p>}
       <div className="modal-actions">
         <button type="submit" className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
