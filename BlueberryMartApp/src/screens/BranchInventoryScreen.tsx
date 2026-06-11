@@ -342,6 +342,7 @@ export default function BranchInventoryScreen() {
 
       {isSearching ? (
         <FlatList
+          key="search"
           style={styles.flex}
           data={visible}
           keyExtractor={item => item.id}
@@ -357,6 +358,7 @@ export default function BranchInventoryScreen() {
 
           {selected !== 'All' ? (
             <FlatList
+              key="grid"
               style={styles.flex}
               data={sections.find(s => s.key === selected)?.items ?? []}
               keyExtractor={i => i.id}
@@ -371,6 +373,7 @@ export default function BranchInventoryScreen() {
             />
           ) : (
             <FlatList
+              key="rails"
               style={styles.flex}
               data={sections}
               keyExtractor={s => s.key}
