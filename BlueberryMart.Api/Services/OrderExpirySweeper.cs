@@ -9,24 +9,28 @@ namespace BlueberryMart.Api.Services;
 /// </summary>
 public sealed class OrderExpirySweeper(
     IServiceScopeFactory scopeFactory,
+    IConfiguration config,
     ILogger<OrderExpirySweeper> logger) : BackgroundService
 {
-    private static readonly TimeSpan HoldWindow = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("OrderExpirySweeper started ({Hold}-min hold, every {Interval}s)",
-            (int)HoldWindow.TotalMinutes, (int)Interval.TotalSeconds);
+        // Hold window is configurable so it can be shortened for demos
+        // (e.g. Orders__HoldMinutes=2 on the worker). Sweep cadence adapts to short holds.
+        var holdMinutes = Math.Max(1, config.GetValue("Orders:HoldMinutes", 30));
+        var holdWindow = TimeSpan.FromMinutes(holdMinutes);
+        var interval = TimeSpan.FromSeconds(Math.Min(60, holdMinutes * 30));
 
-        using var timer = new PeriodicTimer(Interval);
+        logger.LogInformation("OrderExpirySweeper started ({Hold}-min hold, sweeping every {Interval}s)",
+            holdMinutes, (int)interval.TotalSeconds);
+
+        using var timer = new PeriodicTimer(interval);
         do
         {
             try
             {
                 using var scope = scopeFactory.CreateScope();
                 var svc = scope.ServiceProvider.GetRequiredService<IOrderExpiryService>();
-                await svc.SweepExpiredAsync(HoldWindow, stoppingToken);
+                await svc.SweepExpiredAsync(holdWindow, stoppingToken);
             }
             catch (OperationCanceledException)
             {
