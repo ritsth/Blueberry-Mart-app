@@ -28,6 +28,15 @@ interface InventoryItem { id: string; itemName: string; price: number; stockQuan
 interface SearchItem { id: string; itemName: string; price: number; stockQuantity: number; }
 interface SearchGroup { branchId: string; branchName: string; branchCity: string; items: SearchItem[]; }
 
+// Show stock as a qualitative level rather than the exact count — keeps real inventory
+// numbers private and turns a low count into a gentle urgency cue.
+const LOW_STOCK = 5;
+function stockLabel(qty: number): string {
+  if (qty <= 0) return 'Out of stock';
+  if (qty <= LOW_STOCK) return 'Only a few left';
+  return 'In stock';
+}
+
 export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 'bulk' }) {
   const navigation = useNavigation<any>();
   const isBulk = mode === 'bulk';
@@ -203,7 +212,10 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
                   <View style={styles.itemInfo}>
                     <Text style={[styles.itemName, outOfStock && styles.itemNameMuted]}>{item.itemName}</Text>
                     <Text style={styles.itemMeta}>
-                      Rs {item.price.toFixed(2)}{'  ·  '}{outOfStock ? 'Out of stock' : `${item.stockQuantity} in stock`}
+                      Rs {item.price.toFixed(2)}{'  ·  '}
+                      <Text style={item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK ? styles.lowStock : undefined}>
+                        {stockLabel(item.stockQuantity)}
+                      </Text>
                     </Text>
                   </View>
                   {outOfStock ? (
@@ -266,7 +278,12 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
                   <View key={item.id} style={styles.itemCard}>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName}>{item.itemName}</Text>
-                      <Text style={styles.itemMeta}>Rs {item.price.toFixed(2)}{'  ·  '}{item.stockQuantity} in stock</Text>
+                      <Text style={styles.itemMeta}>
+                        Rs {item.price.toFixed(2)}{'  ·  '}
+                        <Text style={item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK ? styles.lowStock : undefined}>
+                          {stockLabel(item.stockQuantity)}
+                        </Text>
+                      </Text>
                     </View>
                     <QtyControl branchId={group.branchId} item={item} />
                   </View>
@@ -362,6 +379,7 @@ const styles = StyleSheet.create({
   itemInfo: { flex: 1, marginRight: 12 },
   itemName: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 3 },
   itemMeta: { fontSize: 12, color: '#6b7280' },
+  lowStock: { color: '#c2410c', fontWeight: '700' },
   itemCardMuted: { backgroundColor: '#f9fafb' },
   itemNameMuted: { color: '#9ca3af' },
   addButton: { backgroundColor: '#16a34a', borderRadius: 8, width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
