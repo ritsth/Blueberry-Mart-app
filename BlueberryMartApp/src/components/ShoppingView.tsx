@@ -59,10 +59,13 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   // clearly-horizontal swipes, so the inventory list still scrolls vertically.
   const backSwipe = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => g.dx > 24 && Math.abs(g.dy) < 30,
+      // Capture phase: the parent claims a clearly-horizontal rightward swipe before the
+      // FlatList can treat it as a scroll. Vertical moves fail the test, so the list scrolls.
+      onMoveShouldSetPanResponderCapture: (_e, g) => g.dx > 16 && Math.abs(g.dy) < 22,
       onPanResponderRelease: (_e, g) => {
-        if (g.dx > 70 && Math.abs(g.dy) < 80) setSelectedBranch(null);
+        if (g.dx > 55 && Math.abs(g.dy) < 90) setSelectedBranch(null);
       },
+      onPanResponderTerminationRequest: () => false,
     }),
   ).current;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
