@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   Text,
@@ -23,7 +24,7 @@ function branchColor(name: string) {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-interface SearchItem { id: string; itemName: string; price: number; stockQuantity: number; }
+interface SearchItem { id: string; itemName: string; price: number; stockQuantity: number; imageUrl: string | null; }
 interface SearchGroup { branchId: string; branchName: string; branchCity: string; items: SearchItem[]; }
 
 // Show stock as a qualitative level rather than the exact count — keeps real inventory
@@ -176,6 +177,9 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
                 </View>
                 {group.items.map(item => (
                   <View key={item.id} style={styles.itemCard}>
+                    {item.imageUrl
+                      ? <Image source={{ uri: item.imageUrl }} style={styles.thumb} />
+                      : <View style={[styles.thumb, styles.thumbPlaceholder]}><Text style={styles.thumbInitial}>{item.itemName.charAt(0).toUpperCase()}</Text></View>}
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName}>{item.itemName}</Text>
                       <Text style={styles.itemMeta}>
@@ -274,6 +278,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
     marginBottom: 8,
   },
+  thumb: { width: 44, height: 44, borderRadius: 8, marginRight: 12, backgroundColor: '#f3f4f6' },
+  thumbPlaceholder: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
+  thumbInitial: { fontSize: 18, fontWeight: '700', color: '#9ca3af' },
   itemInfo: { flex: 1, marginRight: 12 },
   itemName: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 3 },
   itemMeta: { fontSize: 12, color: '#6b7280' },

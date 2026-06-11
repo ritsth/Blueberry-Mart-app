@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   Text,
@@ -25,7 +26,16 @@ function stockLabel(qty: number): string {
   return 'In stock';
 }
 
-interface InventoryItem { id: string; itemName: string; price: number; stockQuantity: number; }
+interface InventoryItem { id: string; itemName: string; price: number; stockQuantity: number; imageUrl: string | null; }
+
+function Thumb({ url, name }: { url: string | null; name: string }) {
+  if (url) return <Image source={{ uri: url }} style={styles.thumb} />;
+  return (
+    <View style={[styles.thumb, styles.thumbPlaceholder]}>
+      <Text style={styles.thumbInitial}>{name.charAt(0).toUpperCase()}</Text>
+    </View>
+  );
+}
 
 /**
  * A single branch's inventory. A root-stack screen (not a tab view) so it gets the native
@@ -161,6 +171,7 @@ export default function BranchInventoryScreen() {
             const outOfStock = item.stockQuantity <= 0;
             return (
               <View style={[styles.itemCard, outOfStock && styles.itemCardMuted]}>
+                <Thumb url={item.imageUrl} name={item.itemName} />
                 <View style={styles.itemInfo}>
                   <Text style={[styles.itemName, outOfStock && styles.itemNameMuted]}>{item.itemName}</Text>
                   <Text style={styles.itemMeta}>
@@ -210,6 +221,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
     marginBottom: 8,
   },
+  thumb: { width: 44, height: 44, borderRadius: 8, marginRight: 12, backgroundColor: '#f3f4f6' },
+  thumbPlaceholder: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
+  thumbInitial: { fontSize: 18, fontWeight: '700', color: '#9ca3af' },
   itemInfo: { flex: 1, marginRight: 12 },
   itemName: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 3 },
   itemMeta: { fontSize: 12, color: '#6b7280' },
