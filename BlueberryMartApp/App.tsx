@@ -12,11 +12,12 @@ import RegisterScreen    from './src/screens/RegisterScreen';
 import ReviewScreen      from './src/screens/ReviewScreen';
 import AddressesScreen   from './src/screens/AddressesScreen';
 import AlertsScreen      from './src/screens/AlertsScreen';
+import BranchInventoryScreen from './src/screens/BranchInventoryScreen';
 import AccountTab        from './src/screens/tabs/AccountTab';
 import ExploreTab        from './src/screens/tabs/ExploreTab';
 import CustomerTabs      from './src/navigation/CustomerTabs';
 import ShareholderTabs   from './src/navigation/ShareholderTabs';
-import { CartProvider }  from './src/context/CartContext';
+import { Branch, CartProvider }  from './src/context/CartContext';
 
 export type RootStackParamList = {
   Login:            undefined;
@@ -26,6 +27,7 @@ export type RootStackParamList = {
   ReviewScreen:     { orderId: string; items: { id: string; name: string }[] };
   AddressesScreen:  undefined;
   AlertsScreen:     undefined;
+  BranchInventory:  { branch: Branch; mode?: 'regular' | 'bulk' };
   Account:          undefined;
   Explore:          { report?: any } | undefined;
 };
@@ -49,6 +51,7 @@ export default function App() {
                 <Stack.Screen name="ReviewScreen"    component={ReviewScreen} />
                 <Stack.Screen name="AddressesScreen" component={AddressesScreen} />
                 <Stack.Screen name="AlertsScreen"    component={AlertsScreen} />
+                <Stack.Screen name="BranchInventory" component={BranchInventoryScreen} />
                 <Stack.Screen name="Account"         component={AccountTab} />
                 <Stack.Screen name="Explore"         component={ExploreTab} />
               </Stack.Navigator>

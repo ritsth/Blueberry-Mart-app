@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
-  PanResponder,
   RefreshControl,
   StyleSheet,
   Text,
@@ -25,7 +23,6 @@ function branchColor(name: string) {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-interface InventoryItem { id: string; itemName: string; price: number; stockQuantity: number; }
 interface SearchItem { id: string; itemName: string; price: number; stockQuantity: number; }
 interface SearchGroup { branchId: string; branchName: string; branchCity: string; items: SearchItem[]; }
 
@@ -44,51 +41,26 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   const { carts, addToCart, updateQty } = useCart();
 
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(true);
-  const [loadingInventory, setLoadingInventory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchGroup[]>([]);
   const [searching, setSearching] = useState(false);
-
-  // Swipe right to return to the branch list — a native-feeling back gesture. Only claims
-  // clearly-horizontal swipes, so the inventory list still scrolls vertically.
-  const backSwipe = useRef(
-    PanResponder.create({
-      // Capture phase: the parent claims a clearly-horizontal rightward swipe before the
-      // FlatList can treat it as a scroll. Vertical moves fail the test, so the list scrolls.
-      onMoveShouldSetPanResponderCapture: (_e, g) => g.dx > 16 && Math.abs(g.dy) < 22,
-      onPanResponderRelease: (_e, g) => {
-        if (g.dx > 55 && Math.abs(g.dy) < 90) setSelectedBranch(null);
-      },
-      onPanResponderTerminationRequest: () => false,
-    }),
-  ).current;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchBranches(); }, []);
 
-  // Pressing the bottom tab while inside a branch returns to the branch list.
+  // Pressing the bottom tab clears any in-progress search.
   useEffect(() => {
-    const unsub = navigation.addListener('tabPress', () => {
-      setSelectedBranch(null);
-      setQuery('');
-    });
+    const unsub = navigation.addListener('tabPress', () => setQuery(''));
     return unsub;
   }, [navigation]);
 
   async function onRefresh() {
     setRefreshing(true);
-    try {
-      if (selectedBranch) await selectBranch(selectedBranch);
-      else await fetchBranches();
-    } finally {
-      setRefreshing(false);
-    }
+    try { await fetchBranches(); } finally { setRefreshing(false); }
   }
 
   // Debounced cross-branch search
@@ -129,53 +101,17 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
     }
   }
 
-  async function selectBranch(branch: Branch) {
-    setSelectedBranch(branch);
-    setQuery('');
-    setSearchResults([]);
-    setInventory([]);
-    setError(null);
-    setLoadingInventory(true);
-    try {
-      const token = await getStoredToken();
-      const endpoint = isBulk ? 'bulk' : 'customer';
-      const qs = isBulk ? '' : '&includeOutOfStock=true';
-      const res = await fetch(
-        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}${qs}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) throw new Error();
-      setInventory(await res.json());
-    } catch {
-      setError('Failed to load inventory.');
-    } finally {
-      setLoadingInventory(false);
-    }
-  }
-
-  async function notifyMe(item: InventoryItem) {
-    try {
-      const token = await getStoredToken();
-      const res = await fetch(`${API_BASE}/api/inventory/${item.id}/notify-me`, {
-        method: 'POST', headers: { Authorization: `Bearer ${token}` },
-      });
-      const body = await res.json().catch(() => ({}));
-      Alert.alert(
-        res.ok ? "You're on the list" : 'Heads up',
-        body.message ?? (res.ok ? "We'll notify you when it's back." : 'Could not subscribe.'),
-      );
-    } catch {
-      Alert.alert('Error', 'Could not subscribe. Check your connection.');
-    }
+  function openBranch(branch: Branch) {
+    navigation.navigate('BranchInventory', { branch, mode });
   }
 
   const isSearching = query.trim().length >= 2;
 
-  function QtyControl({ branchId, item }: { branchId: string; item: { id: string; itemName: string; price: number; stockQuantity: number } }) {
-    const inCart = carts[branchId]?.items.find(c => c.itemId === item.id);
+  function QtyControl({ branch, item }: { branch: Branch; item: SearchItem }) {
+    const inCart = carts[branch.id]?.items.find(c => c.itemId === item.id);
     if (!inCart) {
       return (
-        <TouchableOpacity style={styles.addButton} onPress={() => addToCart(item, branches.find(b => b.id === branchId) ?? selectedBranch!)} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.addButton} onPress={() => addToCart(item, branch)} activeOpacity={0.8}>
           <Ionicons name="add" size={16} color="#fff" />
         </TouchableOpacity>
       );
@@ -183,12 +119,12 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
     const atMax = inCart.quantity >= item.stockQuantity;
     return (
       <View style={styles.qtyRow}>
-        <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(branchId, item.id, -1)}><Ionicons name="remove" size={16} color="#16a34a" /></TouchableOpacity>
+        <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(branch.id, item.id, -1)}><Ionicons name="remove" size={16} color="#16a34a" /></TouchableOpacity>
         <Text style={styles.qtyCount}>{inCart.quantity}</Text>
         <TouchableOpacity
           style={[styles.qtyBtn, atMax && styles.qtyBtnDisabled]}
           disabled={atMax}
-          onPress={() => addToCart(item, branches.find(b => b.id === branchId) ?? selectedBranch!)}
+          onPress={() => addToCart(item, branch)}
         >
           <Ionicons name="add" size={16} color={atMax ? '#cbd5e1' : '#16a34a'} />
         </TouchableOpacity>
@@ -200,58 +136,6 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
     return <View style={styles.centered}><ActivityIndicator size="large" color="#16a34a" /></View>;
   }
 
-  // ─── Inventory view (branch selected) ──────────────────────────────────────
-  if (selectedBranch !== null) {
-    return (
-      <View style={styles.container} {...backSwipe.panHandlers}>
-        <TouchableOpacity onPress={() => setSelectedBranch(null)} style={styles.backRow}>
-          <Ionicons name="chevron-back" size={18} color="#16a34a" />
-          <Text style={styles.backText}>All branches</Text>
-        </TouchableOpacity>
-        <Text style={styles.heading}>{selectedBranch.name}</Text>
-        <Text style={styles.subheading}>{selectedBranch.city}</Text>
-
-        {loadingInventory ? (
-          <View style={styles.centered}><ActivityIndicator size="large" color="#16a34a" /></View>
-        ) : (
-          <FlatList
-            data={inventory}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.list}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
-            ListEmptyComponent={<Text style={styles.emptyNote}>{isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}</Text>}
-            renderItem={({ item }) => {
-              const outOfStock = item.stockQuantity <= 0;
-              return (
-                <View style={[styles.itemCard, outOfStock && styles.itemCardMuted]}>
-                  <View style={styles.itemInfo}>
-                    <Text style={[styles.itemName, outOfStock && styles.itemNameMuted]}>{item.itemName}</Text>
-                    <Text style={styles.itemMeta}>
-                      Rs {item.price.toFixed(2)}{'  ·  '}
-                      <Text style={item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK ? styles.lowStock : undefined}>
-                        {stockLabel(item.stockQuantity)}
-                      </Text>
-                    </Text>
-                  </View>
-                  {outOfStock ? (
-                    <TouchableOpacity style={styles.notifyButton} onPress={() => notifyMe(item)} activeOpacity={0.8}>
-                      <Ionicons name="notifications-outline" size={14} color="#16a34a" />
-                      <Text style={styles.notifyButtonText}>Notify me</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <QtyControl branchId={selectedBranch.id} item={item} />
-                  )}
-                </View>
-              );
-            }}
-          />
-        )}
-        {error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
-    );
-  }
-
-  // ─── Branch list + search ───────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <View style={styles.searchBar}>
@@ -278,6 +162,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
           ListEmptyComponent={!searching ? <Text style={styles.emptyNote}>No items found for &quot;{query}&quot;</Text> : null}
           renderItem={({ item: group }) => {
             const color = branchColor(group.branchName);
+            const branch: Branch = { id: group.branchId, name: group.branchName, city: group.branchCity };
             return (
               <View style={styles.searchGroup}>
                 <View style={styles.searchGroupHeader}>
@@ -300,7 +185,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
                         </Text>
                       </Text>
                     </View>
-                    <QtyControl branchId={group.branchId} item={item} />
+                    <QtyControl branch={branch} item={item} />
                   </View>
                 ))}
               </View>
@@ -324,7 +209,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
               const branchCart = carts[item.id];
               const count = branchCart?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
               return (
-                <TouchableOpacity style={styles.branchCard} onPress={() => selectBranch(item)} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.branchCard} onPress={() => openBranch(item)} activeOpacity={0.8}>
                   <View style={[styles.branchLogo, { backgroundColor: color }]}>
                     <Ionicons name="storefront" size={26} color="#fff" />
                   </View>
@@ -355,8 +240,6 @@ const styles = StyleSheet.create({
   heading: { fontSize: 22, fontWeight: '700', color: '#14532d', marginBottom: 4 },
   subheading: { fontSize: 13, color: '#6b7280', marginBottom: 16 },
   list: { gap: 10, paddingBottom: 24 },
-  backRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  backText: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
   errorText: { color: '#dc2626', fontSize: 13, textAlign: 'center', marginBottom: 12 },
   emptyNote: { textAlign: 'center', color: '#9ca3af', marginTop: 40 },
 
@@ -395,14 +278,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 3 },
   itemMeta: { fontSize: 12, color: '#6b7280' },
   lowStock: { color: '#c2410c', fontWeight: '700' },
-  itemCardMuted: { backgroundColor: '#f9fafb' },
-  itemNameMuted: { color: '#9ca3af' },
   addButton: { backgroundColor: '#16a34a', borderRadius: 8, width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  notifyButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12,
-  },
-  notifyButtonText: { color: '#16a34a', fontWeight: '700', fontSize: 12 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn: {
     width: 32, height: 32, borderRadius: 16,
