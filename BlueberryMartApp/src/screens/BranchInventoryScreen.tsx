@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -42,6 +43,10 @@ export default function BranchInventoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+
+  const q = query.trim().toLowerCase();
+  const visible = q ? inventory.filter(i => i.itemName.toLowerCase().includes(q)) : inventory;
 
   useEffect(() => { load(); }, []);
 
@@ -120,15 +125,38 @@ export default function BranchInventoryScreen() {
       <Text style={styles.heading}>{branch.name}</Text>
       <Text style={styles.subheading}>{branch.city}</Text>
 
+      {!loading && (
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={`Search ${branch.name}...`}
+            placeholderTextColor="#9ca3af"
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+          />
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color="#16a34a" /></View>
       ) : (
         <FlatList
-          data={inventory}
+          data={visible}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
-          ListEmptyComponent={<Text style={styles.emptyNote}>{isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}</Text>}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <Text style={styles.emptyNote}>
+              {q
+                ? `No items match "${query}"`
+                : isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}
+            </Text>
+          }
           renderItem={({ item }) => {
             const outOfStock = item.stockQuantity <= 0;
             return (
@@ -165,6 +193,12 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   heading: { fontSize: 22, fontWeight: '700', color: '#14532d', marginBottom: 4 },
   subheading: { fontSize: 13, color: '#6b7280', marginBottom: 16 },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#f3f4f6', borderRadius: 12,
+    paddingHorizontal: 12, marginBottom: 16, height: 44,
+  },
+  searchInput: { flex: 1, fontSize: 15, color: '#111827' },
   list: { gap: 10, paddingBottom: 24 },
   backRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   backText: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
