@@ -191,12 +191,20 @@ export default function CartScreen() {
                       <View key={item.itemId} style={styles.itemRow}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.itemName}>{item.itemName}</Text>
-                          <Text style={styles.itemMeta}>Rs {item.price.toFixed(2)} each</Text>
+                          <Text style={styles.itemMeta}>
+                            Rs {item.price.toFixed(2)} each{item.quantity >= item.stock ? '  ·  max in stock' : ''}
+                          </Text>
                         </View>
                         <View style={styles.qtyRow}>
                           <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(bc.branch.id, item.itemId, -1)}><Ionicons name="remove" size={15} color="#16a34a" /></TouchableOpacity>
                           <Text style={styles.qtyCount}>{item.quantity}</Text>
-                          <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(bc.branch.id, item.itemId, 1)}><Ionicons name="add" size={15} color="#16a34a" /></TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.qtyBtn, item.quantity >= item.stock && styles.qtyBtnDisabled]}
+                            disabled={item.quantity >= item.stock}
+                            onPress={() => updateQty(bc.branch.id, item.itemId, 1)}
+                          >
+                            <Ionicons name="add" size={15} color={item.quantity >= item.stock ? '#cbd5e1' : '#16a34a'} />
+                          </TouchableOpacity>
                         </View>
                         <Text style={styles.itemTotal}>Rs {(item.price * item.quantity).toFixed(2)}</Text>
                       </View>
@@ -281,6 +289,7 @@ const styles = StyleSheet.create({
   itemTotal: { fontSize: 13, fontWeight: '700', color: '#14532d', minWidth: 70, textAlign: 'right' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' },
+  qtyBtnDisabled: { backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' },
   qtyCount: { fontSize: 14, fontWeight: '700', color: '#14532d', minWidth: 18, textAlign: 'center' },
 
   modeToggle: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 12 },

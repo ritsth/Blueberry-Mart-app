@@ -147,7 +147,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
 
   const isSearching = query.trim().length >= 2;
 
-  function QtyControl({ branchId, item }: { branchId: string; item: { id: string; itemName: string; price: number } }) {
+  function QtyControl({ branchId, item }: { branchId: string; item: { id: string; itemName: string; price: number; stockQuantity: number } }) {
     const inCart = carts[branchId]?.items.find(c => c.itemId === item.id);
     if (!inCart) {
       return (
@@ -156,11 +156,18 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
         </TouchableOpacity>
       );
     }
+    const atMax = inCart.quantity >= item.stockQuantity;
     return (
       <View style={styles.qtyRow}>
         <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(branchId, item.id, -1)}><Ionicons name="remove" size={16} color="#16a34a" /></TouchableOpacity>
         <Text style={styles.qtyCount}>{inCart.quantity}</Text>
-        <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item, branches.find(b => b.id === branchId) ?? selectedBranch!)}><Ionicons name="add" size={16} color="#16a34a" /></TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.qtyBtn, atMax && styles.qtyBtnDisabled]}
+          disabled={atMax}
+          onPress={() => addToCart(item, branches.find(b => b.id === branchId) ?? selectedBranch!)}
+        >
+          <Ionicons name="add" size={16} color={atMax ? '#cbd5e1' : '#16a34a'} />
+        </TouchableOpacity>
       </View>
     );
   }
@@ -369,5 +376,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center',
     borderWidth: 1, borderColor: '#bbf7d0',
   },
+  qtyBtnDisabled: { backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' },
   qtyCount: { fontSize: 15, fontWeight: '700', color: '#14532d', minWidth: 20, textAlign: 'center' },
 });
