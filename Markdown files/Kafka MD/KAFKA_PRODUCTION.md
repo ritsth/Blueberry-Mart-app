@@ -92,8 +92,14 @@ gcloud run services update blueberrymart-api --region us-central1 \
   --update-secrets "Kafka__BootstrapServers=kafka-bootstrap:latest,Kafka__ApiKey=kafka-api-key:latest,Kafka__ApiSecret=kafka-api-secret:latest"
 ```
 
-The API now publishes (RunConsumers stays false because an API key is set). To bake this into
-CI, add the same three `--update-secrets` to the deploy step in `.github/workflows/deploy.yml`.
+The API now publishes (RunConsumers stays false because an API key is set). The Kafka secrets
+on the API persist across CI deploys (the deploy step doesn't touch them).
+
+**CI tracks the worker (done):** `deploy.yml` has an "Update Kafka worker image" step that
+redeploys `blueberrymart-worker` on the same freshly-built image as the API. It only updates the
+**image** — the worker's env/secrets/scaling are set out-of-band (this section), so a manual
+`--min-instances 0` (scaled down between demos) is preserved. If the worker is ever deleted,
+re-provision it with the full step 4 command before relying on CI.
 
 ## 6. Verify
 

@@ -115,3 +115,20 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff" \
             --quiet
+
+      # Keep the Kafka consumer worker on the same image as the API. This only
+      # updates the image; the worker's env/secrets/scaling are set out-of-band
+      # (see Markdown files/Kafka MD/KAFKA_PRODUCTION.md), so this preserves a
+      # manual --min-instances 0 (scaled down between demos). Skips cleanly if the
+      # worker hasn't been provisioned yet.
+      - name: Update Kafka worker image
+        run: |
+          if gcloud run services describe blueberrymart-worker --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} >/dev/null 2>&1; then
+            gcloud run deploy blueberrymart-worker \
+              --image ${{ env.IMAGE }}:${{ github.sha }} \
+              --region ${{ env.REGION }} \
+              --project ${{ env.PROJECT_ID }} \
+              --quiet
+          else
+            echo "blueberrymart-worker not provisioned yet — skipping (see KAFKA_PRODUCTION.md)."
+          fi
