@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  PanResponder,
   RefreshControl,
   StyleSheet,
   Text,
@@ -53,6 +54,17 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchGroup[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // Swipe right to return to the branch list — a native-feeling back gesture. Only claims
+  // clearly-horizontal swipes, so the inventory list still scrolls vertically.
+  const backSwipe = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => g.dx > 24 && Math.abs(g.dy) < 30,
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx > 70 && Math.abs(g.dy) < 80) setSelectedBranch(null);
+      },
+    }),
+  ).current;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchBranches(); }, []);
@@ -188,7 +200,7 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   // ─── Inventory view (branch selected) ──────────────────────────────────────
   if (selectedBranch !== null) {
     return (
-      <View style={styles.container}>
+      <View style={styles.container} {...backSwipe.panHandlers}>
         <TouchableOpacity onPress={() => setSelectedBranch(null)} style={styles.backRow}>
           <Ionicons name="chevron-back" size={18} color="#16a34a" />
           <Text style={styles.backText}>All branches</Text>
