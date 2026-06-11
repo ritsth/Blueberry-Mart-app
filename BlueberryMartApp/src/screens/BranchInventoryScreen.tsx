@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getStoredToken } from '../services/authService';
 import { Branch, useCart } from '../context/CartContext';
+import FloatingCart from '../components/FloatingCart';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
@@ -404,6 +405,7 @@ export default function BranchInventoryScreen() {
         </>
       )}
       {error && <Text style={styles.errorText}>{error}</Text>}
+      <FloatingCart />
     </View>
   );
 }
@@ -433,7 +435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, marginBottom: 12, height: 44,
   },
   searchInput: { flex: 1, fontSize: 15, color: '#111827' },
-  list: { gap: 12, paddingBottom: 24, paddingTop: 4 },
+  list: { gap: 12, paddingBottom: 96, paddingTop: 4 },
   gridRow: { gap: GRID_GAP },
   backRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   backText: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
@@ -450,7 +452,7 @@ const styles = StyleSheet.create({
   chipLabelActive: { color: '#14532d' },
 
   // Sections / rails
-  railsContent: { paddingBottom: 24 },
+  railsContent: { paddingBottom: 96 },
   section: { marginBottom: 22 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sectionTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: '#111827' },
