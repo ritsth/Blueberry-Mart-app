@@ -1,10 +1,10 @@
 namespace BlueberryMart.Api.Services.Interfaces;
 
 /// <summary>
-/// Stores a review image and returns a URL/path that can be served back to clients.
-/// Implementations: GCS (production) and local filesystem (development/tests).
+/// Stores an uploaded image under a named folder and returns a URL/path that can be served
+/// back to clients. Implementations: GCS (production) and local filesystem (development/tests).
 /// </summary>
-public interface IReviewImageStorage
+public interface IImageStorage
 {
     /// <summary>Returns the resolved extension for a content type, or null if unsupported.</summary>
     static string? ResolveExtension(string contentType) => contentType.ToLowerInvariant() switch
@@ -15,5 +15,6 @@ public interface IReviewImageStorage
         _ => null,
     };
 
-    Task<string> SaveAsync(IFormFile image, string extension, CancellationToken ct = default);
+    /// <param name="folder">Logical folder, e.g. "reviews" or "items".</param>
+    Task<string> SaveAsync(IFormFile image, string extension, string folder, CancellationToken ct = default);
 }

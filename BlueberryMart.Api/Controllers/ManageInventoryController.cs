@@ -19,7 +19,10 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/inventory/manage")]
 [Authorize(Roles = "Staff,Manager,Admin")]
-public class ManageInventoryController(BlueberryMartDbContext context, IStockEventProducer stockEvents) : ControllerBase
+public class ManageInventoryController(
+    BlueberryMartDbContext context,
+    IStockEventProducer stockEvents,
+    IImageStorage imageStorage) : ControllerBase
 {
     private const int LowStockThreshold = 5;
 
@@ -91,6 +94,7 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
                 StockQuantity = i.StockQuantity,
                 IsBulkOnly = i.IsBulkOnly,
                 IsActive = i.IsActive,
+                ImageUrl = i.ImageUrl,
                 UpdatedAt = i.UpdatedAt,
             })
             .ToListAsync();
@@ -123,6 +127,7 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
             Price = request.Price,
             StockQuantity = request.StockQuantity,
             IsBulkOnly = request.IsBulkOnly,
+            ImageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -149,6 +154,7 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
         item.ItemName = name;
         item.Price = request.Price;
         item.IsBulkOnly = request.IsBulkOnly;
+        item.ImageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl;
         item.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
@@ -259,6 +265,24 @@ public class ManageInventoryController(BlueberryMartDbContext context, IStockEve
         StockQuantity = i.StockQuantity,
         IsBulkOnly = i.IsBulkOnly,
         IsActive = i.IsActive,
+        ImageUrl = i.ImageUrl,
         UpdatedAt = i.UpdatedAt,
     };
+
+    // Uploads an item photo and returns its public URL; the caller includes it in the
+    // create/update body. No branch scope — it's just a file, not yet tied to an item.
+    [HttpPost("image")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadImage(IFormFile image)
+    {
+        if (image is null || image.Length == 0)
+            return BadRequest(new { message = "No image provided." });
+
+        var ext = IImageStorage.ResolveExtension(image.ContentType);
+        if (ext is null)
+            return BadRequest(new { message = "Only JPEG, PNG, and WebP images are allowed." });
+
+        var url = await imageStorage.SaveAsync(image, ext, "items");
+        return Ok(new { url });
+    }
 }

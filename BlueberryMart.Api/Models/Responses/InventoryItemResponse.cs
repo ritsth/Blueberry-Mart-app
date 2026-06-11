@@ -11,6 +11,7 @@ public class InventoryItemResponse
     public int StockQuantity { get; set; }
     public bool IsBulkOnly { get; set; }
     public bool IsActive { get; set; }
+    public string? ImageUrl { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
 

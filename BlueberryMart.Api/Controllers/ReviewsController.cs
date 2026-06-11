@@ -11,7 +11,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/reviews")]
 [Authorize(Roles = "Customer,Shareholder")]
-public class ReviewsController(BlueberryMartDbContext context, IReviewImageStorage imageStorage) : ControllerBase
+public class ReviewsController(BlueberryMartDbContext context, IImageStorage imageStorage) : ControllerBase
 {
     private const int TextReviewPoints = 10;
     private const int PhotoReviewPoints = 20;
@@ -59,11 +59,11 @@ public class ReviewsController(BlueberryMartDbContext context, IReviewImageStora
         string? savedImagePath = null;
         if (image is not null)
         {
-            var ext = IReviewImageStorage.ResolveExtension(image.ContentType);
+            var ext = IImageStorage.ResolveExtension(image.ContentType);
             if (ext is null)
                 return BadRequest(new { message = "Only JPEG, PNG, and WebP images are allowed." });
 
-            savedImagePath = await imageStorage.SaveAsync(image, ext);
+            savedImagePath = await imageStorage.SaveAsync(image, ext, "reviews");
         }
 
         var review = new Review

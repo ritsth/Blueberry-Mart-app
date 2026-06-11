@@ -78,6 +78,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
                 ItemName = i.ItemName,
                 Price = i.Price,
                 StockQuantity = i.StockQuantity,
+                ImageUrl = i.ImageUrl,
                 BranchId = i.BranchId,
                 BranchName = i.Branch.Name,
                 BranchCity = i.Branch.LocationCity,
@@ -91,7 +92,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
                 BranchId = g.Key.BranchId,
                 BranchName = g.Key.BranchName,
                 BranchCity = g.Key.BranchCity,
-                Items = g.Select(i => new { i.Id, i.ItemName, i.Price, i.StockQuantity }).ToList(),
+                Items = g.Select(i => new { i.Id, i.ItemName, i.Price, i.StockQuantity, i.ImageUrl }).ToList(),
             });
 
         return Ok(grouped);

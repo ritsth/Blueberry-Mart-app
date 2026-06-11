@@ -46,13 +46,13 @@ builder.Services.Configure<BlueberryMart.Api.Configuration.EsewaOptions>(
 builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IEsewaPaymentService,
     BlueberryMart.Api.Services.EsewaPaymentService>();
 
-// Review image storage: GCS when a bucket is configured, otherwise local filesystem
+// Image storage (review photos, item photos): GCS when a bucket is configured, else local.
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Gcs:BucketName"]))
-    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IReviewImageStorage,
-        BlueberryMart.Api.Services.GcsReviewImageStorage>();
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IImageStorage,
+        BlueberryMart.Api.Services.GcsImageStorage>();
 else
-    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IReviewImageStorage,
-        BlueberryMart.Api.Services.LocalReviewImageStorage>();
+    builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IImageStorage,
+        BlueberryMart.Api.Services.LocalImageStorage>();
 
 // Inventory event stream: real Kafka producer when a broker is configured,
 // otherwise a no-op so the app runs without Kafka (production today, and tests).
