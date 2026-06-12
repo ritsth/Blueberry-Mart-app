@@ -153,8 +153,10 @@ public class ManageOrdersController(BlueberryMartDbContext context, IStockEventP
         if (target != allowedNext)
             return BadRequest(new { message = $"From '{order.Status}' the only next status is '{allowedNext}'." });
 
+        var now = DateTime.UtcNow;
         order.Status = target;
-        order.UpdatedAt = DateTime.UtcNow;
+        order.UpdatedAt = now;
+        salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, target, now));
         await context.SaveChangesAsync();
 
         return Ok(new { order.Id, order.Status });

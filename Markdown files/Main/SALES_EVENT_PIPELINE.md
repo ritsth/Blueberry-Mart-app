@@ -37,7 +37,7 @@ Envelope `{ type, data }` (`Models/Events/SalesEvents.cs`):
 | `order_placed` | `OrdersController.PlaceOrder` | order + immutable line facts (item, qty, unit price, branch, member flag, order discount/delivery, per-line `rn`) |
 | `payment_status_changed` | `PaymentsController` (initiate/success/failure), `ManageOrdersController.RecordPayment` | order id, status (`initiated`/`completed`/`failed`) |
 | `review_changed` | `ReviewsController.SubmitReview`, `AdminController.DeleteReview` | order id, item id, rating (null = deleted) |
-| `order_status_changed` | `PaymentsController` (→`confirmed`), `ManageOrdersController.RecordPayment` (→`confirmed`) & `.Cancel` (→`cancelled`), `OrdersController.MarkReceived` (→`completed`), `OrderExpiryService` (→`cancelled`) | order id, status (`confirmed`/`completed`/`cancelled`) — placement stays implicit `pending` via the view default |
+| `order_status_changed` | `PaymentsController` & `ManageOrdersController.RecordPayment` (→`confirmed`), `ManageOrdersController.AdvanceStatus` (→`processing`/`ready`/`completed`) & `.Cancel` (→`cancelled`), `OrdersController.MarkReceived` (→`completed`), `OrderExpiryService` (→`cancelled`) | order id, new status — placement stays implicit `pending` via the view default |
 
 ## Transactional outbox (guaranteed delivery)
 
