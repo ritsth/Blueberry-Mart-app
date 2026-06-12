@@ -86,9 +86,9 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
     }
 
     // GET /api/inventory/reorder?branchId=&bulk=&limit=
-    // "Buy again": items the signed-in customer has previously ordered at this branch (across
-    // non-cancelled orders), most-recently-ordered first, limited to active in-stock items in
-    // the requested catalogue (retail or bulk).
+    // "Buy again": items the signed-in customer has previously *paid for* at this branch (an
+    // order with a completed payment, not cancelled — so refunds don't count), most-recently-
+    // ordered first, limited to active in-stock items in the requested catalogue (retail or bulk).
     [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("reorder")]
     public async Task<IActionResult> Reorder([FromQuery] Guid branchId, [FromQuery] bool bulk = false, [FromQuery] int limit = 10)
@@ -110,6 +110,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
             join o in context.Orders on oi.OrderId equals o.Id
             join inv in context.Inventory on oi.ItemId equals inv.Id
             where o.UserId == userId && o.BranchId == branchId && o.Status != "cancelled"
+                  && context.Payments.Any(p => p.OrderId == o.Id && p.Status == "completed")
                   && inv.IsActive && inv.StockQuantity > 0 && inv.IsBulkOnly == bulk
             group o by new { inv.Id, inv.ItemName, inv.Price, inv.StockQuantity, inv.ImageUrl } into g
             orderby g.Max(x => x.CreatedAt) descending

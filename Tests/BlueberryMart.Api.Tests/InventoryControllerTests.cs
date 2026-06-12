@@ -150,12 +150,13 @@ public class InventoryControllerTests
     }
 
     [Fact]
-    public async Task Reorder_ReturnsItemsTheCustomerPreviouslyOrdered()
+    public async Task Reorder_ReturnsItemsTheCustomerPreviouslyPaidFor()
     {
         var token = await TestHelpers.GetCustomerTokenAsync(_client);
         var itemId = await TestHelpers.CreateInventoryItemAsync(
             _factory, _downtownBranchId, $"Reorder {Guid.NewGuid():N}", stock: 50);
-        await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, itemId, quantity: 1);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, itemId, quantity: 1);
+        await TestHelpers.MarkOrderPaidAsync(_factory, orderId);   // buy-again counts paid orders only
 
         var resp = await _client.SendAsync(
             new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/reorder?branchId={_downtownBranchId}")
@@ -166,6 +167,24 @@ public class InventoryControllerTests
         Assert.NotNull(items);
         Assert.Contains(items!, i => i.GetProperty("id").GetString() == itemId.ToString());
         Assert.All(items!, i => Assert.True(i.GetProperty("stockQuantity").GetInt32() > 0));
+    }
+
+    [Fact]
+    public async Task Reorder_ExcludesUnpaidOrders()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtownBranchId, $"Unpaid {Guid.NewGuid():N}", stock: 50);
+        // Placed but never paid → must NOT show in buy-again.
+        await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, itemId, quantity: 1);
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/reorder?branchId={_downtownBranchId}")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.DoesNotContain(items!, i => i.GetProperty("id").GetString() == itemId.ToString());
     }
 
     [Fact]
