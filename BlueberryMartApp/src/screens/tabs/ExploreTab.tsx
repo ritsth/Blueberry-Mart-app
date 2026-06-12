@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -48,6 +48,7 @@ export default function ExploreTab() {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [loadedReportId, setLoadedReportId] = useState<string | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -124,6 +125,23 @@ export default function ExploreTab() {
   function run() {
     if (measures.length === 0) { setRunError('Pick at least one measure.'); return; }
     runSpec(buildSpec(measures, dims, year, completedOnly, chartType));
+  }
+
+  // Pull-to-refresh: reload the catalog and re-run the current query.
+  async function onRefresh() {
+    setRefreshing(true);
+    try {
+      const c = await getCatalog();
+      setCatalog(c);
+      setCatalogError(null);
+      if (c.enabled && measures.length > 0) {
+        await runSpec(buildSpec(measures, dims, year, completedOnly, chartType));
+      }
+    } catch (e: any) {
+      setCatalogError(e?.message ?? 'Failed to load.');
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   function loadReport(rep: SavedReport) {
@@ -204,7 +222,12 @@ export default function ExploreTab() {
         <Text style={styles.headerSub}>Build a custom chart</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
+      >
         {/* MEASURES */}
         <Text style={styles.label}>Measures</Text>
         <SelectedChips

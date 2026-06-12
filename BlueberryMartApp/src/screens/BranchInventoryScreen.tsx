@@ -120,6 +120,8 @@ export default function BranchInventoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ChipKey>('All');
+  // Inventory ids the user has subscribed to this session → swap the bell for a check.
+  const [notified, setNotified] = useState<Set<string>>(new Set());
 
   const q = query.trim().toLowerCase();
   const isSearching = q.length > 0;
@@ -180,16 +182,18 @@ export default function BranchInventoryScreen() {
   }
 
   async function notifyMe(item: InventoryItem) {
+    if (notified.has(item.id)) return;
     try {
       const token = await getStoredToken();
       const res = await fetch(`${API_BASE}/api/inventory/${item.id}/notify-me`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` },
       });
-      const body = await res.json().catch(() => ({}));
-      Alert.alert(
-        res.ok ? "You're on the list" : 'Heads up',
-        body.message ?? (res.ok ? "We'll notify you when it's back." : 'Could not subscribe.'),
-      );
+      if (res.ok) {
+        setNotified(prev => new Set(prev).add(item.id));   // flips the button to a check
+      } else {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert('Heads up', body.message ?? 'Could not subscribe.');
+      }
     } catch {
       Alert.alert('Error', 'Could not subscribe. Check your connection.');
     }
@@ -225,9 +229,15 @@ export default function BranchInventoryScreen() {
   // added state reads clearly against the photo.
   function CardControl({ item }: { item: InventoryItem }) {
     if (item.stockQuantity <= 0) {
+      const done = notified.has(item.id);
       return (
-        <TouchableOpacity style={styles.notifyChip} onPress={() => notifyMe(item)} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={16} color="#16a34a" />
+        <TouchableOpacity
+          style={[styles.notifyChip, done && styles.notifyChipDone]}
+          onPress={() => notifyMe(item)}
+          activeOpacity={0.8}
+          disabled={done}
+        >
+          <Ionicons name={done ? 'checkmark' : 'notifications-outline'} size={16} color={done ? '#fff' : '#16a34a'} />
         </TouchableOpacity>
       );
     }
@@ -251,6 +261,22 @@ export default function BranchInventoryScreen() {
     );
   }
 
+  // Pill button for a sold-out search row: bell → "Notify me", check → "On the list".
+  function NotifyButton({ item }: { item: InventoryItem }) {
+    const done = notified.has(item.id);
+    return (
+      <TouchableOpacity
+        style={[styles.notifyButton, done && styles.notifyButtonDone]}
+        onPress={() => notifyMe(item)}
+        activeOpacity={0.8}
+        disabled={done}
+      >
+        <Ionicons name={done ? 'checkmark-circle' : 'notifications-outline'} size={14} color="#16a34a" />
+        <Text style={styles.notifyButtonText}>{done ? 'On the list' : 'Notify me'}</Text>
+      </TouchableOpacity>
+    );
+  }
+
   // Wide horizontal-row card, used for search results.
   function ItemRow({ item }: { item: InventoryItem }) {
     const outOfStock = item.stockQuantity <= 0;
@@ -266,14 +292,7 @@ export default function BranchInventoryScreen() {
             </Text>
           </Text>
         </View>
-        {outOfStock ? (
-          <TouchableOpacity style={styles.notifyButton} onPress={() => notifyMe(item)} activeOpacity={0.8}>
-            <Ionicons name="notifications-outline" size={14} color="#16a34a" />
-            <Text style={styles.notifyButtonText}>Notify me</Text>
-          </TouchableOpacity>
-        ) : (
-          <QtyControl item={item} />
-        )}
+        {outOfStock ? <NotifyButton item={item} /> : <QtyControl item={item} />}
       </View>
     );
   }
@@ -532,6 +551,7 @@ const styles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 10, backgroundColor: '#fff',
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#16a34a',
   },
+  notifyChipDone: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
 
   // Wide row card (search)
   itemCard: {
@@ -553,6 +573,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12,
   },
+  notifyButtonDone: { backgroundColor: '#f0fdf4' },
   notifyButtonText: { color: '#16a34a', fontWeight: '700', fontSize: 12 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn: {

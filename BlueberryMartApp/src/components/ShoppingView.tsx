@@ -50,6 +50,8 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchGroup[]>([]);
   const [searching, setSearching] = useState(false);
+  // Inventory ids subscribed to this session → swap the bell for a check.
+  const [notified, setNotified] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchBranches(); }, []);
@@ -110,16 +112,18 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
   const isSearching = query.trim().length >= 2;
 
   async function notifyMe(item: SearchItem) {
+    if (notified.has(item.id)) return;
     try {
       const token = await getStoredToken();
       const res = await fetch(`${API_BASE}/api/inventory/${item.id}/notify-me`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` },
       });
-      const body = await res.json().catch(() => ({}));
-      Alert.alert(
-        res.ok ? "You're on the list" : 'Heads up',
-        body.message ?? (res.ok ? "We'll notify you when it's back." : 'Could not subscribe.'),
-      );
+      if (res.ok) {
+        setNotified(prev => new Set(prev).add(item.id));   // flips the button to a check
+      } else {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert('Heads up', body.message ?? 'Could not subscribe.');
+      }
     } catch {
       Alert.alert('Error', 'Could not subscribe. Check your connection.');
     }
@@ -208,12 +212,20 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
                           </Text>
                         </Text>
                       </View>
-                      {outOfStock ? (
-                        <TouchableOpacity style={styles.notifyButton} onPress={() => notifyMe(item)} activeOpacity={0.8}>
-                          <Ionicons name="notifications-outline" size={14} color="#16a34a" />
-                          <Text style={styles.notifyButtonText}>Notify me</Text>
-                        </TouchableOpacity>
-                      ) : (
+                      {outOfStock ? (() => {
+                        const done = notified.has(item.id);
+                        return (
+                          <TouchableOpacity
+                            style={[styles.notifyButton, done && styles.notifyButtonDone]}
+                            onPress={() => notifyMe(item)}
+                            activeOpacity={0.8}
+                            disabled={done}
+                          >
+                            <Ionicons name={done ? 'checkmark-circle' : 'notifications-outline'} size={14} color="#16a34a" />
+                            <Text style={styles.notifyButtonText}>{done ? 'On the list' : 'Notify me'}</Text>
+                          </TouchableOpacity>
+                        );
+                      })() : (
                         <QtyControl branch={branch} item={item} />
                       )}
                     </View>
@@ -311,6 +323,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12,
   },
+  notifyButtonDone: { backgroundColor: '#f0fdf4' },
   notifyButtonText: { color: '#16a34a', fontWeight: '700', fontSize: 12 },
   thumb: { width: 44, height: 44, borderRadius: 8, marginRight: 12, backgroundColor: '#f3f4f6' },
   thumbPlaceholder: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
