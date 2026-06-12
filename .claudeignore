@@ -1,0 +1,28 @@
+# Files Claude / the LLM should never read or upload.
+#
+# NOTE: the ENFORCED block lives in .claude/settings.json under
+# permissions.deny ("Read(...)" rules) — that is what actually stops a read.
+# This file documents intent and mirrors those patterns for any tooling
+# that honors a .claudeignore.
+
+# Secrets in environment files (keep the *.example templates readable)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local/prod app config that carries secrets (keep the *.example readable)
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.*.local.json
+
+# Credentials / keys
+**/secrets*.json
+**/service-account*.json
+**/*-sa.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
