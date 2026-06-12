@@ -72,8 +72,9 @@ attaches `Authorization: Bearer <token>` and reads the token with `getStoredToke
   a self-service **Explore** tab.
 - **Explore** (`ExploreTab` + `analyticsService`): a self-service report builder for
   shareholders over the BigQuery warehouse. Fetches `/api/analytics/catalog` and renders
-  catalog-driven pickers (measures + aggregation, group-by dimensions, time range,
-  chart type), POSTs the spec to `/api/analytics/query`, and renders a Bar/Line/Pie
+  catalog-driven pickers (measures + aggregation, group-by dimensions incl. `order_status`,
+  time range, chart type, and a "Collected revenue only" toggle = payment `completed` AND
+  `order_status != cancelled`), POSTs the spec to `/api/analytics/query`, and renders a Bar/Line/Pie
   chart (`react-native-chart-kit`) with a scrollable data-table fallback. Charts can be
   **saved** (config only) to `/api/analytics/reports` and re-loaded/re-run against fresh
   data. When BigQuery isn't configured (e.g. production), the catalog reports

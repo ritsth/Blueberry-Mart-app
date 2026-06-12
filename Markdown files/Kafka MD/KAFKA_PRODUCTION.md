@@ -7,7 +7,8 @@
 
 Originally a runbook for taking the local-only inventory event pipeline (`KAFKA_LOCAL.md`) live.
 It now carries **two** event streams: the original `inventory.stock-changed`, and `sales.events`
-(order/payment/review) that feeds the event-sourced `sales_fact` warehouse — see
+(order placed / payment status / review / order status) that feeds the event-sourced `sales_fact`
+warehouse — see
 `Markdown files/Main/SALES_EVENT_PIPELINE.md`.
 
 ## Target architecture

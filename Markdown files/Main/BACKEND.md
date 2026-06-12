@@ -50,11 +50,16 @@ wwwroot/       static files (eSewa result pages)
 
 All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (UTC).
 
-> **Order lifecycle note:** today the code only sets `pending` (on placement) →
-> `confirmed` (on successful payment). Nothing yet advances an order to
-> `processing`/`ready`/`completed` — there is no fulfilment/status-management
-> endpoint. (`delivered` is **not** a status; the terminal state is `completed`,
-> used for both pickup and delivery.)
+> **Order lifecycle:** `pending` (placement) → `confirmed` (eSewa success or manual
+> record-payment) → `processing` → `ready` → `completed`. The linear fulfilment chain is
+> advanced by staff via `POST /api/orders/manage/{id}/status`; the customer's `receive`
+> endpoint also moves `confirmed → completed`. `cancelled` is terminal — set by a
+> manager cancel or by unpaid-order expiry; a **paid** order can only be cancelled while
+> still `pending`/`confirmed` (pre-fulfilment), which is treated as a refund. (`delivered`
+> is **not** a status; `completed` is the terminal state for both pickup and delivery.)
+> Every post-placement status change emits an `order_status_changed` sales event, which
+> drives the Explore `order_status` dimension; **dashboard/Explore revenue counts only
+> collected money = a completed payment AND `order_status != cancelled`.**
 
 ## Endpoints
 | Method & path | Auth | Purpose |

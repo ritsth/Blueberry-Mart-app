@@ -45,7 +45,8 @@ Wide/denormalized so arbitrary `GROUP BY` needs no joins — the whole point of 
 | `order_type` | STRING | dimension | pickup / delivery |
 | `is_member` | BOOL | dimension | |
 | `is_bulk` | BOOL | dimension | |
-| `payment_status` | STRING | dimension | completed / failed / initiated |
+| `payment_status` | STRING | dimension | completed / failed / initiated / none |
+| `order_status` | STRING | dimension | pending / confirmed / processing / ready / completed / cancelled (added 2026-06-11) |
 | `customer_id` | STRING | dimension | (high-cardinality; for distinct counts) |
 | `quantity` | INT64 | measure | |
 | `unit_price` | NUMERIC | measure | |

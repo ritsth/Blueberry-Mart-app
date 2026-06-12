@@ -78,7 +78,10 @@ detail modal (line items, totals, delivery address) with contextual actions:
   path: marks paid, moves `pending → confirmed`, credits loyalty points.
 - **Advance status** along the linear chain `confirmed → processing → ready → completed`
   (non-linear jumps rejected; unpaid orders can't be advanced).
-- **Cancel** (manager/admin) — sets `cancelled` and **restocks** the order's items.
+- **Cancel** (manager/admin) — sets `cancelled` and **restocks** the order's items. A **paid**
+  order can only be cancelled while still `pending`/`confirmed` (pre-fulfilment) — that's a refund,
+  so it drops out of revenue (cancelled ∩ paid) while staying analyzable via the Explore
+  `order_status` dimension.
 
 ### Reports
 **Reports** page (manager/admin only): revenue (paid orders), paid-order count, average
