@@ -169,11 +169,11 @@ public class OrdersControllerTests
     }
 
     [Fact]
-    public async Task MarkReceived_ConfirmedOrder_BecomesCompleted()
+    public async Task MarkReceived_ReadyOrder_BecomesCompleted()
     {
         var token = await TestHelpers.GetCustomerTokenAsync(_client);
         var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, _eggsItemId);
-        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "confirmed");
+        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "ready");
 
         var req = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/receive").WithBearer(token);
         var resp = await _client.SendAsync(req);
@@ -181,6 +181,20 @@ public class OrdersControllerTests
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("completed", json.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task MarkReceived_ConfirmedOrder_ReturnsConflict()
+    {
+        // Not yet 'ready' (still being prepared) — the customer can't complete it.
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, _eggsItemId);
+        await TestHelpers.SetOrderStatusAsync(_factory, orderId, "confirmed");
+
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/receive").WithBearer(token);
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
     }
 
     [Fact]
@@ -193,5 +207,49 @@ public class OrdersControllerTests
         var resp = await _client.SendAsync(req);
 
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Cancel_OwnPendingOrder_CancelsAndRestocks()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtownBranchId, $"Cancel {Guid.NewGuid():N}", stock: 5);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, itemId, quantity: 2);
+        Assert.Equal(3, await TestHelpers.GetStockAsync(_factory, itemId));   // reserved at placement
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/cancel").WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("cancelled", json.GetProperty("status").GetString());
+        Assert.Equal(5, await TestHelpers.GetStockAsync(_factory, itemId));   // restocked
+    }
+
+    [Fact]
+    public async Task Cancel_PaidConfirmedOrder_ReturnsConflict()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, _eggsItemId);
+        await TestHelpers.MarkOrderPaidAsync(_factory, orderId);   // -> confirmed + completed payment
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/cancel").WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Cancel_AnotherUsersOrder_ReturnsNotFound()
+    {
+        var owner = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, owner, _downtownBranchId, _eggsItemId);
+
+        var other = await TestHelpers.GetTokenAsync(_client, "customer2@blueberrymart.com", "customer2_password");
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, $"/api/orders/{orderId}/cancel").WithBearer(other));
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 }

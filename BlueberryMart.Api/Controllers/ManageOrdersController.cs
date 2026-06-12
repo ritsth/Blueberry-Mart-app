@@ -19,7 +19,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/orders/manage")]
 [Authorize(Roles = "Staff,Manager,Admin")]
-public class ManageOrdersController(BlueberryMartDbContext context, IStockEventProducer stockEvents, ISalesEventOutbox salesEvents) : ControllerBase
+public class ManageOrdersController(BlueberryMartDbContext context, ISalesEventOutbox salesEvents, IOrderCancellationService cancellation) : ControllerBase
 {
     // Linear forward fulfillment chain (paid orders only — pending is advanced by
     // recording a payment, not here). Cancellation has its own manager-only endpoint.
@@ -248,46 +248,7 @@ public class ManageOrdersController(BlueberryMartDbContext context, IStockEventP
         if (isPaid && order.Status is not ("pending" or "confirmed"))
             return Conflict(new { message = "A paid order can only be cancelled before it is processed." });
 
-        // Return the stock reserved at placement.
-        var lines = await (from oi in context.OrderItems
-                           join inv in context.Inventory on oi.ItemId equals inv.Id
-                           where oi.OrderId == id
-                           select new { oi.Quantity, Inv = inv }).ToListAsync();
-
-        var events = new List<StockChangedEvent>();
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        try
-        {
-            var now = DateTime.UtcNow;
-            foreach (var line in lines)
-            {
-                var oldQty = line.Inv.StockQuantity;
-                line.Inv.StockQuantity += line.Quantity;
-                line.Inv.UpdatedAt = now;
-                events.Add(new StockChangedEvent(
-                    ItemId: line.Inv.Id,
-                    BranchId: line.Inv.BranchId,
-                    ItemName: line.Inv.ItemName,
-                    OldQuantity: oldQty,
-                    NewQuantity: line.Inv.StockQuantity,
-                    Reason: "order_cancelled",
-                    OccurredAt: now));
-            }
-
-            order.Status = "cancelled";
-            order.UpdatedAt = now;
-            salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "cancelled", now));
-
-            await context.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-
-        foreach (var evt in events) stockEvents.Publish(evt);
+        await cancellation.CancelAsync(order);
 
         return Ok(new { order.Id, order.Status });
     }

@@ -53,10 +53,13 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 > **Order lifecycle:** `pending` (placement) → `confirmed` (eSewa success or manual
 > record-payment) → `processing` → `ready` → `completed`. The linear fulfilment chain is
 > advanced by staff via `POST /api/orders/manage/{id}/status`; the customer's `receive`
-> endpoint also moves `confirmed → completed`. `cancelled` is terminal — set by a
-> manager cancel or by unpaid-order expiry; a **paid** order can only be cancelled while
-> still `pending`/`confirmed` (pre-fulfilment), which is treated as a refund. (`delivered`
-> is **not** a status; `completed` is the terminal state for both pickup and delivery.)
+> endpoint moves `ready → completed` (only once staff have marked it `ready`). `cancelled`
+> is terminal — set by **manager** cancel, unpaid-order **expiry**, or **customer**
+> self-cancel. A customer may self-cancel only their own **`pending` (unpaid)** order
+> (`POST /api/orders/{id}/cancel`); a paid order is a refund and stays manager-only (a
+> manager can cancel while `pending`/`confirmed`). All cancels share `IOrderCancellationService`
+> (restock + events). (`delivered` is **not** a status; `completed` is the terminal state for
+> both pickup and delivery.)
 > Every post-placement status change emits an `order_status_changed` sales event, which
 > drives the Explore `order_status` dimension; **dashboard/Explore revenue counts only
 > collected money = a completed payment AND `order_status != cancelled`.**
@@ -66,7 +69,8 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 |---|---|---|
 | `POST /api/auth/login` | public | Email/password → JWT |
 | `POST /api/auth/register` | public | Create a customer account → JWT |
-| `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a confirmed order received (→ completed) |
+| `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a **ready** order received (→ completed; owner only) |
+| `POST /api/orders/{id}/cancel` | Customer/Shareholder | Self-cancel own **pending** (unpaid) order + restock (owner only) |
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |

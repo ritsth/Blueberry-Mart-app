@@ -77,6 +77,10 @@ else
 builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.ISalesEventOutbox,
     BlueberryMart.Api.Services.SalesEventOutbox>();
 
+// Shared order-cancel logic (restock + events) used by both the manager and customer cancel paths.
+builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IOrderCancellationService,
+    BlueberryMart.Api.Services.OrderCancellationService>();
+
 // Consumer turns stock-changed events into back-in-stock notifications.
 if (runConsumers)
     builder.Services.AddHostedService<BlueberryMart.Api.Services.StockEventConsumer>();

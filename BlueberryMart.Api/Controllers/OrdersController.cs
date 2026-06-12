@@ -17,6 +17,7 @@ public class OrdersController(
     BlueberryMartDbContext context,
     IStockEventProducer stockEvents,
     ISalesEventOutbox salesEvents,
+    IOrderCancellationService cancellation,
     ISettingsService settings) : ControllerBase
 {
 
@@ -56,9 +57,9 @@ public class OrdersController(
     }
 
     // POST /api/orders/{id}/receive
-    // Customer confirms they received the order; moves it from 'confirmed' to
-    // 'completed' (the terminal state for both pickup and delivery). Reviewing an
-    // order requires it to be completed.
+    // Customer confirms they received the order; moves it from 'ready' to 'completed'
+    // (the terminal state for both pickup and delivery). Only available once staff have
+    // prepared the order (marked it 'ready'). Reviewing an order requires it to be completed.
     [HttpPost("{id:guid}/receive")]
     public async Task<IActionResult> MarkReceived(Guid id)
     {
@@ -69,14 +70,41 @@ public class OrdersController(
         if (order is null)
             return NotFound(new { message = "Order not found." });
 
-        if (order.Status != "confirmed")
-            return Conflict(new { message = $"Order is '{order.Status}' and cannot be marked as received." });
+        if (order.Status != "ready")
+            return Conflict(new { message = "Your order isn't ready for pickup/delivery yet." });
 
         var now = DateTime.UtcNow;
         order.Status = "completed";
         order.UpdatedAt = now;
         salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "completed", now));
         await context.SaveChangesAsync();
+
+        return Ok(new { order.Id, order.Status });
+    }
+
+    // POST /api/orders/{id}/cancel
+    // Customer cancels their OWN order — only while it's still 'pending' (placed but unpaid).
+    // Restocks the items. A paid (confirmed) order is a refund and stays manager-only, so it's
+    // rejected here. Cancellation logic is shared with the manager path (IOrderCancellationService).
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var order = await context.Orders
+            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId, ct);
+        if (order is null)
+            return NotFound(new { message = "Order not found." });
+
+        if (order.Status != "pending")
+            return Conflict(new
+            {
+                message = order.Status == "confirmed"
+                    ? "This order is already paid — please contact the branch to cancel it."
+                    : "This order can no longer be cancelled."
+            });
+
+        await cancellation.CancelAsync(order, ct);
 
         return Ok(new { order.Id, order.Status });
     }

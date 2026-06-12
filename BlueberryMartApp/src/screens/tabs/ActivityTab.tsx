@@ -70,6 +70,32 @@ export default function ActivityTab() {
     }
   }
 
+  // Customer cancels their own UNPAID (pending) order. Paid orders stay manager-only.
+  function confirmCancel(order: Order) {
+    Alert.alert('Cancel order?', `Order #${order.orderNumber} will be cancelled and the items released.`, [
+      { text: 'Keep order', style: 'cancel' },
+      { text: 'Cancel order', style: 'destructive', onPress: () => cancelOrder(order.id) },
+    ]);
+  }
+
+  async function cancelOrder(orderId: string) {
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/orders/${orderId}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert('Could not cancel', body.message ?? 'Something went wrong.');
+        return;
+      }
+      await fetchData();
+    } catch {
+      Alert.alert('Error', 'Could not cancel the order. Check your connection.');
+    }
+  }
+
   // Retry payment for an unpaid (pending) order from the Activity list.
   async function onPaymentClose(outcome: PaymentOutcome) {
     setPayOrderId(null);
@@ -182,15 +208,24 @@ export default function ActivityTab() {
               )}
 
               {order.status === 'pending' && (
-                <TouchableOpacity
-                  style={styles.payButton}
-                  onPress={() => setPayOrderId(order.id)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.payButtonText}>Pay now with eSewa</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={styles.payButton}
+                    onPress={() => setPayOrderId(order.id)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.payButtonText}>Pay now with eSewa</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => confirmCancel(order)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel order</Text>
+                  </TouchableOpacity>
+                </>
               )}
-              {order.status === 'confirmed' && (
+              {order.status === 'ready' && (
                 <TouchableOpacity
                   style={styles.receiveButton}
                   onPress={() => markReceived(order.id)}
@@ -321,6 +356,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center', marginTop: 12,
   },
   payButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  cancelButton: {
+    backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#fecaca',
+    paddingVertical: 9, alignItems: 'center', marginTop: 8,
+  },
+  cancelButtonText: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
   reviewButton: {
     backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#16a34a',
     paddingVertical: 10, alignItems: 'center', marginTop: 12,
