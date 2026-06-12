@@ -16,6 +16,7 @@ namespace BlueberryMart.Api.Controllers;
 public class OrdersController(
     BlueberryMartDbContext context,
     IStockEventProducer stockEvents,
+    ISalesEventOutbox salesEvents,
     ISettingsService settings) : ControllerBase
 {
 
@@ -184,22 +185,45 @@ public class OrdersController(
             };
             context.Orders.Add(order);
 
-            // Persist line items for analytics
+            // Persist line items for analytics, capturing each line id + position (rn) so the
+            // sales event can carry them. Line 1 (rn=1) is the primary line that holds the
+            // order-level discount/delivery fee in the warehouse.
+            var eventLines = new List<OrderLineDto>();
+            var rn = 0;
             foreach (var (inv, qty) in lineItems)
             {
+                rn++;
+                var lineId = Guid.NewGuid();
                 context.OrderItems.Add(new OrderItem
                 {
-                    Id = Guid.NewGuid(),
+                    Id = lineId,
                     OrderId = order.Id,
                     ItemId = inv.Id,
                     Quantity = qty,
                     UnitPrice = inv.Price
                 });
+                eventLines.Add(new OrderLineDto(lineId, inv.Id, inv.ItemName, inv.IsBulkOnly, qty, inv.Price, rn));
             }
 
             // Loyalty points are credited later, when the eSewa payment completes
             // (see PaymentsController.Success) — not at placement, so unpaid orders earn nothing.
 
+            await context.SaveChangesAsync();   // populates the DB-generated order.OrderNumber
+
+            // Stage the OrderPlaced sales event into the outbox, in the same transaction.
+            var branchName = await context.Branches
+                .Where(b => b.Id == request.BranchId).Select(b => b.Name).FirstAsync();
+            salesEvents.OrderPlaced(new OrderPlacedEvent(
+                OrderId: order.Id,
+                OrderNumber: order.OrderNumber,
+                OccurredAt: order.CreatedAt,
+                BranchName: branchName,
+                OrderType: order.OrderType,
+                IsMember: isMember,
+                CustomerId: userId,
+                OrderDiscount: order.DiscountAmount,
+                OrderDeliveryFee: order.DeliveryFee,
+                Lines: eventLines));
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
 

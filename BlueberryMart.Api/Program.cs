@@ -72,9 +72,18 @@ else
     builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.IStockEventProducer,
         BlueberryMart.Api.Services.NoOpStockEventProducer>();
 
+// Stages sales domain events into the transactional outbox (scoped: shares the request's
+// DbContext so the outbox row commits atomically with the change that produced it).
+builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.ISalesEventOutbox,
+    BlueberryMart.Api.Services.SalesEventOutbox>();
+
 // Consumer turns stock-changed events into back-in-stock notifications.
 if (runConsumers)
     builder.Services.AddHostedService<BlueberryMart.Api.Services.StockEventConsumer>();
+
+// Publishes transactional-outbox rows (sales events) to Kafka — worker-only, single instance.
+if (runConsumers)
+    builder.Services.AddHostedService<BlueberryMart.Api.Services.OutboxDispatcher>();
 
 // Unpaid-order expiry sweeper — worker-only (a single always-on instance), so it never
 // races multiple API instances or vanishes when the API scales to zero.
@@ -94,6 +103,9 @@ else
         BlueberryMart.Api.Services.DisabledInventoryAnalytics>();
 if (bigQueryConfigured && runConsumers)
     builder.Services.AddHostedService<BlueberryMart.Api.Services.BigQueryStockSink>();
+// Streams sales events into the append-only raw tables that back the sales_fact view.
+if (bigQueryConfigured && runConsumers)
+    builder.Services.AddHostedService<BlueberryMart.Api.Services.BigQuerySalesSink>();
 
 // Self-service "Explore" analytics over the sales_fact warehouse: opt-in via the same
 // BigQuery:ProjectId. A disabled (no-op) implementation is used when BigQuery is off.

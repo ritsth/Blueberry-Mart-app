@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Models.Events;
 using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/reviews")]
 [Authorize(Roles = "Customer,Shareholder")]
-public class ReviewsController(BlueberryMartDbContext context, IImageStorage imageStorage) : ControllerBase
+public class ReviewsController(BlueberryMartDbContext context, IImageStorage imageStorage, ISalesEventOutbox salesEvents) : ControllerBase
 {
     private const int TextReviewPoints = 10;
     private const int PhotoReviewPoints = 20;
@@ -87,6 +88,7 @@ public class ReviewsController(BlueberryMartDbContext context, IImageStorage ima
             user.UpdatedAt = DateTime.UtcNow;
         }
 
+        salesEvents.ReviewChanged(new ReviewChangedEvent(orderId, itemId, rating, DateTime.UtcNow));
         await context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(SubmitReview), new { id = review.Id }, new

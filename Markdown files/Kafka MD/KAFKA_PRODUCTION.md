@@ -1,27 +1,38 @@
 # Kafka in Production — Confluent Cloud + Cloud Run worker
 
-Runbook for taking the local-only inventory event pipeline (`KAFKA_LOCAL.md`) live, using
-**Confluent Cloud** as the managed broker and a **dedicated Cloud Run worker** for the
-consumers. The application code already supports this — no code changes are needed to
-provision it.
+> **Status: LIVE.** Confluent Cloud is the broker in prod; `blueberrymart-api` produces and
+> `blueberrymart-worker` (`min-instances=1`, `RunConsumers=true`) runs the consumers. The Kafka
+> secrets are in Secret Manager (`kafka-bootstrap`, `kafka-api-key`, `kafka-api-secret`). This
+> doc is both the original provisioning runbook **and** the current-state reference.
+
+Originally a runbook for taking the local-only inventory event pipeline (`KAFKA_LOCAL.md`) live.
+It now carries **two** event streams: the original `inventory.stock-changed`, and `sales.events`
+(order/payment/review) that feeds the event-sourced `sales_fact` warehouse — see
+`Markdown files/Main/SALES_EVENT_PIPELINE.md`.
 
 ## Target architecture
 
 ```
 API service (blueberrymart-api, scales to zero)         ──produces──┐
-   Kafka producer ON, RunConsumers OFF                              ▼
+   Kafka producer ON, RunConsumers OFF                              │
+   + writes sales events to the transactional outbox                ▼
                                                           Confluent Cloud (Basic)
-                                                          topic: inventory.stock-changed
+                                                          topics: inventory.stock-changed
+                                                                  sales.events
                                                                     │
 Worker service (blueberrymart-worker, min-instances=1)  ──consumes─┘
    RunConsumers ON →  StockEventConsumer (back-in-stock notifications)
                       BigQueryStockSink   (→ BigQuery stock_events)
+                      OutboxDispatcher    (outbox_messages → sales.events)
+                      BigQuerySalesSink   (sales.events → sales_* raw tables)
 ```
 
-- **API** publishes events on order/restock/adjust but does **not** consume.
+- **API** publishes stock events on order/restock/adjust and stages sales events into the
+  `outbox_messages` table, but does **not** consume.
 - **Worker** is the *same image*, deployed separately with `Kafka__RunConsumers=true` and
   `--min-instances=1 --no-cpu-throttling` (a Kafka consumer is a long-running loop with no
-  HTTP requests, so it needs CPU always allocated).
+  HTTP requests, so it needs CPU always allocated). The `OutboxDispatcher` also runs here so a
+  single instance publishes outbox rows without racing.
 
 ## How the code decides (already implemented)
 
@@ -37,7 +48,9 @@ Worker service (blueberrymart-worker, min-instances=1)  ──consumes─┘
 
 1. Create a Confluent Cloud account (or provision via **GCP Marketplace** to bill through GCP).
 2. Create a **Basic** cluster in **`us-central1`** (same region as Cloud Run/Cloud SQL).
-3. Create the topic **`inventory.stock-changed`** (start with 6 partitions; key is `branch:item`).
+3. Create the topics **`inventory.stock-changed`** (key `branch:item`) and **`sales.events`**
+   (key = order id). Start with 6 partitions each. Confluent Cloud disallows client-side
+   auto-create, so the topics must be created via Console / CLI / admin API before use.
 4. Create an **API key/secret** scoped to the cluster — these are the SASL username/password.
 5. Note the cluster's **bootstrap server** (e.g. `pkc-xxxxx.us-central1.gcp.confluent.cloud:9092`).
 
@@ -119,8 +132,12 @@ re-provision it with the full step 4 command before relying on CI.
 - The worker is the ops surface: if it's down, events queue durably in Kafka and process when
   it returns. Add consumer-lag monitoring for polish.
 
-## Reliability (optional, later)
+## Reliability
 
-Producing is fire-and-forget *after* the DB commit, so a crash between commit and publish
-loses that event. For exactly-once, add a **transactional outbox** (write the event to an
-`outbox` table in the same DB transaction; a relay publishes it). Out of scope for the demo.
+- **Stock events** (`inventory.stock-changed`) are still fire-and-forget *after* the DB commit,
+  so a crash between commit and publish can lose one. Acceptable: they only drive back-in-stock
+  notifications and the `stock_events` analytics log.
+- **Sales events** (`sales.events`) use a **transactional outbox** (implemented): the event is
+  written to `outbox_messages` in the *same* DB transaction as the order/payment/review, and the
+  worker's `OutboxDispatcher` relays it to Kafka and stamps `published_at`. So a sales event can
+  never be lost or orphaned. See `Markdown files/Main/SALES_EVENT_PIPELINE.md`.

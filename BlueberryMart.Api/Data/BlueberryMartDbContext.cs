@@ -18,6 +18,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<SavedReport> SavedReports => Set<SavedReport>();
     public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
     public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -249,6 +250,21 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(r => r.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(r => r.Shareholder).WithMany().HasForeignKey(r => r.ShareholderId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(r => r.ShareholderId);
+        });
+
+        modelBuilder.Entity<OutboxMessage>(e =>
+        {
+            e.ToTable("outbox_messages");
+            e.HasKey(o => o.Id);
+            e.Property(o => o.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(o => o.Topic).HasColumnName("topic").IsRequired();
+            e.Property(o => o.Key).HasColumnName("key").IsRequired();
+            e.Property(o => o.Payload).HasColumnName("payload").IsRequired();
+            e.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.Property(o => o.PublishedAt).HasColumnName("published_at");
+            e.Property(o => o.Attempts).HasColumnName("attempts").HasDefaultValue(0);
+            // The dispatcher scans for unpublished rows oldest-first.
+            e.HasIndex(o => new { o.PublishedAt, o.CreatedAt });
         });
     }
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Models.Events;
 using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Configuration;
 using BlueberryMart.Api.Services.Interfaces;
@@ -16,6 +17,7 @@ namespace BlueberryMart.Api.Controllers;
 public class PaymentsController(
     BlueberryMartDbContext context,
     IEsewaPaymentService esewa,
+    ISalesEventOutbox salesEvents,
     IOptions<EsewaOptions> options) : ControllerBase
 {
     private readonly EsewaOptions _options = options.Value;
@@ -64,6 +66,7 @@ public class PaymentsController(
             payment.UpdatedAt = DateTime.UtcNow;
         }
 
+        salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(order.Id, "initiated", DateTime.UtcNow));
         await context.SaveChangesAsync();
 
         var form = esewa.BuildInitiationPayload(payment);
@@ -129,6 +132,7 @@ public class PaymentsController(
                 user.UpdatedAt = now;
             }
 
+            salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(order.Id, "completed", now));
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
@@ -160,6 +164,7 @@ public class PaymentsController(
                     {
                         payment.Status = "failed";
                         payment.UpdatedAt = DateTime.UtcNow;
+                        salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(payment.OrderId, "failed", DateTime.UtcNow));
                         await context.SaveChangesAsync();
                     }
                 }

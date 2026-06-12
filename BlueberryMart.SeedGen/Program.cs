@@ -12,6 +12,12 @@ using Npgsql;
 // and a high-skewed review distribution — so the charts look alive.
 //
 //   dotnet run --project BlueberryMart.SeedGen -- --rows 200000 --seed 42
+//
+// LEGACY / INCOMPATIBLE: `sales_fact` is now a VIEW over append-only raw tables
+// fed by the sales event pipeline (see analytics/sales_fact_view.sql). This tool
+// still drops/creates `sales_fact` as a TABLE, which would collide with that view.
+// Do NOT run it against the live dataset; point --table at a throwaway table, or
+// retire it. To seed the event-sourced warehouse, use analytics/sales_fact_backfill.sql.
 // ---------------------------------------------------------------------------
 
 string GetArg(string name, string fallback)

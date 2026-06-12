@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.DTOs;
+using BlueberryMart.Api.Models.Events;
 using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Models.Responses;
 using BlueberryMart.Api.Services.Interfaces;
@@ -19,7 +20,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = "Admin")]
-public class AdminController(BlueberryMartDbContext context, ISettingsService settings) : ControllerBase
+public class AdminController(BlueberryMartDbContext context, ISettingsService settings, ISalesEventOutbox salesEvents) : ControllerBase
 {
     private static readonly string[] AssignableRoles = ["customer", "shareholder", "staff", "manager", "admin"];
 
@@ -208,6 +209,8 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
         if (review is null) return NotFound(new { message = "Review not found." });
 
         context.Reviews.Remove(review);
+        // Tombstone (rating null) so the warehouse stops counting this review.
+        salesEvents.ReviewChanged(new ReviewChangedEvent(review.OrderId, review.ItemId, null, DateTime.UtcNow));
         await context.SaveChangesAsync();
         return NoContent();
     }

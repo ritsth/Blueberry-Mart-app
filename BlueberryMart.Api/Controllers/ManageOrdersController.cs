@@ -19,7 +19,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/orders/manage")]
 [Authorize(Roles = "Staff,Manager,Admin")]
-public class ManageOrdersController(BlueberryMartDbContext context, IStockEventProducer stockEvents) : ControllerBase
+public class ManageOrdersController(BlueberryMartDbContext context, IStockEventProducer stockEvents, ISalesEventOutbox salesEvents) : ControllerBase
 {
     // Linear forward fulfillment chain (paid orders only — pending is advanced by
     // recording a payment, not here). Cancellation has its own manager-only endpoint.
@@ -215,6 +215,7 @@ public class ManageOrdersController(BlueberryMartDbContext context, IStockEventP
                 user.UpdatedAt = now;
             }
 
+            salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(order.Id, "completed", now));
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }

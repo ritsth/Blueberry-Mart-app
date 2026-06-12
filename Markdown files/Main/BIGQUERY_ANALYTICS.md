@@ -6,7 +6,31 @@ Reference for the data behind the shareholder **Explore** tab. The analytics *en
 
 ---
 
-## What is running now (LIVE)
+## Architecture change — event-sourced `sales_fact` (Option C)
+
+**The pipeline is moving from the hourly federation batch (Option A) to a fully event-driven
+design.** The application code has landed; the one-time prod cutover (below) is the remaining
+manual step.
+
+- Confluent Cloud **is** live in prod (the API produces; `blueberrymart-worker`, `minScale=1`,
+  `RunConsumers=true`, runs the consumers). The old "prod has zero Kafka" note was stale.
+- `sales_fact` becomes a **VIEW** (`analytics/sales_fact_view.sql`) over three append-only raw
+  tables — `sales_order_lines`, `sales_payment_status`, `sales_reviews` — streamed into by
+  `BigQuerySalesSink` from the `sales.events` Kafka topic. Events are emitted via a
+  **transactional outbox** (`outbox_messages` + `OutboxDispatcher`) at order placement, payment
+  status changes, and review submit/delete. Reads (Explore catalog + queries) are unchanged
+  because the view emits the identical 26 columns.
+- **Cutover steps (run once):** pre-create the `sales.events` topic in Confluent; run
+  `analytics/sales_fact_raw_tables.sql`; **drop the old `sales_fact` table** then run
+  `analytics/sales_fact_view.sql`; run `analytics/sales_fact_backfill.sql` to seed history;
+  **pause** the hourly scheduled query.
+- **Safety net:** the hourly schedule is off, but the federated rebuild lives on in
+  `analytics/sales_fact_backfill.sql` as an **on-demand** reconcile/repair tool (event sourcing
+  has no auto-heal).
+
+Everything below describes the previous (Option A) batch design, retained for history.
+
+## What was running before (Option A, LIVE until cutover)
 
 Prod `sales_fact` is rebuilt from the **live prod Postgres** by a **BigQuery scheduled
 query with Cloud SQL federation** — Option A below. No Kafka, no app code, no always-on

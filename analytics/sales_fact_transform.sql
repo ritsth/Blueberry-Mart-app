@@ -1,3 +1,8 @@
+-- SUPERSEDED (kept for reference). `sales_fact` is now a VIEW fed by the sales event
+-- pipeline (analytics/sales_fact_view.sql), and the hourly schedule is OFF. The federated
+-- rebuild now lives in analytics/sales_fact_backfill.sql (it rebuilds the append-only raw
+-- tables, not this single table) and is run on demand only, as the reconcile/repair path.
+--
 -- Rebuilds the BigQuery `sales_fact` warehouse table from the LIVE prod Postgres
 -- (Cloud SQL) via a federated EXTERNAL_QUERY. This is the body of the hourly
 -- BigQuery scheduled query "sales_fact hourly refresh (Postgres federation)".

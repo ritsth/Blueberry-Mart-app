@@ -28,4 +28,10 @@ public class KafkaOptions
 
     /// <summary>Consumer group for the back-in-stock consumer.</summary>
     public string ConsumerGroup { get; set; } = "blueberrymart-backinstock";
+
+    /// <summary>Topic that sales domain events (order/payment/review) are published to.</summary>
+    public string SalesTopic { get; set; } = "sales.events";
+
+    /// <summary>Consumer group for the BigQuery sales sink.</summary>
+    public string SalesConsumerGroup { get; set; } = "blueberrymart-sales-sink";
 }
