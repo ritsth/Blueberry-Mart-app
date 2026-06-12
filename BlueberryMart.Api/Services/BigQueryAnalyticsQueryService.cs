@@ -24,8 +24,12 @@ public sealed class BigQueryAnalyticsQueryService : IAnalyticsQueryService
     private readonly BigQueryClient _client;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    // Cached after first introspection (the table schema is static for a process).
+    // Cached after introspection, but re-checked periodically so a schema change (e.g. a new
+    // sales_fact column like order_status) is picked up without restarting this singleton —
+    // otherwise a long-running instance would reject filters on the new column forever.
+    private static readonly TimeSpan CatalogTtl = TimeSpan.FromMinutes(5);
     private AnalyticsCatalog? _catalog;
+    private DateTime _catalogAt;
     private Dictionary<string, BigQueryDbType> _columnTypes = new();
     private Dictionary<string, MeasureDef> _measures = new();
     private HashSet<string> _dimensionIds = new();
@@ -93,13 +97,15 @@ public sealed class BigQueryAnalyticsQueryService : IAnalyticsQueryService
         return _catalog!;
     }
 
+    private bool CatalogFresh => _catalog is not null && DateTime.UtcNow - _catalogAt < CatalogTtl;
+
     private async Task EnsureCatalogAsync(CancellationToken ct)
     {
-        if (_catalog is not null) return;
+        if (CatalogFresh) return;
         await _gate.WaitAsync(ct);
         try
         {
-            if (_catalog is not null) return;
+            if (CatalogFresh) return;
 
             var sql =
                 $"SELECT column_name, data_type FROM `{_opts.ProjectId}.{_opts.DatasetId}`.INFORMATION_SCHEMA.COLUMNS " +
@@ -143,6 +149,7 @@ public sealed class BigQueryAnalyticsQueryService : IAnalyticsQueryService
             _measures = measureDefs;
             _dimensionIds = dimensions.Select(d => d.Id).ToHashSet();
             _catalog = new AnalyticsCatalog(true, dimensions, measures);
+            _catalogAt = DateTime.UtcNow;
         }
         finally
         {
