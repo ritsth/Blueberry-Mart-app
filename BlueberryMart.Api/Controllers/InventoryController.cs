@@ -30,7 +30,7 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
     // Bulk (business) catalogue — Blueberry Plus members only
     [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("bulk")]
-    public async Task<IActionResult> GetBulk([FromQuery] Guid branchId)
+    public async Task<IActionResult> GetBulk([FromQuery] Guid branchId, [FromQuery] bool includeOutOfStock = false)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var user = await context.Users.FindAsync(userId);
@@ -38,9 +38,11 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
             return StatusCode(StatusCodes.Status403Forbidden,
                 new { message = "Bulk ordering is available to Blueberry Plus members only." });
 
-        var items = await context.Inventory
-            .Where(i => i.BranchId == branchId && i.IsActive && i.StockQuantity > 0 && i.IsBulkOnly)
-            .ToListAsync();
+        var query = context.Inventory.Where(i => i.BranchId == branchId && i.IsActive && i.IsBulkOnly);
+        if (!includeOutOfStock)   // default keeps sold-out items hidden
+            query = query.Where(i => i.StockQuantity > 0);
+
+        var items = await query.OrderByDescending(i => i.StockQuantity > 0).ThenBy(i => i.ItemName).ToListAsync();
 
         return Ok(items);
     }

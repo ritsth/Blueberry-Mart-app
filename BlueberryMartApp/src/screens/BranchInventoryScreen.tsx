@@ -60,6 +60,17 @@ const CATEGORIES: { key: CategoryKey; label: string; icon: keyof typeof Ionicons
 ];
 const CATEGORY_META = Object.fromEntries(CATEGORIES.map(c => [c.key, c])) as Record<CategoryKey, typeof CATEGORIES[number]>;
 
+// Sold-out items get their own bucket (a chip + a section) so they stay visible with a
+// "Notify me" action instead of being buried at the tail of a category rail.
+const OUT_OF_STOCK = 'OutOfStock' as const;
+const OOS_CAT = {
+  key: 'Out of stock',
+  icon: 'alert-circle' as keyof typeof Ionicons.glyphMap,
+  color: '#9ca3af',
+};
+
+type ChipKey = CategoryKey | 'All' | typeof OUT_OF_STOCK;
+
 function has(haystack: string, ...needles: string[]) {
   return needles.some(n => haystack.includes(n));
 }
@@ -108,26 +119,39 @@ export default function BranchInventoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<CategoryKey | 'All'>('All');
+  const [selected, setSelected] = useState<ChipKey>('All');
 
   const q = query.trim().toLowerCase();
   const isSearching = q.length > 0;
   const visible = isSearching ? inventory.filter(i => i.itemName.toLowerCase().includes(q)) : inventory;
 
-  // Items grouped into the categories actually present, in display order.
+  // In-stock items grouped into the categories actually present, in display order.
+  // Sold-out items are pulled into their own bucket (below) so they don't disappear
+  // off the right edge of a horizontal rail.
   const sections = useMemo(() => {
     const map = new Map<CategoryKey, InventoryItem[]>();
     for (const it of inventory) {
+      if (it.stockQuantity <= 0) continue;
       const c = categoryFor(it.itemName);
       (map.get(c) ?? map.set(c, []).get(c)!).push(it);
     }
     return CATEGORIES.filter(c => map.has(c.key)).map(c => ({ ...c, items: map.get(c.key)! }));
   }, [inventory]);
 
+  const outOfStock = useMemo(
+    () => inventory.filter(i => i.stockQuantity <= 0).sort((a, b) => a.itemName.localeCompare(b.itemName)),
+    [inventory],
+  );
+
   // Keep the selected chip valid if the data (and so the available categories) changes.
   useEffect(() => {
-    if (selected !== 'All' && !sections.some(s => s.key === selected)) setSelected('All');
-  }, [sections, selected]);
+    if (selected === 'All') return;
+    if (selected === OUT_OF_STOCK) {
+      if (outOfStock.length === 0) setSelected('All');
+      return;
+    }
+    if (!sections.some(s => s.key === selected)) setSelected('All');
+  }, [sections, outOfStock, selected]);
 
   useEffect(() => { load(); }, []);
 
@@ -137,9 +161,8 @@ export default function BranchInventoryScreen() {
     try {
       const token = await getStoredToken();
       const endpoint = isBulk ? 'bulk' : 'customer';
-      const qs = isBulk ? '' : '&includeOutOfStock=true';
       const res = await fetch(
-        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}${qs}`,
+        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}&includeOutOfStock=true`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error();
@@ -275,7 +298,7 @@ export default function BranchInventoryScreen() {
     );
   }
 
-  function SectionHeader({ cat, onPress }: { cat: typeof CATEGORIES[number]; onPress?: () => void }) {
+  function SectionHeader({ cat, onPress }: { cat: { key: string; icon: keyof typeof Ionicons.glyphMap; color: string }; onPress?: () => void }) {
     const inner = (
       <>
         <Ionicons name={cat.icon} size={18} color={cat.color} />
@@ -289,15 +312,18 @@ export default function BranchInventoryScreen() {
   }
 
   function ChipRow() {
-    const chips: ({ key: 'All'; label: string; icon: keyof typeof Ionicons.glyphMap; color: string } | typeof CATEGORIES[number])[] =
-      [{ key: 'All', label: 'All', icon: 'grid', color: '#14532d' }, ...sections];
+    const chips: { key: ChipKey; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
+      { key: 'All', label: 'All', icon: 'grid', color: '#14532d' },
+      ...sections.map(s => ({ key: s.key, label: s.label, icon: s.icon, color: s.color })),
+      ...(outOfStock.length ? [{ key: OUT_OF_STOCK, label: 'Sold out', icon: OOS_CAT.icon, color: OOS_CAT.color }] : []),
+    ];
     return (
       <View style={styles.chipBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow} keyboardShouldPersistTaps="handled">
           {chips.map(c => {
             const active = selected === c.key;
             return (
-              <TouchableOpacity key={c.key} style={styles.chip} onPress={() => setSelected(c.key as CategoryKey | 'All')} activeOpacity={0.8}>
+              <TouchableOpacity key={c.key} style={styles.chip} onPress={() => setSelected(c.key)} activeOpacity={0.8}>
                 <View style={[styles.chipIcon, { backgroundColor: c.color }, active && styles.chipIconActive]}>
                   <Ionicons name={c.icon} size={22} color="#fff" />
                 </View>
@@ -355,20 +381,20 @@ export default function BranchInventoryScreen() {
         />
       ) : (
         <>
-          {sections.length > 0 && <ChipRow />}
+          {(sections.length > 0 || outOfStock.length > 0) && <ChipRow />}
 
           {selected !== 'All' ? (
             <FlatList
               key="grid"
               style={styles.flex}
-              data={sections.find(s => s.key === selected)?.items ?? []}
+              data={selected === OUT_OF_STOCK ? outOfStock : (sections.find(s => s.key === selected)?.items ?? [])}
               keyExtractor={i => i.id}
               numColumns={2}
               columnWrapperStyle={styles.gridRow}
               contentContainerStyle={styles.list}
               refreshControl={refresh}
               keyboardShouldPersistTaps="handled"
-              ListHeaderComponent={<SectionHeader cat={CATEGORY_META[selected]} />}
+              ListHeaderComponent={<SectionHeader cat={selected === OUT_OF_STOCK ? OOS_CAT : CATEGORY_META[selected]} />}
               ListEmptyComponent={<Text style={styles.emptyNote}>No items in this category.</Text>}
               renderItem={({ item }) => <ProductCard item={item} width={GRID_CARD_W} />}
             />
@@ -383,9 +409,26 @@ export default function BranchInventoryScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
-                <Text style={styles.emptyNote}>
-                  {isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}
-                </Text>
+                outOfStock.length ? null : (
+                  <Text style={styles.emptyNote}>
+                    {isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}
+                  </Text>
+                )
+              }
+              ListFooterComponent={
+                outOfStock.length ? (
+                  <View style={styles.section}>
+                    <SectionHeader cat={OOS_CAT} onPress={() => setSelected(OUT_OF_STOCK)} />
+                    <FlatList
+                      data={outOfStock}
+                      keyExtractor={i => i.id}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.rail}
+                      renderItem={({ item }) => <ProductCard item={item} width={RAIL_CARD_W} />}
+                    />
+                  </View>
+                ) : null
               }
               renderItem={({ item: s }) => (
                 <View style={styles.section}>
