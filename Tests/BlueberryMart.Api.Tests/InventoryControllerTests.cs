@@ -120,4 +120,30 @@ public class InventoryControllerTests
             Assert.True(item.GetProperty("isBulkOnly").GetBoolean());
         });
     }
+
+    [Fact]
+    public async Task Top_CustomerToken_ReturnsInStockItems()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/top?branchId={_downtownBranchId}")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.NotNull(items);
+        // Only in-stock items are surfaced as best sellers.
+        Assert.All(items!, item => Assert.True(item.GetProperty("stockQuantity").GetInt32() > 0));
+    }
+
+    [Fact]
+    public async Task Top_Bulk_NonMember_ReturnsForbidden()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/top?branchId={_downtownBranchId}&bulk=true")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
 }

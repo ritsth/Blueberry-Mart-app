@@ -47,6 +47,44 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
         return Ok(items);
     }
 
+    // GET /api/inventory/top?branchId=&bulk=&limit=
+    // A branch's best sellers: items ranked by units sold across that branch's non-cancelled
+    // orders, limited to active, in-stock items in the requested catalogue (retail or bulk).
+    [Authorize(Roles = "Customer,Shareholder")]
+    [HttpGet("top")]
+    public async Task<IActionResult> Top([FromQuery] Guid branchId, [FromQuery] bool bulk = false, [FromQuery] int limit = 10)
+    {
+        if (bulk)
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await context.Users.FindAsync(userId);
+            if (user is null || !user.IsMember)
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bulk ordering is available to Blueberry Plus members only." });
+        }
+
+        limit = Math.Clamp(limit, 1, 20);
+
+        var top = await (
+            from oi in context.OrderItems
+            join o in context.Orders on oi.OrderId equals o.Id
+            join inv in context.Inventory on oi.ItemId equals inv.Id
+            where o.BranchId == branchId && o.Status != "cancelled"
+                  && inv.IsActive && inv.StockQuantity > 0 && inv.IsBulkOnly == bulk
+            group oi by new { inv.Id, inv.ItemName, inv.Price, inv.StockQuantity, inv.ImageUrl } into g
+            orderby g.Sum(x => x.Quantity) descending
+            select new
+            {
+                Id = g.Key.Id,
+                ItemName = g.Key.ItemName,
+                Price = g.Key.Price,
+                StockQuantity = g.Key.StockQuantity,
+                ImageUrl = g.Key.ImageUrl,
+            }).Take(limit).ToListAsync();
+
+        return Ok(top);
+    }
+
     [Authorize(Roles = "Shareholder")]
     [HttpGet("shareholder")]
     public async Task<ActionResult<IEnumerable<Inventory>>> GetForShareholder()

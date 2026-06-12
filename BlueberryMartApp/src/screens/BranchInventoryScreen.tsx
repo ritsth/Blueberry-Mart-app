@@ -69,7 +69,16 @@ const OOS_CAT = {
   color: '#9ca3af',
 };
 
-type ChipKey = CategoryKey | 'All' | typeof OUT_OF_STOCK;
+// Best sellers — a curated cross-category rail/chip of the branch's most-ordered items,
+// fed by GET /api/inventory/top (ranked by units sold). Pinned first when there's history.
+const POPULAR = 'Popular' as const;
+const POPULAR_CAT = {
+  key: 'Best sellers',
+  icon: 'flame' as keyof typeof Ionicons.glyphMap,
+  color: '#ea580c',
+};
+
+type ChipKey = CategoryKey | 'All' | typeof OUT_OF_STOCK | typeof POPULAR;
 
 function has(haystack: string, ...needles: string[]) {
   return needles.some(n => haystack.includes(n));
@@ -115,6 +124,7 @@ export default function BranchInventoryScreen() {
   const { carts, addToCart, updateQty } = useCart();
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [topItems, setTopItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,8 +162,12 @@ export default function BranchInventoryScreen() {
       if (outOfStock.length === 0) setSelected('All');
       return;
     }
+    if (selected === POPULAR) {
+      if (topItems.length === 0) setSelected('All');
+      return;
+    }
     if (!sections.some(s => s.key === selected)) setSelected('All');
-  }, [sections, outOfStock, selected]);
+  }, [sections, outOfStock, topItems, selected]);
 
   useEffect(() => { load(); }, []);
 
@@ -162,13 +176,16 @@ export default function BranchInventoryScreen() {
     setLoading(true);
     try {
       const token = await getStoredToken();
+      const auth = { headers: { Authorization: `Bearer ${token}` } };
       const endpoint = isBulk ? 'bulk' : 'customer';
-      const res = await fetch(
-        `${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}&includeOutOfStock=true`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) throw new Error();
-      setInventory(await res.json());
+      const [invRes, topRes] = await Promise.all([
+        fetch(`${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}&includeOutOfStock=true`, auth),
+        fetch(`${API_BASE}/api/inventory/top?branchId=${branch.id}&bulk=${isBulk}`, auth),
+      ]);
+      if (!invRes.ok) throw new Error();
+      setInventory(await invRes.json());
+      // Best sellers are a nice-to-have — never fail the screen over them.
+      setTopItems(topRes.ok ? await topRes.json() : []);
     } catch {
       setError('Failed to load inventory.');
     } finally {
@@ -333,6 +350,7 @@ export default function BranchInventoryScreen() {
   function ChipRow() {
     const chips: { key: ChipKey; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
       { key: 'All', label: 'All', icon: 'grid', color: '#14532d' },
+      ...(topItems.length ? [{ key: POPULAR, label: 'Popular', icon: POPULAR_CAT.icon, color: POPULAR_CAT.color }] : []),
       ...sections.map(s => ({ key: s.key, label: s.label, icon: s.icon, color: s.color })),
       ...(outOfStock.length ? [{ key: OUT_OF_STOCK, label: 'Sold out', icon: OOS_CAT.icon, color: OOS_CAT.color }] : []),
     ];
@@ -400,20 +418,26 @@ export default function BranchInventoryScreen() {
         />
       ) : (
         <>
-          {(sections.length > 0 || outOfStock.length > 0) && <ChipRow />}
+          {(sections.length > 0 || outOfStock.length > 0 || topItems.length > 0) && <ChipRow />}
 
           {selected !== 'All' ? (
             <FlatList
               key="grid"
               style={styles.flex}
-              data={selected === OUT_OF_STOCK ? outOfStock : (sections.find(s => s.key === selected)?.items ?? [])}
+              data={
+                selected === OUT_OF_STOCK ? outOfStock
+                  : selected === POPULAR ? topItems
+                    : (sections.find(s => s.key === selected)?.items ?? [])
+              }
               keyExtractor={i => i.id}
               numColumns={2}
               columnWrapperStyle={styles.gridRow}
               contentContainerStyle={styles.list}
               refreshControl={refresh}
               keyboardShouldPersistTaps="handled"
-              ListHeaderComponent={<SectionHeader cat={selected === OUT_OF_STOCK ? OOS_CAT : CATEGORY_META[selected]} />}
+              ListHeaderComponent={
+                <SectionHeader cat={selected === OUT_OF_STOCK ? OOS_CAT : selected === POPULAR ? POPULAR_CAT : CATEGORY_META[selected]} />
+              }
               ListEmptyComponent={<Text style={styles.emptyNote}>No items in this category.</Text>}
               renderItem={({ item }) => <ProductCard item={item} width={GRID_CARD_W} />}
             />
@@ -428,11 +452,26 @@ export default function BranchInventoryScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
-                outOfStock.length ? null : (
+                (outOfStock.length || topItems.length) ? null : (
                   <Text style={styles.emptyNote}>
                     {isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}
                   </Text>
                 )
+              }
+              ListHeaderComponent={
+                topItems.length ? (
+                  <View style={styles.section}>
+                    <SectionHeader cat={POPULAR_CAT} onPress={() => setSelected(POPULAR)} />
+                    <FlatList
+                      data={topItems}
+                      keyExtractor={i => i.id}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.rail}
+                      renderItem={({ item }) => <ProductCard item={item} width={RAIL_CARD_W} />}
+                    />
+                  </View>
+                ) : null
               }
               ListFooterComponent={
                 outOfStock.length ? (

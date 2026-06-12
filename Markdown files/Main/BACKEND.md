@@ -70,6 +70,7 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |
+| `GET /api/inventory/top?branchId=&bulk=` | Customer/Shareholder | Branch best sellers (in-stock items ranked by units sold; bulk=true needs membership) |
 | `GET /api/inventory/shareholder` | Shareholder | Full inventory |
 | `GET /api/inventory/search?q=` | Customer/Shareholder | Search across branches |
 | `POST /api/inventory/{id}/restock` | Shareholder | Add stock; emits a stock-changed event |
