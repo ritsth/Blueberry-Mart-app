@@ -28,9 +28,14 @@ on the view (27 columns; defaults to `pending`). The agreed rule is **revenue = 
 collected = `payment_status='completed'` AND `order_status!='cancelled'`** — a paid order cancelled
 later is a refund (`cancelled` ∩ `completed`): kept in the warehouse for analysis, excluded from
 revenue. Both surfaces apply it: the Postgres home dashboard (`ShareholderController.GetAnalytics`)
-and the Explore "Collected revenue only" toggle. See `SALES_EVENT_PIPELINE.md`. Cutover: create
-`sales_order_status` (re-run `sales_fact_raw_tables.sql`), re-run `sales_fact_backfill.sql` (seeds
-status from `orders`), then `CREATE OR REPLACE VIEW` with `sales_fact_view.sql`.
+and the Explore "Collected revenue only" toggle. See `SALES_EVENT_PIPELINE.md`.
+
+**Cutover DONE 2026-06-11** (commits `384a474`, `7e382b5`): created `sales_order_status`; seeded
+**313** status rows from prod `orders` (completed 178 / cancelled 64 / processing 25 / confirmed 24
+/ ready 22); `CREATE OR REPLACE VIEW` added `order_status` (754 lines unchanged). Verified collected
+revenue = **836,265** vs unfiltered **1,014,480** (cancelled orders had no completed payments, so
+they only drop unpaid/pending money). The 3 live raw tables were left untouched (targeted seed, not
+a full backfill).
 
 ### What we actually ran at cutover (2026-06-12)
 
