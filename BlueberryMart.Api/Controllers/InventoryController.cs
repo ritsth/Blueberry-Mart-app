@@ -85,6 +85,46 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
         return Ok(top);
     }
 
+    // GET /api/inventory/reorder?branchId=&bulk=&limit=
+    // "Buy again": items the signed-in customer has previously ordered at this branch (across
+    // non-cancelled orders), most-recently-ordered first, limited to active in-stock items in
+    // the requested catalogue (retail or bulk).
+    [Authorize(Roles = "Customer,Shareholder")]
+    [HttpGet("reorder")]
+    public async Task<IActionResult> Reorder([FromQuery] Guid branchId, [FromQuery] bool bulk = false, [FromQuery] int limit = 10)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        if (bulk)
+        {
+            var user = await context.Users.FindAsync(userId);
+            if (user is null || !user.IsMember)
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new { message = "Bulk ordering is available to Blueberry Plus members only." });
+        }
+
+        limit = Math.Clamp(limit, 1, 20);
+
+        var items = await (
+            from oi in context.OrderItems
+            join o in context.Orders on oi.OrderId equals o.Id
+            join inv in context.Inventory on oi.ItemId equals inv.Id
+            where o.UserId == userId && o.BranchId == branchId && o.Status != "cancelled"
+                  && inv.IsActive && inv.StockQuantity > 0 && inv.IsBulkOnly == bulk
+            group o by new { inv.Id, inv.ItemName, inv.Price, inv.StockQuantity, inv.ImageUrl } into g
+            orderby g.Max(x => x.CreatedAt) descending
+            select new
+            {
+                Id = g.Key.Id,
+                ItemName = g.Key.ItemName,
+                Price = g.Key.Price,
+                StockQuantity = g.Key.StockQuantity,
+                ImageUrl = g.Key.ImageUrl,
+            }).Take(limit).ToListAsync();
+
+        return Ok(items);
+    }
+
     [Authorize(Roles = "Shareholder")]
     [HttpGet("shareholder")]
     public async Task<ActionResult<IEnumerable<Inventory>>> GetForShareholder()

@@ -8,11 +8,13 @@ namespace BlueberryMart.Api.Tests;
 [Collection("Integration")]
 public class InventoryControllerTests
 {
+    private readonly BlueberryMartApiFactory _factory;
     private readonly HttpClient _client;
     private readonly Guid _downtownBranchId;
 
     public InventoryControllerTests(BlueberryMartApiFactory factory)
     {
+        _factory          = factory;
         _client           = factory.CreateClient();
         _downtownBranchId = factory.DowntownBranchId;
     }
@@ -142,6 +144,36 @@ public class InventoryControllerTests
         var token = await TestHelpers.GetCustomerTokenAsync(_client);
         var resp = await _client.SendAsync(
             new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/top?branchId={_downtownBranchId}&bulk=true")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reorder_ReturnsItemsTheCustomerPreviouslyOrdered()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtownBranchId, $"Reorder {Guid.NewGuid():N}", stock: 50);
+        await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, itemId, quantity: 1);
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/reorder?branchId={_downtownBranchId}")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.NotNull(items);
+        Assert.Contains(items!, i => i.GetProperty("id").GetString() == itemId.ToString());
+        Assert.All(items!, i => Assert.True(i.GetProperty("stockQuantity").GetInt32() > 0));
+    }
+
+    [Fact]
+    public async Task Reorder_Bulk_NonMember_ReturnsForbidden()
+    {
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/reorder?branchId={_downtownBranchId}&bulk=true")
             .WithBearer(token));
 
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);

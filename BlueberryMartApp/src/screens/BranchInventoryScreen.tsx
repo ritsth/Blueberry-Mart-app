@@ -78,7 +78,16 @@ const POPULAR_CAT = {
   color: '#ea580c',
 };
 
-type ChipKey = CategoryKey | 'All' | typeof OUT_OF_STOCK | typeof POPULAR;
+// Buy again — the signed-in customer's own previously-ordered items at this branch
+// (GET /api/inventory/reorder, most-recent first). Personalized, so it sits above Best sellers.
+const BUY_AGAIN = 'BuyAgain' as const;
+const BUY_AGAIN_CAT = {
+  key: 'Buy again',
+  icon: 'repeat' as keyof typeof Ionicons.glyphMap,
+  color: '#0d9488',
+};
+
+type ChipKey = CategoryKey | 'All' | typeof OUT_OF_STOCK | typeof POPULAR | typeof BUY_AGAIN;
 
 function has(haystack: string, ...needles: string[]) {
   return needles.some(n => haystack.includes(n));
@@ -125,6 +134,7 @@ export default function BranchInventoryScreen() {
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [topItems, setTopItems] = useState<InventoryItem[]>([]);
+  const [reorder, setReorder] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,8 +176,12 @@ export default function BranchInventoryScreen() {
       if (topItems.length === 0) setSelected('All');
       return;
     }
+    if (selected === BUY_AGAIN) {
+      if (reorder.length === 0) setSelected('All');
+      return;
+    }
     if (!sections.some(s => s.key === selected)) setSelected('All');
-  }, [sections, outOfStock, topItems, selected]);
+  }, [sections, outOfStock, topItems, reorder, selected]);
 
   useEffect(() => { load(); }, []);
 
@@ -178,14 +192,16 @@ export default function BranchInventoryScreen() {
       const token = await getStoredToken();
       const auth = { headers: { Authorization: `Bearer ${token}` } };
       const endpoint = isBulk ? 'bulk' : 'customer';
-      const [invRes, topRes] = await Promise.all([
+      const [invRes, topRes, reorderRes] = await Promise.all([
         fetch(`${API_BASE}/api/inventory/${endpoint}?branchId=${branch.id}&includeOutOfStock=true`, auth),
         fetch(`${API_BASE}/api/inventory/top?branchId=${branch.id}&bulk=${isBulk}`, auth),
+        fetch(`${API_BASE}/api/inventory/reorder?branchId=${branch.id}&bulk=${isBulk}`, auth),
       ]);
       if (!invRes.ok) throw new Error();
       setInventory(await invRes.json());
-      // Best sellers are a nice-to-have — never fail the screen over them.
+      // Best sellers / Buy again are nice-to-haves — never fail the screen over them.
       setTopItems(topRes.ok ? await topRes.json() : []);
+      setReorder(reorderRes.ok ? await reorderRes.json() : []);
     } catch {
       setError('Failed to load inventory.');
     } finally {
@@ -350,6 +366,7 @@ export default function BranchInventoryScreen() {
   function ChipRow() {
     const chips: { key: ChipKey; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
       { key: 'All', label: 'All', icon: 'grid', color: '#14532d' },
+      ...(reorder.length ? [{ key: BUY_AGAIN, label: 'Buy again', icon: BUY_AGAIN_CAT.icon, color: BUY_AGAIN_CAT.color }] : []),
       ...(topItems.length ? [{ key: POPULAR, label: 'Popular', icon: POPULAR_CAT.icon, color: POPULAR_CAT.color }] : []),
       ...sections.map(s => ({ key: s.key, label: s.label, icon: s.icon, color: s.color })),
       ...(outOfStock.length ? [{ key: OUT_OF_STOCK, label: 'Sold out', icon: OOS_CAT.icon, color: OOS_CAT.color }] : []),
@@ -418,7 +435,7 @@ export default function BranchInventoryScreen() {
         />
       ) : (
         <>
-          {(sections.length > 0 || outOfStock.length > 0 || topItems.length > 0) && <ChipRow />}
+          {(sections.length > 0 || outOfStock.length > 0 || topItems.length > 0 || reorder.length > 0) && <ChipRow />}
 
           {selected !== 'All' ? (
             <FlatList
@@ -427,7 +444,8 @@ export default function BranchInventoryScreen() {
               data={
                 selected === OUT_OF_STOCK ? outOfStock
                   : selected === POPULAR ? topItems
-                    : (sections.find(s => s.key === selected)?.items ?? [])
+                    : selected === BUY_AGAIN ? reorder
+                      : (sections.find(s => s.key === selected)?.items ?? [])
               }
               keyExtractor={i => i.id}
               numColumns={2}
@@ -436,7 +454,12 @@ export default function BranchInventoryScreen() {
               refreshControl={refresh}
               keyboardShouldPersistTaps="handled"
               ListHeaderComponent={
-                <SectionHeader cat={selected === OUT_OF_STOCK ? OOS_CAT : selected === POPULAR ? POPULAR_CAT : CATEGORY_META[selected]} />
+                <SectionHeader cat={
+                  selected === OUT_OF_STOCK ? OOS_CAT
+                    : selected === POPULAR ? POPULAR_CAT
+                      : selected === BUY_AGAIN ? BUY_AGAIN_CAT
+                        : CATEGORY_META[selected]
+                } />
               }
               ListEmptyComponent={<Text style={styles.emptyNote}>No items in this category.</Text>}
               renderItem={({ item }) => <ProductCard item={item} width={GRID_CARD_W} />}
@@ -452,26 +475,41 @@ export default function BranchInventoryScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
-                (outOfStock.length || topItems.length) ? null : (
+                (outOfStock.length || topItems.length || reorder.length) ? null : (
                   <Text style={styles.emptyNote}>
                     {isBulk ? 'No bulk items available at this branch.' : 'No items available at this branch.'}
                   </Text>
                 )
               }
               ListHeaderComponent={
-                topItems.length ? (
-                  <View style={styles.section}>
-                    <SectionHeader cat={POPULAR_CAT} onPress={() => setSelected(POPULAR)} />
-                    <FlatList
-                      data={topItems}
-                      keyExtractor={i => i.id}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.rail}
-                      renderItem={({ item }) => <ProductCard item={item} width={RAIL_CARD_W} />}
-                    />
-                  </View>
-                ) : null
+                <>
+                  {reorder.length ? (
+                    <View style={styles.section}>
+                      <SectionHeader cat={BUY_AGAIN_CAT} onPress={() => setSelected(BUY_AGAIN)} />
+                      <FlatList
+                        data={reorder}
+                        keyExtractor={i => i.id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.rail}
+                        renderItem={({ item }) => <ProductCard item={item} width={RAIL_CARD_W} />}
+                      />
+                    </View>
+                  ) : null}
+                  {topItems.length ? (
+                    <View style={styles.section}>
+                      <SectionHeader cat={POPULAR_CAT} onPress={() => setSelected(POPULAR)} />
+                      <FlatList
+                        data={topItems}
+                        keyExtractor={i => i.id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.rail}
+                        renderItem={({ item }) => <ProductCard item={item} width={RAIL_CARD_W} />}
+                      />
+                    </View>
+                  ) : null}
+                </>
               }
               ListFooterComponent={
                 outOfStock.length ? (
