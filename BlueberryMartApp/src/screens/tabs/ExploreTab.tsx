@@ -131,6 +131,17 @@ export default function ExploreTab() {
     runSpec(buildSpec(measures, dims, year, completedOnly, chartType));
   }
 
+  // Filters (time range + "Collected revenue only") apply live — re-run immediately instead of
+  // waiting for a manual Run, which made the toggle feel like it did nothing (esp. on a loaded
+  // report). `overrides` carries the just-changed value so we don't read stale state.
+  function rerunWith(overrides: { year?: string; completedOnly?: boolean }) {
+    const y = overrides.year ?? year;
+    const c = overrides.completedOnly ?? completedOnly;
+    if (catalog?.enabled && measures.length > 0) {
+      runSpec(buildSpec(measures, dims, y, c, chartType));
+    }
+  }
+
   // Pull-to-refresh: reload the catalog and re-run the current query.
   async function onRefresh() {
     setRefreshing(true);
@@ -252,7 +263,11 @@ export default function ExploreTab() {
         <Text style={[styles.label, styles.mt]}>Time range</Text>
         <DropdownButton text={year === 'All' ? 'All time' : year} onPress={() => setSheet('time')} value />
 
-        <TouchableOpacity style={styles.toggleRow} onPress={() => setCompletedOnly(v => !v)} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.toggleRow}
+          onPress={() => { const next = !completedOnly; setCompletedOnly(next); rerunWith({ completedOnly: next }); }}
+          activeOpacity={0.7}
+        >
           <Ionicons name={completedOnly ? 'checkbox' : 'square-outline'} size={20} color={completedOnly ? '#16a34a' : '#9ca3af'} />
           <Text style={styles.toggleText}>Collected revenue only (paid, not cancelled)</Text>
         </TouchableOpacity>
@@ -328,7 +343,7 @@ export default function ExploreTab() {
 
       <PickerSheet visible={sheet === 'time'} title="Time range" onClose={() => setSheet(null)}>
         {YEARS.map(y => (
-          <TouchableOpacity key={y} style={styles.optRow} onPress={() => { setYear(y); setSheet(null); }}>
+          <TouchableOpacity key={y} style={styles.optRow} onPress={() => { setYear(y); setSheet(null); rerunWith({ year: y }); }}>
             <Text style={styles.optText}>{y === 'All' ? 'All time' : y}</Text>
             {year === y && <Ionicons name="checkmark" size={18} color="#16a34a" />}
           </TouchableOpacity>
