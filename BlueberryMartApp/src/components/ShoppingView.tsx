@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -108,6 +109,22 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
 
   const isSearching = query.trim().length >= 2;
 
+  async function notifyMe(item: SearchItem) {
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/inventory/${item.id}/notify-me`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      Alert.alert(
+        res.ok ? "You're on the list" : 'Heads up',
+        body.message ?? (res.ok ? "We'll notify you when it's back." : 'Could not subscribe.'),
+      );
+    } catch {
+      Alert.alert('Error', 'Could not subscribe. Check your connection.');
+    }
+  }
+
   function QtyControl({ branch, item }: { branch: Branch; item: SearchItem }) {
     const inCart = carts[branch.id]?.items.find(c => c.itemId === item.id);
     if (!inCart) {
@@ -175,23 +192,33 @@ export default function ShoppingView({ mode = 'regular' }: { mode?: 'regular' | 
                     <Text style={styles.searchGroupCity}>{group.branchCity}</Text>
                   </View>
                 </View>
-                {group.items.map(item => (
-                  <View key={item.id} style={styles.itemCard}>
-                    {item.imageUrl
-                      ? <Image source={{ uri: item.imageUrl }} style={styles.thumb} />
-                      : <View style={[styles.thumb, styles.thumbPlaceholder]}><Text style={styles.thumbInitial}>{item.itemName.charAt(0).toUpperCase()}</Text></View>}
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.itemName}</Text>
-                      <Text style={styles.itemMeta}>
-                        Rs {item.price.toFixed(2)}{'  ·  '}
-                        <Text style={item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK ? styles.lowStock : undefined}>
-                          {stockLabel(item.stockQuantity)}
+                {group.items.map(item => {
+                  const outOfStock = item.stockQuantity <= 0;
+                  return (
+                    <View key={item.id} style={[styles.itemCard, outOfStock && styles.itemCardMuted]}>
+                      {item.imageUrl
+                        ? <Image source={{ uri: item.imageUrl }} style={styles.thumb} />
+                        : <View style={[styles.thumb, styles.thumbPlaceholder]}><Text style={styles.thumbInitial}>{item.itemName.charAt(0).toUpperCase()}</Text></View>}
+                      <View style={styles.itemInfo}>
+                        <Text style={[styles.itemName, outOfStock && styles.itemNameMuted]}>{item.itemName}</Text>
+                        <Text style={styles.itemMeta}>
+                          Rs {item.price.toFixed(2)}{'  ·  '}
+                          <Text style={item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK ? styles.lowStock : undefined}>
+                            {stockLabel(item.stockQuantity)}
+                          </Text>
                         </Text>
-                      </Text>
+                      </View>
+                      {outOfStock ? (
+                        <TouchableOpacity style={styles.notifyButton} onPress={() => notifyMe(item)} activeOpacity={0.8}>
+                          <Ionicons name="notifications-outline" size={14} color="#16a34a" />
+                          <Text style={styles.notifyButtonText}>Notify me</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <QtyControl branch={branch} item={item} />
+                      )}
                     </View>
-                    <QtyControl branch={branch} item={item} />
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             );
           }}
@@ -278,6 +305,13 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
     marginBottom: 8,
   },
+  itemCardMuted: { backgroundColor: '#f9fafb' },
+  itemNameMuted: { color: '#9ca3af' },
+  notifyButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12,
+  },
+  notifyButtonText: { color: '#16a34a', fontWeight: '700', fontSize: 12 },
   thumb: { width: 44, height: 44, borderRadius: 8, marginRight: 12, backgroundColor: '#f3f4f6' },
   thumbPlaceholder: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
   thumbInitial: { fontSize: 18, fontWeight: '700', color: '#9ca3af' },

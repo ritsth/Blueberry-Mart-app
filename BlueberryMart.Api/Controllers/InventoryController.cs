@@ -68,11 +68,14 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
         var term = q.Trim();
 
         // bulk=false → regular (non-bulk) catalogue; bulk=true → bulk-only items.
+        // Sold-out items are included so they can be searched and offer a "notify me";
+        // in-stock items sort first within each branch group.
         var matches = await context.Inventory
-            .Where(i => i.IsActive && i.StockQuantity > 0 && i.IsBulkOnly == bulk &&
+            .Where(i => i.IsActive && i.IsBulkOnly == bulk &&
                         EF.Functions.ILike(i.ItemName, $"%{term}%"))
             .Include(i => i.Branch)
             .OrderBy(i => i.Branch.Name)
+            .ThenByDescending(i => i.StockQuantity > 0)
             .ThenBy(i => i.ItemName)
             .Select(i => new
             {
