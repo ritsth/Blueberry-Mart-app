@@ -124,12 +124,15 @@ export default function ShareholderHomeTab() {
   }
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
-    >
+    // Pad the parent by the safe-area inset (not the scroll content) so the pull-to-refresh
+    // spinner lands in the visible area instead of being drawn under the status bar/notch.
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />}
+      >
       <Text style={styles.heading}>Analytics</Text>
 
       <View style={styles.revenueCard}>
@@ -266,14 +269,16 @@ export default function ShareholderHomeTab() {
       }
 
       <View style={{ height: 24 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1, backgroundColor: '#f9fafb' },
+  screen: { flex: 1, backgroundColor: '#f9fafb' },
   scroll: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12 },
+  content: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 16 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   errorText: { color: '#dc2626', fontSize: 13 },
   heading: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 16 },
