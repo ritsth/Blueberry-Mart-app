@@ -15,10 +15,17 @@ public class ShareholderController(BlueberryMartDbContext context, IInventoryAna
     [HttpGet("analytics")]
     public async Task<IActionResult> GetAnalytics()
     {
-        var totalRevenue = await context.Orders
-            .SumAsync(o => o.TotalAmount);
+        // "Revenue" = money actually collected: orders that aren't cancelled AND have a completed
+        // payment. A paid order cancelled later is a refund, so it drops out here; unpaid pending
+        // orders never count until their payment completes.
+        var paidOrderIds = context.Payments.Where(p => p.Status == "completed").Select(p => p.OrderId);
+        var collectedOrders = context.Orders.Where(o => o.Status != "cancelled" && paidOrderIds.Contains(o.Id));
+        var collectedOrderIds = collectedOrders.Select(o => o.Id);
 
-        var revenueByBranch = await context.Orders
+        var totalRevenue = await collectedOrders
+            .SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
+
+        var revenueByBranch = await collectedOrders
             .GroupBy(o => new { o.BranchId, o.Branch.Name })
             .Select(g => new
             {
@@ -31,6 +38,7 @@ public class ShareholderController(BlueberryMartDbContext context, IInventoryAna
             .ToListAsync();
 
         var topSellingItems = await context.OrderItems
+            .Where(oi => collectedOrderIds.Contains(oi.OrderId))
             .GroupBy(oi => new { oi.ItemId, oi.Item.ItemName, oi.Item.BranchId, oi.Item.Price })
             .Select(g => new
             {
@@ -61,7 +69,7 @@ public class ShareholderController(BlueberryMartDbContext context, IInventoryAna
 
         // Revenue over the last 14 days, grouped by day
         var sinceDate = DateTime.UtcNow.Date.AddDays(-13);
-        var dailyRaw = await context.Orders
+        var dailyRaw = await collectedOrders
             .Where(o => o.CreatedAt >= sinceDate)
             .GroupBy(o => o.CreatedAt.Date)
             .Select(g => new { Day = g.Key, Revenue = g.Sum(o => o.TotalAmount) })
@@ -78,7 +86,7 @@ public class ShareholderController(BlueberryMartDbContext context, IInventoryAna
             .ToList();
 
         // Pickup vs delivery split
-        var orderTypeSplit = await context.Orders
+        var orderTypeSplit = await collectedOrders
             .GroupBy(o => o.OrderType)
             .Select(g => new { Type = g.Key, Count = g.Count(), Revenue = g.Sum(o => o.TotalAmount) })
             .ToListAsync();

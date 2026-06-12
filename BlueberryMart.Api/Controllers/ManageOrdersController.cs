@@ -216,6 +216,7 @@ public class ManageOrdersController(BlueberryMartDbContext context, IStockEventP
             }
 
             salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(order.Id, "completed", now));
+            salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "confirmed", now));
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
@@ -238,6 +239,12 @@ public class ManageOrdersController(BlueberryMartDbContext context, IStockEventP
 
         if (order.Status is "completed" or "cancelled")
             return Conflict(new { message = $"A '{order.Status}' order can't be cancelled." });
+
+        // A paid order is a refund when cancelled — only allow it before fulfilment begins
+        // (still pending/confirmed). Once it's being processed, it must be handled manually.
+        var isPaid = await context.Payments.AnyAsync(p => p.OrderId == id && p.Status == "completed");
+        if (isPaid && order.Status is not ("pending" or "confirmed"))
+            return Conflict(new { message = "A paid order can only be cancelled before it is processed." });
 
         // Return the stock reserved at placement.
         var lines = await (from oi in context.OrderItems
@@ -267,6 +274,7 @@ public class ManageOrdersController(BlueberryMartDbContext context, IStockEventP
 
             order.Status = "cancelled";
             order.UpdatedAt = now;
+            salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "cancelled", now));
 
             await context.SaveChangesAsync();
             await transaction.CommitAsync();

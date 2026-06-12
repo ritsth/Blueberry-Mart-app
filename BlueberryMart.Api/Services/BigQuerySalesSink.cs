@@ -49,6 +49,7 @@ public sealed class BigQuerySalesSink(
         var orderLines = client.GetTable(_bq.DatasetId, _bq.OrderLinesTableId);
         var payments = client.GetTable(_bq.DatasetId, _bq.PaymentStatusTableId);
         var reviews = client.GetTable(_bq.DatasetId, _bq.ReviewsTableId);
+        var orderStatus = client.GetTable(_bq.DatasetId, _bq.OrderStatusTableId);
 
         var config = new ConsumerConfig
         {
@@ -75,7 +76,7 @@ public sealed class BigQuerySalesSink(
 
                 try
                 {
-                    Handle(result.Message.Value, orderLines, payments, reviews);
+                    Handle(result.Message.Value, orderLines, payments, reviews, orderStatus);
                     // Commit only after a successful insert, so a failed write is retried.
                     consumer.Commit(result);
                 }
@@ -89,7 +90,7 @@ public sealed class BigQuerySalesSink(
         finally { consumer.Close(); }
     }
 
-    private static void Handle(string value, BigQueryTable orderLines, BigQueryTable payments, BigQueryTable reviews)
+    private static void Handle(string value, BigQueryTable orderLines, BigQueryTable payments, BigQueryTable reviews, BigQueryTable orderStatus)
     {
         var envelope = JsonSerializer.Deserialize<SalesEventEnvelope>(value);
         if (envelope is null) return;
@@ -140,6 +141,17 @@ public sealed class BigQuerySalesSink(
                     { "order_id", e.OrderId.ToString() },
                     { "item_id", e.ItemId.ToString() },
                     { "rating", e.Rating },   // null = deleted (tombstone)
+                    { "occurred_at", e.OccurredAt },
+                });
+                    break;
+                }
+            case SalesEventTypes.OrderStatusChanged:
+                {
+                    var e = JsonSerializer.Deserialize<OrderStatusChangedEvent>(envelope.Data)!;
+                    orderStatus.InsertRow(new BigQueryInsertRow
+                {
+                    { "order_id", e.OrderId.ToString() },
+                    { "status", e.Status },
                     { "occurred_at", e.OccurredAt },
                 });
                     break;

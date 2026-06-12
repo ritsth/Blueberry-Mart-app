@@ -133,6 +133,7 @@ public class PaymentsController(
             }
 
             salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(order.Id, "completed", now));
+            salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "confirmed", now));
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }

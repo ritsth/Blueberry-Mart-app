@@ -58,3 +58,14 @@ SELECT * FROM EXTERNAL_QUERY("project-76ca6efe-7878-4dc8-bff.us.bbm-cloudsql-us"
   SELECT r.order_id::text AS order_id, r.item_id::text AS item_id, r.rating AS rating, r.created_at AS occurred_at
   FROM reviews r
 ''');
+
+-- Current order status per order (the view defaults un-changed orders to 'pending', so seeding
+-- the current status is enough — only cancelled/confirmed/completed orders need a row, but we
+-- seed all for an exact snapshot). updated_at is the best available "occurred_at".
+TRUNCATE TABLE `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_order_status`;
+INSERT INTO `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_order_status`
+  (order_id, status, occurred_at)
+SELECT * FROM EXTERNAL_QUERY("project-76ca6efe-7878-4dc8-bff.us.bbm-cloudsql-us", '''
+  SELECT o.id::text AS order_id, o.status::text AS status, o.updated_at AS occurred_at
+  FROM orders o
+''');

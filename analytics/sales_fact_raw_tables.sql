@@ -39,3 +39,12 @@ CREATE TABLE IF NOT EXISTS `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_r
   rating      INT64,
   occurred_at TIMESTAMP
 );
+
+-- One row per order status change (confirmed | completed | cancelled). Latest per order wins;
+-- the view defaults orders with no row to 'pending'. Drives the order_status dimension and the
+-- revenue rule (a refund is order_status='cancelled' on a payment_status='completed' order).
+CREATE TABLE IF NOT EXISTS `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_order_status` (
+  order_id    STRING,
+  status      STRING,
+  occurred_at TIMESTAMP
+);

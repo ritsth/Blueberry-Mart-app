@@ -20,6 +20,27 @@ public static class TestHelpers
         await ctx.SaveChangesAsync();
     }
 
+    /// <summary>Marks an order paid: adds a completed payment + sets status 'confirmed'. Returns the order total.</summary>
+    public static async Task<decimal> MarkOrderPaidAsync(BlueberryMartApiFactory factory, Guid orderId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var order = await ctx.Orders.FirstAsync(o => o.Id == orderId);
+        order.Status = "confirmed";
+        ctx.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            TransactionUuid = $"test-{Guid.NewGuid()}",
+            Amount = order.TotalAmount,
+            Status = "completed",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await ctx.SaveChangesAsync();
+        return order.TotalAmount;
+    }
+
     /// <summary>Creates a fresh inventory item (default out of stock) so tests don't disturb seeded items.</summary>
     public static async Task<Guid> CreateInventoryItemAsync(
         BlueberryMartApiFactory factory, Guid branchId, string name, int stock = 0)

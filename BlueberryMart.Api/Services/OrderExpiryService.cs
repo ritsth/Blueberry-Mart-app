@@ -14,6 +14,7 @@ namespace BlueberryMart.Api.Services;
 public sealed class OrderExpiryService(
     BlueberryMartDbContext db,
     IStockEventProducer stockEvents,
+    ISalesEventOutbox salesEvents,
     ILogger<OrderExpiryService> logger) : IOrderExpiryService
 {
     public async Task<int> SweepExpiredAsync(TimeSpan holdWindow, CancellationToken ct = default)
@@ -74,6 +75,7 @@ public sealed class OrderExpiryService(
 
             order.Status = "cancelled";
             order.UpdatedAt = now;
+            salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "cancelled", now));
 
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);

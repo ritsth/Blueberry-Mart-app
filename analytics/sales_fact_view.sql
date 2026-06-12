@@ -1,9 +1,9 @@
 -- Defines `sales_fact` as a VIEW over the append-only raw tables fed by the sales event
--- pipeline (replaces the hourly federation rebuild in sales_fact_transform.sql). Emits the
--- SAME 26 columns/types/order as the old table, so the self-service "Explore" catalog
--- (BigQueryAnalyticsQueryService, which introspects INFORMATION_SCHEMA.COLUMNS and SELECTs
--- from this name) keeps working unchanged. Current state is computed at read time:
--- latest payment status per order, latest review per (order,item).
+-- pipeline (replaces the hourly federation rebuild in sales_fact_transform.sql). The original
+-- 26 columns are unchanged; `order_status` is appended (27 total). The self-service "Explore"
+-- catalog (BigQueryAnalyticsQueryService) introspects INFORMATION_SCHEMA.COLUMNS and classes the
+-- new STRING column as a dimension automatically. Current state is computed at read time:
+-- latest payment status per order, latest review per (order,item), latest status per order.
 --
 --   bq query --use_legacy_sql=false "$(cat analytics/sales_fact_view.sql)"
 
@@ -20,6 +20,13 @@ latest_review AS (
     SELECT order_id, item_id, rating,
            ROW_NUMBER() OVER (PARTITION BY order_id, item_id ORDER BY occurred_at DESC) AS rn
     FROM `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_reviews`
+  ) WHERE rn = 1
+),
+latest_status AS (
+  SELECT order_id, status FROM (
+    SELECT order_id, status,
+           ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY occurred_at DESC) AS rn
+    FROM `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_order_status`
   ) WHERE rn = 1
 )
 SELECT
@@ -50,6 +57,7 @@ SELECT
   l.is_member,
   l.is_bulk,
   COALESCE(p.payment_status, 'none')        AS payment_status,
+  COALESCE(s.status, 'pending')             AS order_status,
   l.customer_id,
   l.quantity,
   l.unit_price,
@@ -61,4 +69,5 @@ SELECT
   (l.rn = 1)                                AS is_order_primary_line
 FROM `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_order_lines` l
 LEFT JOIN latest_payment p ON p.order_id = l.order_id
-LEFT JOIN latest_review  r ON r.order_id = l.order_id AND r.item_id = l.item_id;
+LEFT JOIN latest_review  r ON r.order_id = l.order_id AND r.item_id = l.item_id
+LEFT JOIN latest_status  s ON s.order_id = l.order_id;

@@ -13,12 +13,24 @@ fed by a Kafka event pipeline. Full design: `Markdown files/Main/SALES_EVENT_PIP
 
 - Confluent Cloud **is** live in prod (the API produces; `blueberrymart-worker`, `minScale=1`,
   `RunConsumers=true`, runs the consumers). The old "prod has zero Kafka" note was stale.
-- `sales_fact` is a **VIEW** (`analytics/sales_fact_view.sql`) over three append-only raw tables —
-  `sales_order_lines`, `sales_payment_status`, `sales_reviews` — streamed into by
-  `BigQuerySalesSink` from the `sales.events` Kafka topic. Events are emitted via a
+- `sales_fact` is a **VIEW** (`analytics/sales_fact_view.sql`) over four append-only raw tables —
+  `sales_order_lines`, `sales_payment_status`, `sales_reviews`, `sales_order_status` — streamed
+  into by `BigQuerySalesSink` from the `sales.events` Kafka topic. Events are emitted via a
   **transactional outbox** (`outbox_messages` + `OutboxDispatcher`) at order placement, payment
-  status changes, and review submit/delete. Explore reads are unchanged — the view emits the
-  identical 26 columns, and the catalog still introspects `INFORMATION_SCHEMA.COLUMNS`.
+  status changes, review submit/delete, and order status changes. The catalog introspects
+  `INFORMATION_SCHEMA.COLUMNS`, so new columns appear automatically.
+
+### Update 2026-06-11 — `order_status` dimension + collected-revenue rule
+
+Cancellations now reach analytics. Added an `order_status_changed` event (emitted on
+confirm/complete/cancel/expire), a `sales_order_status` raw table, and an **`order_status`** column
+on the view (27 columns; defaults to `pending`). The agreed rule is **revenue = money actually
+collected = `payment_status='completed'` AND `order_status!='cancelled'`** — a paid order cancelled
+later is a refund (`cancelled` ∩ `completed`): kept in the warehouse for analysis, excluded from
+revenue. Both surfaces apply it: the Postgres home dashboard (`ShareholderController.GetAnalytics`)
+and the Explore "Collected revenue only" toggle. See `SALES_EVENT_PIPELINE.md`. Cutover: create
+`sales_order_status` (re-run `sales_fact_raw_tables.sql`), re-run `sales_fact_backfill.sql` (seeds
+status from `orders`), then `CREATE OR REPLACE VIEW` with `sales_fact_view.sql`.
 
 ### What we actually ran at cutover (2026-06-12)
 

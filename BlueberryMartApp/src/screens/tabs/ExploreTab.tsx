@@ -23,7 +23,11 @@ function buildSpec(measures: MeasureSpec[], dims: string[], year: string, comple
   const filters = [];
   if (year === 'All') filters.push({ field: 'order_date', op: 'gte', values: ['2023-01-01'] });
   else filters.push({ field: 'year', op: 'eq', values: [year] });
-  if (completedOnly) filters.push({ field: 'payment_status', op: 'eq', values: ['completed'] });
+  // "Collected revenue" = paid AND not cancelled (a cancel of a paid order is a refund).
+  if (completedOnly) {
+    filters.push({ field: 'payment_status', op: 'eq', values: ['completed'] });
+    filters.push({ field: 'order_status', op: 'ne', values: ['cancelled'] });
+  }
   const orderBy = dims.length > 0 && measures.length > 0
     ? [{ field: `${measures[0].field}_${measures[0].agg}`, dir: 'desc' }] : undefined;
   return { measures, dimensions: dims, filters, orderBy, limit: 200, chartType };
@@ -250,7 +254,7 @@ export default function ExploreTab() {
 
         <TouchableOpacity style={styles.toggleRow} onPress={() => setCompletedOnly(v => !v)} activeOpacity={0.7}>
           <Ionicons name={completedOnly ? 'checkbox' : 'square-outline'} size={20} color={completedOnly ? '#16a34a' : '#9ca3af'} />
-          <Text style={styles.toggleText}>Completed orders only</Text>
+          <Text style={styles.toggleText}>Collected revenue only (paid, not cancelled)</Text>
         </TouchableOpacity>
 
         {/* CHART TYPE */}

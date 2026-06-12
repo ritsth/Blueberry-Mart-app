@@ -12,6 +12,7 @@ public static class SalesEventTypes
     public const string OrderPlaced = "order_placed";
     public const string PaymentStatusChanged = "payment_status_changed";
     public const string ReviewChanged = "review_changed";
+    public const string OrderStatusChanged = "order_status_changed";
 }
 
 /// <summary>One immutable order line within an <see cref="OrderPlacedEvent"/>.</summary>
@@ -43,3 +44,11 @@ public sealed record PaymentStatusChangedEvent(Guid OrderId, string Status, Date
 
 /// <summary>Emitted when a review is submitted (Rating set) or deleted (Rating null = tombstone).</summary>
 public sealed record ReviewChangedEvent(Guid OrderId, Guid ItemId, int? Rating, DateTime OccurredAt);
+
+/// <summary>
+/// Emitted whenever an order's status changes after placement (confirmed / completed / cancelled).
+/// Latest per order wins; the <c>sales_fact</c> view exposes it as the <c>order_status</c> dimension
+/// (defaulting to <c>pending</c> for never-changed orders). A cancel of a paid order is a refund:
+/// <c>order_status='cancelled'</c> ∩ <c>payment_status='completed'</c>.
+/// </summary>
+public sealed record OrderStatusChangedEvent(Guid OrderId, string Status, DateTime OccurredAt);

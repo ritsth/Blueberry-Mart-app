@@ -27,6 +27,9 @@ public class BigQueryOptions
     /// <summary>Append-only raw table: one row per review submit/delete (rating null = deleted).</summary>
     public string ReviewsTableId { get; set; } = "sales_reviews";
 
+    /// <summary>Append-only raw table: one row per order status change. Latest per order wins.</summary>
+    public string OrderStatusTableId { get; set; } = "sales_order_status";
+
     /// <summary>Consumer group for the BigQuery sink (independent of the back-in-stock group).</summary>
     public string ConsumerGroup { get; set; } = "blueberrymart-bigquery-sink";
 }

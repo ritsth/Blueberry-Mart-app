@@ -72,8 +72,10 @@ public class OrdersController(
         if (order.Status != "confirmed")
             return Conflict(new { message = $"Order is '{order.Status}' and cannot be marked as received." });
 
+        var now = DateTime.UtcNow;
         order.Status = "completed";
-        order.UpdatedAt = DateTime.UtcNow;
+        order.UpdatedAt = now;
+        salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "completed", now));
         await context.SaveChangesAsync();
 
         return Ok(new { order.Id, order.Status });

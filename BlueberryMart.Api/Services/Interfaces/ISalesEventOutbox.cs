@@ -13,4 +13,5 @@ public interface ISalesEventOutbox
     void OrderPlaced(OrderPlacedEvent evt);
     void PaymentStatusChanged(PaymentStatusChangedEvent evt);
     void ReviewChanged(ReviewChangedEvent evt);
+    void OrderStatusChanged(OrderStatusChangedEvent evt);
 }

@@ -25,6 +25,9 @@ public sealed class SalesEventOutbox(BlueberryMartDbContext context, IOptions<Ka
     public void ReviewChanged(ReviewChangedEvent evt) =>
         Enqueue(evt.OrderId, SalesEventTypes.ReviewChanged, evt);
 
+    public void OrderStatusChanged(OrderStatusChangedEvent evt) =>
+        Enqueue(evt.OrderId, SalesEventTypes.OrderStatusChanged, evt);
+
     private void Enqueue(Guid orderId, string type, object payload)
     {
         var envelope = new SalesEventEnvelope(type, JsonSerializer.Serialize(payload));

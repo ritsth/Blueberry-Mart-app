@@ -10,10 +10,12 @@ Two independent streams run over Confluent Cloud (LIVE in prod) + a Cloud Run **
 - **`inventory.stock-changed`** — emitted on order/restock/adjust (`IStockEventProducer`,
   fire-and-forget after commit). Consumers: `StockEventConsumer` (back-in-stock notifications),
   `BigQueryStockSink` (→ `blueberrymart.stock_events`).
-- **`sales.events`** — order/payment/review events behind the event-sourced `sales_fact`
-  warehouse. Emitted via a **transactional outbox** (`ISalesEventOutbox` → `outbox_messages`,
-  same DB txn as the change). `OutboxDispatcher` publishes them; `BigQuerySalesSink` appends to
-  raw tables. See `Markdown files/Main/SALES_EVENT_PIPELINE.md`.
+- **`sales.events`** — order-placed / payment-status / review / order-status events behind the
+  event-sourced `sales_fact` warehouse. Emitted via a **transactional outbox** (`ISalesEventOutbox`
+  → `outbox_messages`, same DB txn as the change). `OutboxDispatcher` publishes them;
+  `BigQuerySalesSink` appends to four raw tables. `order_status_changed` (confirm/complete/cancel/
+  expire) drives the `order_status` dimension; **revenue = paid AND not cancelled**. See
+  `Markdown files/Main/SALES_EVENT_PIPELINE.md`.
 
 ### Producer vs consumer split (important)
 - `Kafka:BootstrapServers` empty ⇒ Kafka disabled (no-op producer, no consumers) — tests + any

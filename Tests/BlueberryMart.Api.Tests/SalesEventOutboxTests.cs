@@ -48,6 +48,32 @@ public class SalesEventOutboxTests
     }
 
     [Fact]
+    public async Task CancelOrder_StagesOrderStatusChangedCancelledInOutbox()
+    {
+        var custToken = await TestHelpers.GetCustomerTokenAsync(_client);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, custToken, _factory.DowntownBranchId, _factory.EggsItemId);
+
+        var adminToken = await TestHelpers.GetAdminTokenAsync(_client);
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, $"/api/orders/manage/{orderId}/cancel").WithBearer(adminToken));
+        resp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var statusEvents = (await ctx.OutboxMessages
+                .Where(m => m.Key == orderId.ToString() && m.Topic == "sales.events")
+                .ToListAsync())
+            .Select(m => JsonSerializer.Deserialize<SalesEventEnvelope>(m.Payload)!)
+            .Where(e => e.Type == SalesEventTypes.OrderStatusChanged)
+            .Select(e => JsonSerializer.Deserialize<OrderStatusChangedEvent>(e.Data)!)
+            .ToList();
+
+        var evt = Assert.Single(statusEvents);
+        Assert.Equal(orderId, evt.OrderId);
+        Assert.Equal("cancelled", evt.Status);
+    }
+
+    [Fact]
     public async Task SubmitReview_StagesReviewChangedEventInOutbox()
     {
         var token = await TestHelpers.GetCustomerTokenAsync(_client);
