@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -35,6 +36,10 @@ const H_PADDING = 24;
 const GRID_GAP = 12;
 const GRID_CARD_W = (Dimensions.get('window').width - H_PADDING * 2 - GRID_GAP) / 2;
 const RAIL_CARD_W = 150;
+
+// How far (px) the list must be over-pulled before a refresh fires on iOS. The native
+// RefreshControl has no threshold and triggers on a slight pull; this requires a deliberate one.
+const PULL_THRESHOLD = 120;
 
 interface InventoryItem { id: string; itemName: string; price: number; stockQuantity: number; imageUrl: string | null; }
 
@@ -390,9 +395,19 @@ export default function BranchInventoryScreen() {
     );
   }
 
-  const refresh = (
-    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />
-  );
+  // Pull-to-refresh sensitivity: RefreshControl fires on a slight pull (no threshold). On iOS we
+  // track the over-scroll and only refresh when released past PULL_THRESHOLD, showing our own
+  // spinner. Android's native control isn't over-sensitive, so it keeps RefreshControl.
+  const pulledY = useRef(0);
+  const scrollRefreshProps = Platform.OS === 'ios'
+    ? {
+        scrollEventThrottle: 16,
+        onScroll: (e: { nativeEvent: { contentOffset: { y: number } } }) => { pulledY.current = e.nativeEvent.contentOffset.y; },
+        onScrollEndDrag: () => { if (!refreshing && pulledY.current <= -PULL_THRESHOLD) onRefresh(); },
+      }
+    : {
+        refreshControl: <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" colors={['#16a34a']} />,
+      };
 
   if (loading) {
     return (
@@ -421,14 +436,18 @@ export default function BranchInventoryScreen() {
         />
       </View>
 
-      {isSearching ? (
+      <View style={styles.flex}>
+        {Platform.OS === 'ios' && refreshing && (
+          <View style={styles.refreshRow}><ActivityIndicator size="small" color="#16a34a" /></View>
+        )}
+        {isSearching ? (
         <FlatList
           key="search"
           style={styles.flex}
           data={visible}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={refresh}
+          {...scrollRefreshProps}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={<Text style={styles.emptyNote}>No items match &quot;{query}&quot;</Text>}
           renderItem={({ item }) => <ItemRow item={item} />}
@@ -451,7 +470,7 @@ export default function BranchInventoryScreen() {
               numColumns={2}
               columnWrapperStyle={styles.gridRow}
               contentContainerStyle={styles.list}
-              refreshControl={refresh}
+              {...scrollRefreshProps}
               keyboardShouldPersistTaps="handled"
               ListHeaderComponent={
                 <SectionHeader cat={
@@ -471,7 +490,7 @@ export default function BranchInventoryScreen() {
               data={sections}
               keyExtractor={s => s.key}
               contentContainerStyle={styles.railsContent}
-              refreshControl={refresh}
+              {...scrollRefreshProps}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
@@ -543,6 +562,7 @@ export default function BranchInventoryScreen() {
           )}
         </>
       )}
+      </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
       <FloatingCart />
     </View>
@@ -566,6 +586,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: H_PADDING },
   flex: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  refreshRow: { paddingVertical: 8, alignItems: 'center' },
   heading: { fontSize: 22, fontWeight: '700', color: '#14532d', marginBottom: 4 },
   subheading: { fontSize: 13, color: '#6b7280', marginBottom: 16 },
   searchBar: {
