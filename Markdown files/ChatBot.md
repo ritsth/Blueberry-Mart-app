@@ -5,6 +5,14 @@ Blueberry Mart **items** (price, stock, branch, bulk) and (2) **order/support** 
 (paying, pickup vs delivery, membership, loyalty, reviews). It politely declines anything
 off-topic.
 
+> **Status — LIVE in prod.** Cloud Run `blueberrymart-api` has `Chat__ApiKey` wired to the
+> `groq-api-key` Secret Manager secret (plus `Chat__BaseUrl`/`Chat__Model` for Groq), so the
+> assistant is enabled in production today — including the **back-in-stock subscription**:
+> a customer can open the **Assistant** tab and say *"notify me when Organic Spinach is back in
+> stock,"* and the `subscribe_back_in_stock` tool creates the same `StockSubscription` the
+> "Notify me" button does (fulfilled into an Alerts notification on restock). The
+> "Enable it" section below is the reference for **how** it was wired, not an outstanding TODO.
+
 **Current provider: Groq (free tier)** — model `llama-3.3-70b-versatile`. The backend
 speaks the generic **OpenAI-compatible** chat format, so any provider can be swapped in via
 config (no code change): Groq, Google Gemini, OpenRouter, a local Ollama, OpenAI, …
@@ -94,7 +102,7 @@ Switch providers (set BaseUrl + Model + ApiKey):
 
 ---
 
-## Enable it
+## Enable it (already done in prod — reference)
 
 **Local dev** — `BlueberryMart.Api/appsettings.Development.json` (gitignored). Base URL/model
 default to Groq, so only the key is needed:
