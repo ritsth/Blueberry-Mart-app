@@ -97,9 +97,9 @@ public sealed class BigQuerySalesSink(
         switch (envelope.Type)
         {
             case SalesEventTypes.OrderPlaced:
-            {
-                var e = JsonSerializer.Deserialize<OrderPlacedEvent>(envelope.Data)!;
-                var rows = e.Lines.Select(l => new BigQueryInsertRow
+                {
+                    var e = JsonSerializer.Deserialize<OrderPlacedEvent>(envelope.Data)!;
+                    var rows = e.Lines.Select(l => new BigQueryInsertRow
                 {
                     { "order_id", e.OrderId.ToString() },
                     { "order_line_id", l.OrderLineId.ToString() },
@@ -118,32 +118,32 @@ public sealed class BigQuerySalesSink(
                     { "order_delivery_fee", e.OrderDeliveryFee },
                     { "rn", l.Rn },
                 });
-                orderLines.InsertRows(rows);
-                break;
-            }
+                    orderLines.InsertRows(rows);
+                    break;
+                }
             case SalesEventTypes.PaymentStatusChanged:
-            {
-                var e = JsonSerializer.Deserialize<PaymentStatusChangedEvent>(envelope.Data)!;
-                payments.InsertRow(new BigQueryInsertRow
+                {
+                    var e = JsonSerializer.Deserialize<PaymentStatusChangedEvent>(envelope.Data)!;
+                    payments.InsertRow(new BigQueryInsertRow
                 {
                     { "order_id", e.OrderId.ToString() },
                     { "payment_status", e.Status },
                     { "occurred_at", e.OccurredAt },
                 });
-                break;
-            }
+                    break;
+                }
             case SalesEventTypes.ReviewChanged:
-            {
-                var e = JsonSerializer.Deserialize<ReviewChangedEvent>(envelope.Data)!;
-                reviews.InsertRow(new BigQueryInsertRow
+                {
+                    var e = JsonSerializer.Deserialize<ReviewChangedEvent>(envelope.Data)!;
+                    reviews.InsertRow(new BigQueryInsertRow
                 {
                     { "order_id", e.OrderId.ToString() },
                     { "item_id", e.ItemId.ToString() },
                     { "rating", e.Rating },   // null = deleted (tombstone)
                     { "occurred_at", e.OccurredAt },
                 });
-                break;
-            }
+                    break;
+                }
         }
     }
 }
