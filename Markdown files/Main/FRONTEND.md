@@ -21,7 +21,7 @@ screens/
   tabs/
     CustomerShopTab.tsx     regular shopping (wraps ShoppingView)
     BulkTab.tsx             members-only bulk catalog (wraps ShoppingView)
-    ActivityTab.tsx         order history + reviews; pay/review actions
+    ActivityTab.tsx         order history + reviews; pay / cancel / receive / review actions
     AccountTab.tsx          profile, loyalty, membership
     ShareholderHomeTab.tsx  shareholder analytics (fixed dashboards)
     ExploreTab.tsx          self-service analytics — build/save custom charts
@@ -60,9 +60,13 @@ attaches `Authorization: Bearer <token>` and reads the token with `getStoredToke
   (`/payment-success.html` / `/payment-failure.html`). It then double-checks
   `GET /api/orders/{id}` before reporting success/failure.
 - **Activity** (`ActivityTab`): lists past orders (from `/api/profile`) and reviews.
-  - Pending (unpaid) orders are tagged **"Not paid"** with a **Pay now with eSewa**
-    button (re-opens `EsewaCheckout`).
-  - Paid orders show a **Write a review** button → `ReviewScreen` for that order.
+  Per-order action depends on status:
+  - **Pending** (unpaid, tagged "Not paid"): **Pay now with eSewa** (re-opens `EsewaCheckout`)
+    and **Cancel order** (`POST /api/orders/{id}/cancel`, with a confirm dialog) — customers can
+    only self-cancel while still unpaid.
+  - **Ready** (staff have prepared it): **Mark as received** (`POST /api/orders/{id}/receive` →
+    `completed`). Earlier statuses (`confirmed`/`processing`) just show the status badge.
+  - **Completed**: **Write a review** button → `ReviewScreen` for that order.
 - **Reviews** (`ReviewScreen`): pick an item from the order, rate 1–5, comment,
   optional photo (camera or library); submits multipart to `/api/reviews` and earns
   loyalty points.
