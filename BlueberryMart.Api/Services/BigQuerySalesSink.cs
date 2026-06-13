@@ -113,7 +113,7 @@ public sealed class BigQuerySalesSink(
                     { "order_type", e.OrderType },
                     { "channel", e.Channel },
                     { "is_member", e.IsMember },
-                    { "customer_id", e.CustomerId.ToString() },
+                    { "customer_id", e.CustomerId?.ToString() },
                     { "quantity", l.Quantity },
                     { "unit_price", l.UnitPrice },
                     { "order_discount", e.OrderDiscount },

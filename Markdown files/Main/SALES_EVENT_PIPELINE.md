@@ -41,8 +41,8 @@ Envelope `{ type, data }` (`Models/Events/SalesEvents.cs`):
 
 > **In-store sales** (`ManageOrdersController.InStoreSale`) are born paid + `completed`: a single
 > call emits `order_placed` (channel `in_store`), `payment_status_changed`→`completed` and
-> `order_status_changed`→`completed` together. Anonymous walk-ins are attributed to the system
-> Walk-in customer; `channel` is the new `sales_fact` dimension for online-vs-in-store analysis.
+> `order_status_changed`→`completed` together. Anonymous walk-ins have **no customer** (null
+> `customer_id`); `channel` is the new `sales_fact` dimension for online-vs-in-store analysis.
 
 ## Transactional outbox (guaranteed delivery)
 

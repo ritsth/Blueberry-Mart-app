@@ -6,12 +6,9 @@ namespace BlueberryMart.Api.Data;
 
 public static class DbInitializer
 {
-    /// <summary>Email of the system "Walk-in" customer that anonymous in-store sales are attributed to.</summary>
-    public const string WalkInEmail = "walkin@system.blueberrymart.local";
-
-    /// <summary>Fixed id of the Walk-in system customer (see <see cref="WalkInEmail"/>) so callers
-    /// don't need a DB lookup. Seeded idempotently by <see cref="EnsureWalkInCustomer"/>.</summary>
-    public static readonly Guid WalkInUserId = new("11111111-1111-1111-1111-111111111111");
+    /// <summary>Email of the former "Walk-in" system customer — kept only so the transitional
+    /// cleanup below can remove it. In-store walk-in sales now use a null <c>Order.UserId</c>.</summary>
+    private const string LegacyWalkInEmail = "walkin@system.blueberrymart.local";
 
     public static void Initialize(BlueberryMartDbContext context, IConfiguration config)
     {
@@ -21,30 +18,23 @@ public static class DbInitializer
 
         SeedDemoData(context);
         EnsureAdmin(context, config);
-        EnsureWalkInCustomer(context);
+        RemoveLegacyWalkInCustomer(context);
         EnsureSettings(context);
     }
 
     /// <summary>
-    /// Ensures the single "Walk-in" system customer exists. In-store sales with no attached
-    /// customer are booked against this account so order/payment FKs stay satisfied. It can never
-    /// sign in (no usable password; role is checked at login on the API/app), and isn't a real person.
-    /// Idempotent: a no-op once present, so it reaches existing databases on the next startup.
+    /// Transitional cleanup: drops the old "Walk-in" system customer that an earlier build seeded
+    /// to carry anonymous in-store sales. Walk-in sales now use a null <c>Order.UserId</c>, so the
+    /// fake account is no longer needed. Idempotent and safe — only deletes it if no orders reference
+    /// it (they shouldn't, since the booking path changed before this ran).
     /// </summary>
-    private static void EnsureWalkInCustomer(BlueberryMartDbContext context)
+    private static void RemoveLegacyWalkInCustomer(BlueberryMartDbContext context)
     {
-        if (context.Users.Any(u => u.Id == WalkInUserId)) return;
+        var walkIn = context.Users.FirstOrDefault(u => u.Email == LegacyWalkInEmail);
+        if (walkIn is null) return;
+        if (context.Orders.Any(o => o.UserId == walkIn.Id)) return;   // shouldn't happen; don't orphan data
 
-        context.Users.Add(new User
-        {
-            Id = WalkInUserId,
-            Email = WalkInEmail,
-            // Random, unusable hash — this account is never meant to authenticate.
-            PasswordHash = BCrypt(Guid.NewGuid().ToString()),
-            Role = "customer",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        });
+        context.Users.Remove(walkIn);
         context.SaveChanges();
     }
 

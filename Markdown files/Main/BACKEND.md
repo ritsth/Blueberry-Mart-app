@@ -32,9 +32,9 @@ wwwroot/       static files (eSewa result pages)
   (`MemberSince`/`MemberUntil`/`MembershipCancelled`, computed `IsMember`).
 - **Branch** — store location.
 - **Inventory** — item per branch (name, price, stock, `IsBulkOnly`).
-- **Order** — `OrderNumber` (sequential from 1001), `OrderType`, `Channel`
-  (`online` | `in_store`), `Status`, `TotalAmount`/`DiscountAmount`/`DeliveryFee`,
-  delivery snapshot.
+- **Order** — `OrderNumber` (sequential from 1001), `UserId` (**nullable** — null for an
+  anonymous in-store walk-in), `OrderType`, `Channel` (`online` | `in_store`), `Status`,
+  `TotalAmount`/`DiscountAmount`/`DeliveryFee`, delivery snapshot.
 - **OrderItem** — line items (item, qty, unit price).
 - **Payment** — one per order; eSewa `TransactionUuid`, amount, `Status`,
   `ProviderRef`.
@@ -69,9 +69,9 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 > `in_store` (rung up by staff at the till). An in-store sale is created **already `completed` and
 > paid** in one shot (it skips the fulfilment chain), and emits the same placed/payment/status
 > events so it lands in `sales_fact` like any sale (exposed there as the `channel` dimension —
-> online vs in-store analytics). Anonymous walk-ins are booked against the system **"Walk-in"
-> customer** (`DbInitializer.WalkInUserId`, seeded idempotently); staff may attach a real customer
-> id to credit loyalty.
+> online vs in-store analytics). An anonymous walk-in has **no customer**: `Order.UserId` is
+> **null** (and `customer_id` is null in the warehouse, so walk-ins don't inflate customer counts).
+> Staff may attach a real customer id to credit loyalty and put it in that customer's history.
 
 ## Endpoints
 | Method & path | Auth | Purpose |
@@ -80,7 +80,7 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `POST /api/auth/register` | public | Create a customer account → JWT |
 | `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a **ready** order received (→ completed; owner only) |
 | `POST /api/orders/{id}/cancel` | Customer/Shareholder | Self-cancel own **pending** (unpaid) order + restock (owner only) |
-| `POST /api/orders/manage/in-store-sale` | Staff/Manager/Admin | Ring up a walk-in sale: creates a paid, `completed`, `channel=in_store` order at the staff's branch (admin passes `branchId`); deducts stock, optional `customerId` for loyalty |
+| `POST /api/orders/manage/in-store-sale` | Staff/Manager/Admin | Ring up a walk-in sale: creates a paid, `completed`, `channel=in_store` order at the staff's branch (admin passes `branchId`); deducts stock. No `customerId` → null owner (anonymous); pass one to credit loyalty |
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |

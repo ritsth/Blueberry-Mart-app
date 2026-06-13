@@ -90,7 +90,7 @@ public class ManageOrdersController(
             {
                 Id = o.Id,
                 OrderNumber = o.OrderNumber,
-                CustomerEmail = o.User.Email,
+                CustomerEmail = o.User != null ? o.User.Email : "Walk-in",
                 BranchId = o.BranchId,
                 BranchName = o.Branch.Name,
                 OrderType = o.OrderType,
@@ -129,7 +129,7 @@ public class ManageOrdersController(
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
-            CustomerEmail = order.User.Email,
+            CustomerEmail = order.User?.Email ?? "Walk-in",
             BranchId = order.BranchId,
             BranchName = order.Branch.Name,
             OrderType = order.OrderType,
@@ -194,7 +194,7 @@ public class ManageOrdersController(
             : null;
         if (request.CustomerId is not null && attachedCustomer is null)
             return NotFound(new { message = "Attached customer not found." });
-        var userId = attachedCustomer?.Id ?? DbInitializer.WalkInUserId;
+        Guid? userId = attachedCustomer?.Id;   // null = anonymous walk-in (no customer)
 
         var method = string.IsNullOrWhiteSpace(request.PaymentMethod) ? "cash" : request.PaymentMethod.Trim().ToLower();
         var config = await settings.GetAsync();
@@ -383,7 +383,7 @@ public class ManageOrdersController(
 
             // Mirror eSewa success: credit loyalty once paid (goods value, excl delivery).
             var goodsTotal = order.TotalAmount - order.DeliveryFee;
-            var user = await context.Users.FindAsync(order.UserId);
+            var user = order.UserId is { } uid ? await context.Users.FindAsync(uid) : null;
             if (user is not null)
             {
                 user.LoyaltyPoints += (int)Math.Floor(goodsTotal);

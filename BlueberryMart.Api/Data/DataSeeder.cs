@@ -241,7 +241,7 @@ public static class DataSeeder
             .Select(u => u.Id)
             .ToListAsync();
         var orderIds = await ctx.Orders
-            .Where(o => seedUserIds.Contains(o.UserId))
+            .Where(o => o.UserId != null && seedUserIds.Contains(o.UserId.Value))
             .Select(o => o.Id)
             .ToListAsync();
 

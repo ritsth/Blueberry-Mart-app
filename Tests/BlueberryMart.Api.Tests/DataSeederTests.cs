@@ -23,10 +23,10 @@ public class DataSeederTests
 
         var seedUserIds = await ctx.Users.Where(u => u.Email.EndsWith(SeedDomain)).Select(u => u.Id).ToListAsync();
         Assert.True(seedUserIds.Count >= 4);
-        Assert.True(await ctx.Orders.CountAsync(o => seedUserIds.Contains(o.UserId)) >= 15);
+        Assert.True(await ctx.Orders.CountAsync(o => o.UserId != null && seedUserIds.Contains(o.UserId.Value)) >= 15);
         // Paid orders produced a payment row.
         Assert.True(await ctx.Payments.CountAsync(p => ctx.Orders
-            .Where(o => seedUserIds.Contains(o.UserId)).Select(o => o.Id).Contains(p.OrderId)) >= 1);
+            .Where(o => o.UserId != null && seedUserIds.Contains(o.UserId.Value)).Select(o => o.Id).Contains(p.OrderId)) >= 1);
 
         await DataSeeder.RunAsync(ctx, ["seed", "clear"]);
 

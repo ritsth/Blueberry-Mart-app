@@ -49,11 +49,9 @@ public static class TestHelpers
         return (await ctx.Inventory.FirstAsync(i => i.Id == itemId)).StockQuantity;
     }
 
-    /// <summary>Id of the system "Walk-in" customer that anonymous in-store sales are booked against.</summary>
-    public static Guid WalkInUserId => BlueberryMart.Api.Data.DbInitializer.WalkInUserId;
-
-    /// <summary>Reads an order's status, channel and owning user directly from the DB.</summary>
-    public static async Task<(string Status, string Channel, Guid UserId)> GetOrderInfoAsync(
+    /// <summary>Reads an order's status, channel and owning user directly from the DB.
+    /// <c>UserId</c> is null for an anonymous in-store walk-in sale.</summary>
+    public static async Task<(string Status, string Channel, Guid? UserId)> GetOrderInfoAsync(
         BlueberryMartApiFactory factory, Guid orderId)
     {
         using var scope = factory.Services.CreateScope();

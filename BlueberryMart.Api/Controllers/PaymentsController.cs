@@ -125,7 +125,7 @@ public class PaymentsController(
             // Loyalty points are credited only once payment completes: 1 point per
             // whole unit of goods value (delivery fee excluded).
             var goodsTotal = order.TotalAmount - order.DeliveryFee;
-            var user = await context.Users.FindAsync(order.UserId);
+            var user = order.UserId is { } uid ? await context.Users.FindAsync(uid) : null;
             if (user is not null)
             {
                 user.LoyaltyPoints += (int)Math.Floor(goodsTotal);

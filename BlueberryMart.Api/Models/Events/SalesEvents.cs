@@ -36,7 +36,8 @@ public sealed record OrderPlacedEvent(
     /// <summary>Sales origin: "online" or "in_store"; exposed as the sales_fact `channel` dimension.</summary>
     string Channel,
     bool IsMember,
-    Guid CustomerId,
+    /// <summary>Owning customer; null for an anonymous in-store walk-in sale.</summary>
+    Guid? CustomerId,
     decimal OrderDiscount,
     decimal OrderDeliveryFee,
     IReadOnlyList<OrderLineDto> Lines);

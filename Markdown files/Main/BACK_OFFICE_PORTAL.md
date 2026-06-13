@@ -86,8 +86,8 @@ detail modal (line items, totals, delivery address) with contextual actions:
   in-stock items + quantities, choose a payment method (cash/card/eSewa), and complete. The backend
   (`POST /api/orders/manage/in-store-sale`) creates a paid, `completed`, `channel=in_store` order in
   one shot and deducts stock. Staff/managers sell at their own branch; admins choose a branch.
-  Sales are anonymous walk-ins (booked against the system Walk-in customer); attaching a specific
-  customer for loyalty is API-supported but not yet in the UI.
+  Sales are anonymous walk-ins (the order has no customer — `UserId` is null, shown as "Walk-in"
+  in the list); attaching a specific customer for loyalty is API-supported but not yet in the UI.
 
 ### Reports
 **Reports** page (manager/admin only): revenue (paid orders), paid-order count, average

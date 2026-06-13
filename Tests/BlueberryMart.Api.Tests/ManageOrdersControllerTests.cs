@@ -129,7 +129,6 @@ public class ManageOrdersControllerTests
     {
         var staff = await RoleTokenAsync("staff", _downtown);
         var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Till {Guid.NewGuid():N}", stock: 5);
-        var walkInBefore = await TestHelpers.GetLoyaltyPointsAsync(_factory, TestHelpers.WalkInUserId);
 
         var resp = await _client.SendAsync(InStoreSale(new
         {
@@ -146,11 +145,9 @@ public class ManageOrdersControllerTests
         var (status, channel, userId) = await TestHelpers.GetOrderInfoAsync(_factory, orderId);
         Assert.Equal("completed", status);
         Assert.Equal("in_store", channel);
-        Assert.Equal(TestHelpers.WalkInUserId, userId);                       // booked against Walk-in
+        Assert.Null(userId);                                                  // anonymous walk-in — no customer
         Assert.True(await TestHelpers.OrderHasCompletedPaymentAsync(_factory, orderId));
         Assert.Equal(3, await TestHelpers.GetStockAsync(_factory, itemId));   // 5 - 2
-        // Walk-in never earns loyalty.
-        Assert.Equal(walkInBefore, await TestHelpers.GetLoyaltyPointsAsync(_factory, TestHelpers.WalkInUserId));
     }
 
     [Fact]
