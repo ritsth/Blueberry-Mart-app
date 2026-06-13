@@ -19,7 +19,12 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/orders/manage")]
 [Authorize(Roles = "Staff,Manager,Admin")]
-public class ManageOrdersController(BlueberryMartDbContext context, ISalesEventOutbox salesEvents, IOrderCancellationService cancellation) : ControllerBase
+public class ManageOrdersController(
+    BlueberryMartDbContext context,
+    ISalesEventOutbox salesEvents,
+    IOrderCancellationService cancellation,
+    IStockEventProducer stockEvents,
+    ISettingsService settings) : ControllerBase
 {
     // Linear forward fulfillment chain (paid orders only — pending is advanced by
     // recording a payment, not here). Cancellation has its own manager-only endpoint.
@@ -160,6 +165,174 @@ public class ManageOrdersController(BlueberryMartDbContext context, ISalesEventO
         await context.SaveChangesAsync();
 
         return Ok(new { order.Id, order.Status });
+    }
+
+    // POST /api/orders/manage/in-store-sale
+    // Staff ring up a walk-in sale at the counter: the order is created already paid and
+    // 'completed' (channel 'in_store'), so it skips the fulfilment chain entirely. Stock is
+    // deducted and the same sales events (placed + payment + status) fire so it lands in
+    // analytics like any sale. With no CustomerId the sale is booked against the system
+    // "Walk-in" customer; an attached real customer earns loyalty and gets it in their history.
+    [HttpPost("in-store-sale")]
+    public async Task<IActionResult> InStoreSale([FromBody] InStoreSaleRequest request)
+    {
+        if (request.Items is null || request.Items.Count == 0)
+            return BadRequest(new { message = "A sale must contain at least one item." });
+
+        // Branch: staff/managers sell at their own branch; admins (no branch) must name one.
+        var branchId = IsAdmin ? request.BranchId ?? CallerBranch() : CallerBranch();
+        if (branchId is null)
+            return BadRequest(new
+            {
+                message = IsAdmin ? "branchId is required." : "Your account is not assigned to a branch."
+            });
+        if (GuardBranch(branchId.Value) is { } denied) return denied;
+
+        // Attribute to an existing customer (loyalty/history) or the system Walk-in account.
+        var attachedCustomer = request.CustomerId is { } cid
+            ? await context.Users.FirstOrDefaultAsync(u => u.Id == cid && u.Role == "customer")
+            : null;
+        if (request.CustomerId is not null && attachedCustomer is null)
+            return NotFound(new { message = "Attached customer not found." });
+        var userId = attachedCustomer?.Id ?? DbInitializer.WalkInUserId;
+
+        var method = string.IsNullOrWhiteSpace(request.PaymentMethod) ? "cash" : request.PaymentMethod.Trim().ToLower();
+        var config = await settings.GetAsync();
+        var now = DateTime.UtcNow;
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            var requestedIds = request.Items.Select(i => i.ItemId).ToList();
+            var inventoryItems = await context.Inventory
+                .Where(i => i.BranchId == branchId.Value && requestedIds.Contains(i.Id))
+                .ToListAsync();
+
+            var missingIds = requestedIds.Except(inventoryItems.Select(i => i.Id)).ToList();
+            if (missingIds.Count > 0)
+                return NotFound(new { message = "One or more items not found in this branch.", missingIds });
+
+            var insufficientStock = request.Items
+                .Join(inventoryItems, r => r.ItemId, i => i.Id, (r, i) => new { r.Quantity, Item = i })
+                .Where(x => x.Quantity <= 0 || x.Item.StockQuantity < x.Quantity)
+                .Select(x => new { x.Item.Id, x.Item.ItemName, x.Item.StockQuantity })
+                .ToList();
+            if (insufficientStock.Count > 0)
+                return Conflict(new { message = "Insufficient stock for one or more items.", insufficientStock });
+
+            // Deduct stock and total up.
+            decimal subtotal = 0;
+            var lineItems = new List<(Inventory Inv, int Qty)>();
+            foreach (var requestItem in request.Items)
+            {
+                var inv = inventoryItems.First(i => i.Id == requestItem.ItemId);
+                inv.StockQuantity -= requestItem.Quantity;
+                inv.UpdatedAt = now;
+                subtotal += inv.Price * requestItem.Quantity;
+                lineItems.Add((inv, requestItem.Quantity));
+            }
+
+            var isMember = attachedCustomer is { IsMember: true };
+            var discount = isMember ? Math.Round(subtotal * config.MemberDiscountRate, 2) : 0m;
+            var goodsTotal = subtotal - discount;   // no delivery fee for an in-store sale
+
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                BranchId = branchId.Value,
+                OrderType = "pickup",
+                Channel = "in_store",
+                Status = "completed",
+                TotalAmount = goodsTotal,
+                DiscountAmount = discount,
+                DeliveryFee = 0m,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+            context.Orders.Add(order);
+
+            var eventLines = new List<OrderLineDto>();
+            var rn = 0;
+            foreach (var (inv, qty) in lineItems)
+            {
+                rn++;
+                var lineId = Guid.NewGuid();
+                context.OrderItems.Add(new OrderItem
+                {
+                    Id = lineId,
+                    OrderId = order.Id,
+                    ItemId = inv.Id,
+                    Quantity = qty,
+                    UnitPrice = inv.Price
+                });
+                eventLines.Add(new OrderLineDto(lineId, inv.Id, inv.ItemName, inv.IsBulkOnly, qty, inv.Price, rn));
+            }
+
+            // Paid at the till — record the completed payment immediately.
+            context.Payments.Add(new Payment
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                TransactionUuid = $"instore-{Guid.NewGuid()}",
+                Amount = goodsTotal,
+                Status = "completed",
+                ProviderRef = $"instore:{method}",
+                CreatedAt = now,
+                UpdatedAt = now,
+            });
+
+            // Loyalty accrues only for an attached real customer (walk-in earns nothing).
+            if (attachedCustomer is not null)
+            {
+                attachedCustomer.LoyaltyPoints += (int)Math.Floor(goodsTotal);
+                attachedCustomer.UpdatedAt = now;
+            }
+
+            await context.SaveChangesAsync();   // populates the DB-generated order.OrderNumber
+
+            var branchName = await context.Branches
+                .Where(b => b.Id == branchId.Value).Select(b => b.Name).FirstAsync();
+
+            // Born completed + paid: emit placed, payment-completed and status-completed together
+            // so the warehouse sees a finished, collected sale in one go.
+            salesEvents.OrderPlaced(new OrderPlacedEvent(
+                OrderId: order.Id,
+                OrderNumber: order.OrderNumber,
+                OccurredAt: now,
+                BranchName: branchName,
+                OrderType: order.OrderType,
+                Channel: order.Channel,
+                IsMember: isMember,
+                CustomerId: userId,
+                OrderDiscount: order.DiscountAmount,
+                OrderDeliveryFee: 0m,
+                Lines: eventLines));
+            salesEvents.PaymentStatusChanged(new PaymentStatusChangedEvent(order.Id, "completed", now));
+            salesEvents.OrderStatusChanged(new OrderStatusChangedEvent(order.Id, "completed", now));
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            // Stock-change events after commit (fire-and-forget; no-op unless Kafka is configured).
+            foreach (var (inv, qty) in lineItems)
+            {
+                stockEvents.Publish(new StockChangedEvent(
+                    ItemId: inv.Id,
+                    BranchId: inv.BranchId,
+                    ItemName: inv.ItemName,
+                    OldQuantity: inv.StockQuantity + qty,
+                    NewQuantity: inv.StockQuantity,
+                    Reason: "in_store_sale",
+                    OccurredAt: now));
+            }
+
+            return Ok(new { order.Id, order.OrderNumber, order.Status, order.Channel, order.TotalAmount });
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     [HttpPost("{id:guid}/record-payment")]

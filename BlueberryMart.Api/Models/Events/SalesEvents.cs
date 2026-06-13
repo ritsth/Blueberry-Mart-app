@@ -33,6 +33,8 @@ public sealed record OrderPlacedEvent(
     DateTime OccurredAt,
     string BranchName,
     string OrderType,
+    /// <summary>Sales origin: "online" or "in_store"; exposed as the sales_fact `channel` dimension.</summary>
+    string Channel,
     bool IsMember,
     Guid CustomerId,
     decimal OrderDiscount,

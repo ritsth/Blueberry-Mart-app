@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `project-76ca6efe-7878-4dc8-bff.blueberrymart.sales_o
   item_name          STRING,
   is_bulk            BOOL,
   order_type         STRING,
+  channel            STRING,    -- sales origin: 'online' | 'in_store' (NULL for pre-channel rows → 'online' in the view)
   is_member          BOOL,
   customer_id        STRING,
   quantity           INT64,

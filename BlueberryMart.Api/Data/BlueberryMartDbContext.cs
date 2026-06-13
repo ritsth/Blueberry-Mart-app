@@ -143,6 +143,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(o => o.UserId).HasColumnName("user_id");
             e.Property(o => o.BranchId).HasColumnName("branch_id");
             e.Property(o => o.OrderType).HasColumnName("order_type").IsRequired();
+            e.Property(o => o.Channel).HasColumnName("channel").HasDefaultValue("online");
             e.Property(o => o.Status).HasColumnName("status").HasDefaultValue("pending");
             e.Property(o => o.TotalAmount).HasColumnName("total_amount").HasColumnType("numeric(12,2)");
             e.Property(o => o.DiscountAmount).HasColumnName("discount_amount").HasColumnType("numeric(12,2)").HasDefaultValue(0);

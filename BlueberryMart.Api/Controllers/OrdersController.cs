@@ -249,6 +249,7 @@ public class OrdersController(
                 OccurredAt: order.CreatedAt,
                 BranchName: branchName,
                 OrderType: order.OrderType,
+                Channel: order.Channel,
                 IsMember: isMember,
                 CustomerId: userId,
                 OrderDiscount: order.DiscountAmount,

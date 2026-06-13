@@ -65,7 +65,9 @@ a { color: var(--green); }
 .filters input { flex: 1; max-width: 320px; }
 
 .error { color: var(--red); font-size: 13px; }
+.success { color: var(--green, #16a34a); font-size: 13px; margin: 0 0 12px; }
 .muted { color: var(--muted); }
+.qty-steppers { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ---- Grid table ---- */
 .grid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }

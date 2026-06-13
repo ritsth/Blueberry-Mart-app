@@ -186,6 +186,28 @@ export function recordPayment(id: string, method: string): Promise<unknown> {
   return request(`/api/orders/manage/${id}/record-payment`, { method: 'POST', body: JSON.stringify({ method }) });
 }
 
+// Ring up a walk-in sale at the till: the order is created already paid + completed (channel
+// 'in_store'). branchId is required for admins; staff/managers sell at their own branch.
+export interface InStoreSaleResult {
+  id: string;
+  orderNumber: number;
+  status: string;
+  channel: string;
+  totalAmount: number;
+}
+
+export function createInStoreSale(body: {
+  branchId?: string;
+  items: { itemId: string; quantity: number }[];
+  paymentMethod: string;
+  customerId?: string;
+}): Promise<InStoreSaleResult> {
+  return request<InStoreSaleResult>('/api/orders/manage/in-store-sale', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export function cancelOrder(id: string): Promise<unknown> {
   return request(`/api/orders/manage/${id}/cancel`, { method: 'POST' });
 }

@@ -6,6 +6,13 @@ namespace BlueberryMart.Api.Data;
 
 public static class DbInitializer
 {
+    /// <summary>Email of the system "Walk-in" customer that anonymous in-store sales are attributed to.</summary>
+    public const string WalkInEmail = "walkin@system.blueberrymart.local";
+
+    /// <summary>Fixed id of the Walk-in system customer (see <see cref="WalkInEmail"/>) so callers
+    /// don't need a DB lookup. Seeded idempotently by <see cref="EnsureWalkInCustomer"/>.</summary>
+    public static readonly Guid WalkInUserId = new("11111111-1111-1111-1111-111111111111");
+
     public static void Initialize(BlueberryMartDbContext context, IConfiguration config)
     {
         // Apply any pending EF Core migrations (creates the schema on a fresh DB,
@@ -14,7 +21,31 @@ public static class DbInitializer
 
         SeedDemoData(context);
         EnsureAdmin(context, config);
+        EnsureWalkInCustomer(context);
         EnsureSettings(context);
+    }
+
+    /// <summary>
+    /// Ensures the single "Walk-in" system customer exists. In-store sales with no attached
+    /// customer are booked against this account so order/payment FKs stay satisfied. It can never
+    /// sign in (no usable password; role is checked at login on the API/app), and isn't a real person.
+    /// Idempotent: a no-op once present, so it reaches existing databases on the next startup.
+    /// </summary>
+    private static void EnsureWalkInCustomer(BlueberryMartDbContext context)
+    {
+        if (context.Users.Any(u => u.Id == WalkInUserId)) return;
+
+        context.Users.Add(new User
+        {
+            Id = WalkInUserId,
+            Email = WalkInEmail,
+            // Random, unusable hash — this account is never meant to authenticate.
+            PasswordHash = BCrypt(Guid.NewGuid().ToString()),
+            Role = "customer",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        context.SaveChanges();
     }
 
     /// <summary>Ensures the single store-settings row exists (with the former hardcoded defaults).</summary>

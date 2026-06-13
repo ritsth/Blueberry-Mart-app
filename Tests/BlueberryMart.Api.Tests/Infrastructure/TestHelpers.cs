@@ -49,6 +49,35 @@ public static class TestHelpers
         return (await ctx.Inventory.FirstAsync(i => i.Id == itemId)).StockQuantity;
     }
 
+    /// <summary>Id of the system "Walk-in" customer that anonymous in-store sales are booked against.</summary>
+    public static Guid WalkInUserId => BlueberryMart.Api.Data.DbInitializer.WalkInUserId;
+
+    /// <summary>Reads an order's status, channel and owning user directly from the DB.</summary>
+    public static async Task<(string Status, string Channel, Guid UserId)> GetOrderInfoAsync(
+        BlueberryMartApiFactory factory, Guid orderId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var o = await ctx.Orders.FirstAsync(x => x.Id == orderId);
+        return (o.Status, o.Channel, o.UserId);
+    }
+
+    /// <summary>True if the order has a completed payment.</summary>
+    public static async Task<bool> OrderHasCompletedPaymentAsync(BlueberryMartApiFactory factory, Guid orderId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        return await ctx.Payments.AnyAsync(p => p.OrderId == orderId && p.Status == "completed");
+    }
+
+    /// <summary>Reads a user's current loyalty-point balance.</summary>
+    public static async Task<int> GetLoyaltyPointsAsync(BlueberryMartApiFactory factory, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        return (await ctx.Users.FirstAsync(u => u.Id == userId)).LoyaltyPoints;
+    }
+
     /// <summary>Forces an inventory item's stock directly in the DB (e.g. to 0 to simulate sold-out).</summary>
     public static async Task SetStockAsync(BlueberryMartApiFactory factory, Guid itemId, int stock)
     {

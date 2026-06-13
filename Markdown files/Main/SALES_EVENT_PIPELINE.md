@@ -34,10 +34,15 @@ Envelope `{ type, data }` (`Models/Events/SalesEvents.cs`):
 
 | Type | Emitted from | Carries |
 |------|--------------|---------|
-| `order_placed` | `OrdersController.PlaceOrder` | order + immutable line facts (item, qty, unit price, branch, member flag, order discount/delivery, per-line `rn`) |
+| `order_placed` | `OrdersController.PlaceOrder` (online) & `ManageOrdersController.InStoreSale` (in-store) | order + immutable line facts (item, qty, unit price, branch, member flag, order discount/delivery, per-line `rn`, **`channel`** = `online`/`in_store`) |
 | `payment_status_changed` | `PaymentsController` (initiate/success/failure), `ManageOrdersController.RecordPayment` | order id, status (`initiated`/`completed`/`failed`) |
 | `review_changed` | `ReviewsController.SubmitReview`, `AdminController.DeleteReview` | order id, item id, rating (null = deleted) |
-| `order_status_changed` | `PaymentsController` & `ManageOrdersController.RecordPayment` (→`confirmed`), `ManageOrdersController.AdvanceStatus` (→`processing`/`ready`/`completed`) & `.Cancel` (→`cancelled`), `OrdersController.MarkReceived` (→`completed`), `OrderExpiryService` (→`cancelled`) | order id, new status — placement stays implicit `pending` via the view default |
+| `order_status_changed` | `PaymentsController` & `ManageOrdersController.RecordPayment` (→`confirmed`), `ManageOrdersController.AdvanceStatus` (→`processing`/`ready`/`completed`) & `.Cancel` (→`cancelled`), `OrdersController.MarkReceived` (→`completed`), `OrderExpiryService` (→`cancelled`), `ManageOrdersController.InStoreSale` (→`completed`) | order id, new status — placement stays implicit `pending` via the view default |
+
+> **In-store sales** (`ManageOrdersController.InStoreSale`) are born paid + `completed`: a single
+> call emits `order_placed` (channel `in_store`), `payment_status_changed`→`completed` and
+> `order_status_changed`→`completed` together. Anonymous walk-ins are attributed to the system
+> Walk-in customer; `channel` is the new `sales_fact` dimension for online-vs-in-store analysis.
 
 ## Transactional outbox (guaranteed delivery)
 

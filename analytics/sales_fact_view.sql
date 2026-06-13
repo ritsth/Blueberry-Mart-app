@@ -1,6 +1,6 @@
 -- Defines `sales_fact` as a VIEW over the append-only raw tables fed by the sales event
 -- pipeline (replaces the hourly federation rebuild in sales_fact_transform.sql). The original
--- 26 columns are unchanged; `order_status` is appended (27 total). The self-service "Explore"
+-- 26 columns plus `order_status` and `channel` (28 total). The self-service "Explore"
 -- catalog (BigQueryAnalyticsQueryService) introspects INFORMATION_SCHEMA.COLUMNS and classes the
 -- new STRING column as a dimension automatically. Current state is computed at read time:
 -- latest payment status per order, latest review per (order,item), latest status per order.
@@ -54,6 +54,7 @@ SELECT
   END                                       AS category,
   l.item_name,
   l.order_type,
+  COALESCE(l.channel, 'online')             AS channel,
   l.is_member,
   l.is_bulk,
   COALESCE(p.payment_status, 'none')        AS payment_status,

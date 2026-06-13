@@ -111,6 +111,7 @@ public sealed class BigQuerySalesSink(
                     { "item_name", l.ItemName },
                     { "is_bulk", l.IsBulk },
                     { "order_type", e.OrderType },
+                    { "channel", e.Channel },
                     { "is_member", e.IsMember },
                     { "customer_id", e.CustomerId.ToString() },
                     { "quantity", l.Quantity },

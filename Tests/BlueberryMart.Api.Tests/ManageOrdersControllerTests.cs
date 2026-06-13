@@ -117,4 +117,112 @@ public class ManageOrdersControllerTests
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("cancelled", json.GetProperty("status").GetString());
     }
+
+    // ---- In-store sales ----
+
+    private HttpRequestMessage InStoreSale(object body) =>
+        new HttpRequestMessage(HttpMethod.Post, "/api/orders/manage/in-store-sale")
+        { Content = JsonContent.Create(body) };
+
+    [Fact]
+    public async Task InStoreSale_WalkIn_CreatesCompletedPaidSale_AndDeductsStock()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Till {Guid.NewGuid():N}", stock: 5);
+        var walkInBefore = await TestHelpers.GetLoyaltyPointsAsync(_factory, TestHelpers.WalkInUserId);
+
+        var resp = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId, quantity = 2 } },
+            paymentMethod = "cash"
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var orderId = Guid.Parse(json.GetProperty("id").GetString()!);
+        Assert.Equal("completed", json.GetProperty("status").GetString());
+        Assert.Equal("in_store", json.GetProperty("channel").GetString());
+
+        var (status, channel, userId) = await TestHelpers.GetOrderInfoAsync(_factory, orderId);
+        Assert.Equal("completed", status);
+        Assert.Equal("in_store", channel);
+        Assert.Equal(TestHelpers.WalkInUserId, userId);                       // booked against Walk-in
+        Assert.True(await TestHelpers.OrderHasCompletedPaymentAsync(_factory, orderId));
+        Assert.Equal(3, await TestHelpers.GetStockAsync(_factory, itemId));   // 5 - 2
+        // Walk-in never earns loyalty.
+        Assert.Equal(walkInBefore, await TestHelpers.GetLoyaltyPointsAsync(_factory, TestHelpers.WalkInUserId));
+    }
+
+    [Fact]
+    public async Task InStoreSale_AttachedCustomer_CreditsLoyalty()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var customerId = await TestHelpers.CreateUserAsync(
+            _factory, $"instore_{Guid.NewGuid():N}@blueberrymart.com", "pw");
+        var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Till {Guid.NewGuid():N}", stock: 10);
+        var before = await TestHelpers.GetLoyaltyPointsAsync(_factory, customerId);
+
+        var resp = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId, quantity = 1 } },
+            paymentMethod = "card",
+            customerId
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var orderId = Guid.Parse(json.GetProperty("id").GetString()!);
+        var (_, _, userId) = await TestHelpers.GetOrderInfoAsync(_factory, orderId);
+        Assert.Equal(customerId, userId);                                     // attributed to the customer
+        Assert.True(await TestHelpers.GetLoyaltyPointsAsync(_factory, customerId) > before);
+    }
+
+    [Fact]
+    public async Task InStoreSale_ItemFromAnotherBranch_NotFound()
+    {
+        // Staff sell only at their own branch; an item from another branch isn't in scope.
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var suburbsItem = await TestHelpers.CreateInventoryItemAsync(_factory, _suburbs, $"Far {Guid.NewGuid():N}", stock: 5);
+
+        var resp = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId = suburbsItem, quantity = 1 } },
+            paymentMethod = "cash"
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task InStoreSale_InsufficientStock_Conflict()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Till {Guid.NewGuid():N}", stock: 1);
+
+        var resp = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId, quantity = 5 } },
+            paymentMethod = "cash"
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task InStoreSale_UnassignedStaff_BadRequest()
+    {
+        // A staff account with no branch can't ring up a sale (nowhere to sell from).
+        var email = $"nobranch_{Guid.NewGuid():N}@blueberrymart.com";
+        await TestHelpers.CreateUserAsync(_factory, email, "pw", "staff", branchId: null);
+        var staff = await TestHelpers.GetTokenAsync(_client, email, "pw");
+        var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Till {Guid.NewGuid():N}", stock: 5);
+
+        var resp = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId, quantity = 1 } },
+            paymentMethod = "cash"
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
 }

@@ -82,6 +82,12 @@ detail modal (line items, totals, delivery address) with contextual actions:
   order can only be cancelled while still `pending`/`confirmed` (pre-fulfilment) — that's a refund,
   so it drops out of revenue (cancelled ∩ paid) while staying analyzable via the Explore
   `order_status` dimension.
+- **New in-store sale** — a "+ New in-store sale" button opens a till modal: pick the branch's
+  in-stock items + quantities, choose a payment method (cash/card/eSewa), and complete. The backend
+  (`POST /api/orders/manage/in-store-sale`) creates a paid, `completed`, `channel=in_store` order in
+  one shot and deducts stock. Staff/managers sell at their own branch; admins choose a branch.
+  Sales are anonymous walk-ins (booked against the system Walk-in customer); attaching a specific
+  customer for loyalty is API-supported but not yet in the UI.
 
 ### Reports
 **Reports** page (manager/admin only): revenue (paid orders), paid-order count, average
@@ -109,6 +115,7 @@ admins any branch or all.
 | GET | `/api/orders/manage/{id}` | Staff,Manager,Admin | order detail (items + payment) |
 | POST | `/api/orders/manage/{id}/status` | Staff,Manager,Admin | advance fulfillment status |
 | POST | `/api/orders/manage/{id}/record-payment` | Staff,Manager,Admin | manual/cash payment |
+| POST | `/api/orders/manage/in-store-sale` | Staff,Manager,Admin | ring up a walk-in sale (paid + completed, channel `in_store`) |
 | POST | `/api/orders/manage/{id}/cancel` | Manager,Admin | cancel + restock |
 | GET | `/api/reports/sales` | Manager,Admin | branch sales report |
 | GET | `/api/admin/users` | Admin | list/search users |

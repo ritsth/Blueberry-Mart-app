@@ -9,8 +9,8 @@ hourly federation rebuild is retired (schedule paused) and repurposed as the rec
 
 | File | What it is | When to run |
 |------|-----------|-------------|
-| `sales_fact_raw_tables.sql` | DDL for the 4 append-only raw tables (`sales_order_lines`, `sales_payment_status`, `sales_reviews`, `sales_order_status`). **Schema source of truth** — must match `BigQuerySalesSink`'s insert-row keys. Idempotent (`IF NOT EXISTS`), so re-run to add a table. | once per dataset |
-| `sales_fact_view.sql` | `CREATE OR REPLACE VIEW sales_fact` over the raw tables (latest payment / review / status per order). Emits the original 26 columns **plus `order_status`** (27; `COALESCE(latest,'pending')`). | after raw tables exist |
+| `sales_fact_raw_tables.sql` | DDL for the 4 append-only raw tables (`sales_order_lines`, `sales_payment_status`, `sales_reviews`, `sales_order_status`). **Schema source of truth** — must match `BigQuerySalesSink`'s insert-row keys. Idempotent (`IF NOT EXISTS`), so re-run to add a table — but **`IF NOT EXISTS` won't add a *column* to an existing table**: a new column (e.g. `channel`) needs a one-off `ALTER TABLE sales_order_lines ADD COLUMN channel STRING` on existing datasets. | once per dataset |
+| `sales_fact_view.sql` | `CREATE OR REPLACE VIEW sales_fact` over the raw tables (latest payment / review / status per order). Emits the original 26 columns **plus `order_status` and `channel`** (28; both `COALESCE`d — `order_status`→`'pending'`, `channel`→`'online'`). | after raw tables exist |
 | `sales_fact_backfill.sql` | TRUNCATE + INSERT the raw tables from prod Postgres via `EXTERNAL_QUERY`. Seeds history **and** is the **on-demand reconcile/repair tool** (no auto-heal in event sourcing). | cutover + on demand |
 | `sales_fact_transform.sql` | **SUPERSEDED.** The old hourly `CREATE OR REPLACE TABLE` federation rebuild, kept for reference only. | never (disabled) |
 

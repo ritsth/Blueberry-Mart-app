@@ -10,6 +10,10 @@ public class Order
     public Guid UserId { get; set; }
     public Guid BranchId { get; set; }
     public string OrderType { get; set; } = null!;
+
+    /// <summary>Sales origin: "online" (customer-placed) or "in_store" (rung up by staff at the till).</summary>
+    public string Channel { get; set; } = "online";
+
     public string Status { get; set; } = "pending";
     public decimal TotalAmount { get; set; }
     public decimal DiscountAmount { get; set; }
