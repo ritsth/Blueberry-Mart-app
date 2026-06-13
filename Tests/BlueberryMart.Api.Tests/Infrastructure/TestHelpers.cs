@@ -49,6 +49,16 @@ public static class TestHelpers
         return (await ctx.Inventory.FirstAsync(i => i.Id == itemId)).StockQuantity;
     }
 
+    /// <summary>Forces an inventory item's stock directly in the DB (e.g. to 0 to simulate sold-out).</summary>
+    public static async Task SetStockAsync(BlueberryMartApiFactory factory, Guid itemId, int stock)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var item = await ctx.Inventory.FirstAsync(i => i.Id == itemId);
+        item.StockQuantity = stock;
+        await ctx.SaveChangesAsync();
+    }
+
     /// <summary>Creates a fresh inventory item (default out of stock) so tests don't disturb seeded items.</summary>
     public static async Task<Guid> CreateInventoryItemAsync(
         BlueberryMartApiFactory factory, Guid branchId, string name, int stock = 0)

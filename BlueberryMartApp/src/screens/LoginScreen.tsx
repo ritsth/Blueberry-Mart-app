@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { login } from '../services/authService';
+import { login, WorkAccountError } from '../services/authService';
 import type { RootStackParamList } from '../../App';
 
 type Props = {
@@ -40,8 +40,8 @@ export default function LoginScreen({ navigation }: Props) {
       } else {
         navigation.replace('CustomerTabs');
       }
-    } catch {
-      setError('Invalid email or password.');
+    } catch (e) {
+      setError(e instanceof WorkAccountError ? e.message : 'Invalid email or password.');
     } finally {
       setLoading(false);
     }

@@ -75,7 +75,7 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |
 | `GET /api/inventory/top?branchId=&bulk=` | Customer/Shareholder | Branch best sellers (in-stock items ranked by units sold; bulk=true needs membership) |
-| `GET /api/inventory/reorder?branchId=&bulk=` | Customer/Shareholder | "Buy again": the caller's previously **paid-for** in-stock items at the branch (completed payment, not cancelled), most-recent first |
+| `GET /api/inventory/reorder?branchId=&bulk=` | Customer/Shareholder | "Buy again": the caller's previously **paid-for** items at the branch (completed payment, not cancelled), most-recent first. Sold-out past purchases are kept (the app offers Notify-me) so history doesn't vanish |
 | `GET /api/inventory/shareholder` | Shareholder | Full inventory |
 | `GET /api/inventory/search?q=` | Customer/Shareholder | Search across branches |
 | `POST /api/inventory/{id}/restock` | Shareholder | Add stock; emits a stock-changed event |

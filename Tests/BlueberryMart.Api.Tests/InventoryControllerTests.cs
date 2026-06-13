@@ -166,7 +166,28 @@ public class InventoryControllerTests
         var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
         Assert.NotNull(items);
         Assert.Contains(items!, i => i.GetProperty("id").GetString() == itemId.ToString());
-        Assert.All(items!, i => Assert.True(i.GetProperty("stockQuantity").GetInt32() > 0));
+    }
+
+    [Fact]
+    public async Task Reorder_IncludesPreviouslyPaidItemNowOutOfStock()
+    {
+        // A past purchase that has since sold out must still appear in "Buy again"
+        // (the card offers a Notify-me), so the customer's history doesn't disappear.
+        var token = await TestHelpers.GetCustomerTokenAsync(_client);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtownBranchId, $"ReorderOOS {Guid.NewGuid():N}", stock: 5);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtownBranchId, itemId, quantity: 1);
+        await TestHelpers.MarkOrderPaidAsync(_factory, orderId);
+        await TestHelpers.SetStockAsync(_factory, itemId, 0);   // item later sells out
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inventory/reorder?branchId={_downtownBranchId}")
+            .WithBearer(token));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.NotNull(items);
+        Assert.Contains(items!, i => i.GetProperty("id").GetString() == itemId.ToString());
     }
 
     [Fact]

@@ -9,14 +9,33 @@ export interface AuthResult {
   role: UserRole;
 }
 
-function parseRole(token: string): UserRole {
+/**
+ * Thrown when a back-office account (staff / manager / admin) tries to sign into the
+ * customer app. The LoginScreen shows this message instead of the generic
+ * "invalid credentials" so the user knows to use the portal, not that their password is wrong.
+ */
+export class WorkAccountError extends Error {
+  constructor() {
+    super('This is a staff account. Please sign in at the Blueberry Mart portal instead.');
+    this.name = 'WorkAccountError';
+  }
+}
+
+// Only these two roles belong to the customer mobile app; staff/manager/admin are portal-only.
+const APP_ROLES = ['customer', 'shareholder'] as const;
+
+/** The raw, lower-cased role claim straight from the JWT (e.g. 'customer', 'manager'). */
+function rawRole(token: string): string {
   const payload = JSON.parse(atob(token.split('.')[1]));
   const roleClaim =
     payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ??
     payload['role'] ??
     '';
-  const normalized = String(roleClaim).toLowerCase();
-  return normalized === 'shareholder' ? 'Shareholder' : 'Customer';
+  return String(roleClaim).toLowerCase();
+}
+
+function parseRole(token: string): UserRole {
+  return rawRole(token) === 'shareholder' ? 'Shareholder' : 'Customer';
 }
 
 export async function login(email: string, password: string): Promise<AuthResult> {
@@ -31,6 +50,13 @@ export async function login(email: string, password: string): Promise<AuthResult
   }
 
   const { token } = await response.json();
+
+  // Block back-office (staff/manager/admin) accounts from the customer app *before* we
+  // persist anything — so they can't get a half-signed-in session that 403s on every fetch.
+  if (!APP_ROLES.includes(rawRole(token) as (typeof APP_ROLES)[number])) {
+    throw new WorkAccountError();
+  }
+
   const role = parseRole(token);
 
   await AsyncStorage.setItem('jwt_token', token);
