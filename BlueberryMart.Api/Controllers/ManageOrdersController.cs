@@ -212,6 +212,11 @@ public class ManageOrdersController(
             if (missingIds.Count > 0)
                 return NotFound(new { message = "One or more items not found in this branch.", missingIds });
 
+            // The in-store till sells regular retail goods only — bulk is members-only wholesale.
+            var bulk = inventoryItems.Where(i => i.IsBulkOnly).Select(i => new { i.Id, i.ItemName }).ToList();
+            if (bulk.Count > 0)
+                return BadRequest(new { message = "Bulk items can't be sold at the in-store till.", bulk });
+
             var insufficientStock = request.Items
                 .Join(inventoryItems, r => r.ItemId, i => i.Id, (r, i) => new { r.Quantity, Item = i })
                 .Where(x => x.Quantity <= 0 || x.Item.StockQuantity < x.Quantity)

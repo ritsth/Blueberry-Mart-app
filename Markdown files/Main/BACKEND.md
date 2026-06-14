@@ -80,7 +80,7 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `POST /api/auth/register` | public | Create a customer account → JWT |
 | `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a **ready** order received (→ completed; owner only) |
 | `POST /api/orders/{id}/cancel` | Customer/Shareholder | Self-cancel own **pending** (unpaid) order + restock (owner only) |
-| `POST /api/orders/manage/in-store-sale` | Staff/Manager/Admin | Ring up a walk-in sale: creates a paid, `completed`, `channel=in_store` order at the staff's branch (admin passes `branchId`); deducts stock. No `customerId` → null owner (anonymous); pass one to credit loyalty |
+| `POST /api/orders/manage/in-store-sale` | Staff/Manager/Admin | Ring up a walk-in sale: creates a paid, `completed`, `channel=in_store` order at the staff's branch (admin passes `branchId`); deducts stock. **Retail only — bulk items rejected.** No `customerId` → null owner (anonymous); pass one to credit loyalty |
 | `GET /api/orders/manage/customers?q=` | Staff/Manager/Admin | Look up shoppers (customer/shareholder) by email to attach to an in-store sale (id, email, isMember, loyaltyPoints; ≤10) |
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |

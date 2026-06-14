@@ -37,7 +37,8 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
   const reloadItems = () => {
     if (!branchId) { setItems([]); return; }
     listManagedItems({ branchId, pageSize: 200 })
-      .then((p) => setItems(p.items.filter((i) => i.isActive && i.stockQuantity > 0)))
+      // Retail only — bulk is members-only wholesale, not sold at the walk-in till.
+      .then((p) => setItems(p.items.filter((i) => i.isActive && i.stockQuantity > 0 && !i.isBulkOnly)))
       .catch(() => setError('Failed to load items.'));
   };
   useEffect(reloadItems, [branchId]);
@@ -125,6 +126,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
               onChange={(e) => setSearch(e.target.value)}
               autoFocus={!embedded}
             />
+            <p className="muted pos-hint">Retail items only — bulk/wholesale isn't sold at the till.</p>
             <div className="pos-items">
               {visible.map((it) => {
                 const qty = cart[it.id] ?? 0;

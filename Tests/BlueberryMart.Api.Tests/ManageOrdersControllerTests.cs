@@ -206,6 +206,23 @@ public class ManageOrdersControllerTests
     }
 
     [Fact]
+    public async Task InStoreSale_BulkItem_BadRequest()
+    {
+        // Bulk = members-only wholesale; not sold at the walk-in till.
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtown, $"Bulk {Guid.NewGuid():N}", stock: 20, bulk: true);
+
+        var resp = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId, quantity = 1 } },
+            paymentMethod = "cash"
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task SearchCustomers_FindsShopperByEmail_ExcludesStaff()
     {
         var staff = await RoleTokenAsync("staff", _downtown);

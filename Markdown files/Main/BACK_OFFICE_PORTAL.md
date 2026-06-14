@@ -86,9 +86,10 @@ In-store walk-in sales are rung up on the dedicated **Sell** page (below), not h
 
 ### Sell (in-store point of sale)
 Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing up walk-ins:
-- Two-pane layout: searchable branch catalogue (active, in-stock) on the left; a running **ticket**
-  (line items, qty steppers, **running total**) on the right, plus a payment method (cash/card/eSewa)
-  and **Complete sale**.
+- Two-pane layout: searchable branch catalogue (active, in-stock, **retail only — bulk excluded**)
+  on the left; a running **ticket** (line items, qty steppers, **running total**) on the right, plus
+  a payment method (cash/card/eSewa) and **Complete sale**. Bulk is members-only wholesale, so it
+  isn't sold at the walk-in till (the API rejects bulk items too).
 - Staff/managers sell at their own branch; admins pick a branch first.
 - **Attach customer (optional):** search shoppers by email (`GET /api/orders/manage/customers?q=`)
   and attach one to credit loyalty / record it in their history; a member shows a 5% discount line.

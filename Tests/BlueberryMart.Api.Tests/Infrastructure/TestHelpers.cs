@@ -88,7 +88,7 @@ public static class TestHelpers
 
     /// <summary>Creates a fresh inventory item (default out of stock) so tests don't disturb seeded items.</summary>
     public static async Task<Guid> CreateInventoryItemAsync(
-        BlueberryMartApiFactory factory, Guid branchId, string name, int stock = 0)
+        BlueberryMartApiFactory factory, Guid branchId, string name, int stock = 0, bool bulk = false)
     {
         using var scope = factory.Services.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
@@ -98,6 +98,7 @@ public static class TestHelpers
             BranchId = branchId,
             ItemName = name,
             StockQuantity = stock,
+            IsBulkOnly = bulk,
             Price = 100m
         };
         ctx.Inventory.Add(item);

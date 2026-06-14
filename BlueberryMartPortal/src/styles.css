@@ -98,7 +98,8 @@ a { color: var(--green); }
 .pos-branch-row { margin-bottom: 16px; }
 
 .pos-list { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
-.pos-search { width: 100%; margin-bottom: 14px; }
+.pos-search { width: 100%; margin-bottom: 10px; }
+.pos-hint { font-size: 12.5px; margin: 0 0 12px; }
 .pos-items { max-height: 64vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .pos-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-bottom: 1px solid var(--line); }
 .pos-item:last-child { border-bottom: 0; }
