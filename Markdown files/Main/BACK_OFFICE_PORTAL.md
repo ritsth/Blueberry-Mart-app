@@ -85,6 +85,8 @@ detail modal (line items, totals, delivery address) with contextual actions:
 In-store walk-in sales are rung up on the dedicated **Sell** page (below), not here.
 
 ### Sell (in-store point of sale)
+> Full end-to-end write-up: **`../IN_STORE_SALES.md`**.
+
 Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing up walk-ins:
 - Two-pane layout: searchable branch catalogue (active, in-stock, **retail only — bulk excluded**)
   on the left; a running **ticket** (line items, qty steppers, **running total**) on the right, plus
