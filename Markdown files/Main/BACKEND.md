@@ -79,12 +79,12 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | Method & path | Auth | Purpose |
 |---|---|---|
 | `POST /api/auth/login` | public | Email/password → JWT |
-| `POST /api/auth/register` | public | Create a customer account → JWT |
+| `POST /api/auth/register` | public | Create a customer account → JWT. Optional `phone` (≤10 digits) **claims** a matching till "guest" account (inherits its loyalty/orders) instead of creating a new row |
 | `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a **ready** order received (→ completed; owner only) |
 | `POST /api/orders/{id}/cancel` | Customer/Shareholder | Self-cancel own **pending** (unpaid) order + restock (owner only) |
 | `POST /api/orders/manage/in-store-sale` | Staff/Manager/Admin | Ring up a walk-in sale: creates a paid, `completed`, `channel=in_store` order at the staff's branch (admin passes `branchId`); deducts stock. **Retail only — bulk items rejected.** No `customerId` → null owner (anonymous); pass one to credit loyalty |
 | `GET /api/orders/manage/customers?q=` | Staff/Manager/Admin | Look up shoppers (customer/shareholder) by email **or phone** to attach to an in-store sale (id, email, phone, isMember, loyaltyPoints; ≤10) |
-| `POST /api/orders/manage/customers` | Staff/Manager/Admin | Quick-create a **guest** customer from `{ phone }` (idempotent — returns the existing user if the phone is already known); lets a first-time walk-in start earning loyalty |
+| `POST /api/orders/manage/customers` | Staff/Manager/Admin | Quick-create a **guest** customer from `{ phone }` (digits only, ≤10; idempotent — returns the existing user if the phone is already known); lets a first-time walk-in start earning loyalty |
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |
@@ -129,6 +129,11 @@ controllers gate with `[Authorize(Roles=…)]`.
 **Password hashing** (`Security/PasswordHasher`): salted **PBKDF2-HMAC-SHA256** (120k iterations),
 stored as `pbkdf2$sha256$<iter>$<salt>$<hash>`. Legacy unsalted-SHA256 hashes still verify and are
 **transparently upgraded to PBKDF2 on the next successful login** (rehash-on-login) — no mass reset.
+
+**Account claim:** a till "guest" (phone only, no login) is upgraded to a full account when someone
+registers with that phone — `Register` finds the guest, attaches email+password to the **same row**
+(keeping its loyalty/orders), instead of creating a new one. Phones are digits-only, ≤10
+(`Validation/PhoneNumber`); a phone already on a full account → 409.
 
 ## Config & secrets
 - Local: `appsettings.Development.json` (dev DB + dev JWT). eSewa sandbox defaults

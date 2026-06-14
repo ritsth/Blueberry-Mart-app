@@ -118,6 +118,52 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task Register_WithGuestPhone_ClaimsTheSameAccount()
+    {
+        // A guest created at the till (phone only, 320 loyalty pts), then someone signs up with that phone.
+        var phone = "98" + Random.Shared.Next(10_000_000, 99_999_999);
+        var guestId = await TestHelpers.CreateGuestUserAsync(_factory, phone, loyalty: 320);
+        var email = $"claim_{Guid.NewGuid():N}@blueberrymart.com";
+
+        var resp = await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123", phone });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        // Same underlying account — loyalty/orders are inherited (not a new row).
+        Assert.Equal(guestId, await TestHelpers.GetUserIdByEmailAsync(_factory, email));
+        Assert.Equal(320, await TestHelpers.GetLoyaltyPointsAsync(_factory, guestId));
+
+        // The claimed account can now log in.
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_PhoneOnFullAccount_ReturnsConflict()
+    {
+        var phone = "97" + Random.Shared.Next(10_000_000, 99_999_999);
+        // First sign-up stores the phone on a full account.
+        await _client.PostAsJsonAsync("/api/auth/register",
+            new { email = $"first_{Guid.NewGuid():N}@blueberrymart.com", password = "secret123", phone });
+
+        // Second sign-up reusing the same phone is rejected (not a claimable guest).
+        var resp = await _client.PostAsJsonAsync("/api/auth/register",
+            new { email = $"second_{Guid.NewGuid():N}@blueberrymart.com", password = "secret123", phone });
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_PhoneTooLong_ReturnsBadRequest()
+    {
+        var resp = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email = $"long_{Guid.NewGuid():N}@blueberrymart.com",
+            password = "secret123",
+            phone = "123456789012",   // 12 digits > 10
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task Login_LegacyHash_UpgradesToPbkdf2OnSuccess()
     {
         // A user whose stored hash is the legacy unsalted-SHA256 format.

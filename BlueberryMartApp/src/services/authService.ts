@@ -65,11 +65,13 @@ export async function login(email: string, password: string): Promise<AuthResult
   return { token, role };
 }
 
-export async function register(email: string, password: string): Promise<AuthResult> {
+// `phone` is optional — when given, the backend links this sign-up to a "guest" account created at
+// the till with the same phone, so in-store loyalty/orders carry over (account claim).
+export async function register(email: string, password: string, phone?: string): Promise<AuthResult> {
   const response = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, phone: phone || undefined }),
   });
 
   if (!response.ok) {

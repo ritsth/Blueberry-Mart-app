@@ -45,7 +45,9 @@ on top of the tabs from within tab screens via `useNavigation`.
 
 ## Auth flow
 `authService.login()` POSTs to `/api/auth/login`; `authService.register()` POSTs to
-`/api/auth/register` (creates a customer and returns a token, just like login). Both
+`/api/auth/register` (creates a customer and returns a token, just like login). The register
+screen has an **optional phone** field — if given, it claims a matching in-store "guest" account so
+the customer inherits the loyalty/orders they earned at the till. Both
 store `jwt_token` + `user_role` in AsyncStorage. The login screen links to the
 register screen ("Don't have an account? Sign up") and vice versa. Every API call
 attaches `Authorization: Bearer <token>` and reads the token with `getStoredToken()`.

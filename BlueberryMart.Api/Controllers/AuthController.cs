@@ -5,6 +5,7 @@ using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Security;
+using BlueberryMart.Api.Validation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -50,12 +51,40 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         if (await context.Users.AnyAsync(u => u.Email == email))
             return Conflict(new { message = "An account with this email already exists." });
 
-        // Public sign-up always creates a Customer account.
+        string? phone = null;
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+        {
+            if (!PhoneNumber.TryNormalize(request.Phone, out var p))
+                return BadRequest(new { message = "Enter a valid phone number (up to 10 digits)." });
+            phone = p;
+        }
+
+        // Claim flow: if a phone is given and a *guest* account (phone-only, no email yet) exists with
+        // it — created at the till — attach email+password to that same record so the customer keeps
+        // the loyalty/orders they earned in store. A phone already on a full account is a conflict.
+        if (phone is not null)
+        {
+            var byPhone = await context.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+            if (byPhone is not null)
+            {
+                if (byPhone.Email is not null)
+                    return Conflict(new { message = "This phone number is already linked to an account." });
+
+                byPhone.Email = email;
+                byPhone.PasswordHash = PasswordHasher.Hash(request.Password);
+                byPhone.UpdatedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+                return Ok(new { token = GenerateToken(byPhone.Id, byPhone.Email!, byPhone.Role, branchId: null) });
+            }
+        }
+
+        // Public sign-up always creates a Customer account (storing the phone if one was given).
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = PasswordHasher.Hash(request.Password),
+            Phone = phone,
             Role = "customer",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -64,7 +93,7 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         await context.SaveChangesAsync();
 
         // Public sign-up always creates a customer, who is never tied to a branch.
-        var token = GenerateToken(user.Id, user.Email, user.Role, branchId: null);
+        var token = GenerateToken(user.Id, user.Email!, user.Role, branchId: null);
         return Ok(new { token });
     }
 

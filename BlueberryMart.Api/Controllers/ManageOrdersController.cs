@@ -5,6 +5,7 @@ using BlueberryMart.Api.Models.Events;
 using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Models.Responses;
 using BlueberryMart.Api.Services.Interfaces;
+using BlueberryMart.Api.Validation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -377,9 +378,8 @@ public class ManageOrdersController(
     [HttpPost("customers")]
     public async Task<IActionResult> CreateGuestCustomer([FromBody] GuestCustomerRequest request)
     {
-        var phone = request.Phone?.Trim();
-        if (string.IsNullOrWhiteSpace(phone))
-            return BadRequest(new { message = "A phone number is required." });
+        if (!PhoneNumber.TryNormalize(request.Phone, out var phone))
+            return BadRequest(new { message = "Enter a valid phone number (up to 10 digits)." });
 
         var now = DateTime.UtcNow;
         var user = await context.Users.FirstOrDefaultAsync(u => u.Phone == phone);

@@ -19,6 +19,7 @@ type Props = {
 
 export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail]               = useState('');
+  const [phone, setPhone]               = useState('');
   const [password, setPassword]         = useState('');
   const [confirm, setConfirm]           = useState('');
   const [loading, setLoading]           = useState(false);
@@ -41,8 +42,9 @@ export default function RegisterScreen({ navigation }: Props) {
     setError(null);
     setLoading(true);
     try {
-      // Public sign-up always creates a customer account.
-      await register(email.trim().toLowerCase(), password);
+      // Public sign-up always creates a customer account; an optional phone claims any
+      // in-store "guest" account with the same number (so loyalty/orders carry over).
+      await register(email.trim().toLowerCase(), password, phone.trim() || undefined);
       navigation.replace('CustomerTabs');
     } catch (e: any) {
       setError(e.message ?? 'Could not create account.');
@@ -71,6 +73,18 @@ export default function RegisterScreen({ navigation }: Props) {
           onChangeText={setEmail}
           editable={!loading}
         />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Phone (optional)"
+          placeholderTextColor="#9ca3af"
+          keyboardType="number-pad"
+          maxLength={10}
+          value={phone}
+          onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))}
+          editable={!loading}
+        />
+        <Text style={styles.hint}>Add your phone to link in-store purchases &amp; loyalty.</Text>
 
         <TextInput
           style={styles.input}
@@ -133,6 +147,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#d1fae5', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12,
     fontSize: 15, color: '#111827', backgroundColor: '#f9fafb', marginBottom: 14,
   },
+  hint: { color: '#6b7280', fontSize: 12, marginTop: -8, marginBottom: 14 },
   error: { color: '#dc2626', fontSize: 13, marginBottom: 12, textAlign: 'center' },
   button: { backgroundColor: '#16a34a', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
   buttonDisabled: { backgroundColor: '#86efac' },

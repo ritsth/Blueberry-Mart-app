@@ -261,6 +261,8 @@ public class ManageOrdersControllerTests
 
     // ---- Guest customers (quick-create at the till) ----
 
+    private static string RandomPhone() => "98" + Random.Shared.Next(10_000_000, 99_999_999);   // 10 digits
+
     private async Task<(string id, HttpStatusCode status)> CreateGuestAsync(string token, string phone)
     {
         var resp = await _client.SendAsync(
@@ -275,7 +277,7 @@ public class ManageOrdersControllerTests
     public async Task CreateGuestCustomer_ThenInStoreSale_CreditsLoyalty()
     {
         var staff = await RoleTokenAsync("staff", _downtown);
-        var phone = $"98{Guid.NewGuid():N}"[..10];
+        var phone = RandomPhone();
 
         var (id, status) = await CreateGuestAsync(staff, phone);
         Assert.Equal(HttpStatusCode.OK, status);
@@ -298,7 +300,7 @@ public class ManageOrdersControllerTests
     public async Task CreateGuestCustomer_ExistingPhone_ReturnsSameRecord()
     {
         var staff = await RoleTokenAsync("staff", _downtown);
-        var phone = $"97{Guid.NewGuid():N}"[..10];
+        var phone = RandomPhone();
 
         var first = await CreateGuestAsync(staff, phone);
         var second = await CreateGuestAsync(staff, phone);
@@ -311,7 +313,7 @@ public class ManageOrdersControllerTests
     public async Task SearchCustomers_FindsGuestByPhone()
     {
         var staff = await RoleTokenAsync("staff", _downtown);
-        var phone = $"96{Guid.NewGuid():N}"[..10];
+        var phone = RandomPhone();
         await CreateGuestAsync(staff, phone);
 
         var resp = await _client.SendAsync(
@@ -327,6 +329,14 @@ public class ManageOrdersControllerTests
     {
         var staff = await RoleTokenAsync("staff", _downtown);
         var (_, status) = await CreateGuestAsync(staff, "   ");
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+    }
+
+    [Fact]
+    public async Task CreateGuestCustomer_PhoneTooLong_BadRequest()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var (_, status) = await CreateGuestAsync(staff, "123456789012");   // 12 digits > 10
         Assert.Equal(HttpStatusCode.BadRequest, status);
     }
 }

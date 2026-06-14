@@ -371,9 +371,10 @@ function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null;
           <input
             placeholder="Customer phone…"
             value={newPhone}
-            inputMode="tel"
+            inputMode="numeric"
+            maxLength={10}
             autoFocus
-            onChange={(e) => setNewPhone(e.target.value)}
+            onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
             onKeyDown={(e) => { if (e.key === 'Enter') createGuest(); }}
           />
           <button className="btn primary" disabled={busy} onClick={createGuest}>Create &amp; attach</button>

@@ -81,7 +81,34 @@ public static class TestHelpers
     {
         using var scope = factory.Services.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
-        return (await ctx.Users.FirstAsync(u => u.Email == email.ToLower())).PasswordHash;
+        return (await ctx.Users.FirstAsync(u => u.Email == email.ToLower())).PasswordHash!;
+    }
+
+    /// <summary>Looks up a user's id by email.</summary>
+    public static async Task<Guid> GetUserIdByEmailAsync(BlueberryMartApiFactory factory, string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        return (await ctx.Users.FirstAsync(u => u.Email == email.ToLower())).Id;
+    }
+
+    /// <summary>Inserts a phone-only "guest" customer (no email/password) and returns its id.</summary>
+    public static async Task<Guid> CreateGuestUserAsync(BlueberryMartApiFactory factory, string phone, int loyalty = 0)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Phone = phone,
+            Role = "customer",
+            LoyaltyPoints = loyalty,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+        return user.Id;
     }
 
     /// <summary>Forces an inventory item's stock directly in the DB (e.g. to 0 to simulate sold-out).</summary>
