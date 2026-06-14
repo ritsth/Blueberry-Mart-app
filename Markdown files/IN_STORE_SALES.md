@@ -99,6 +99,12 @@ walk-in pays in store
   control.)
 - Either way: a phone already on a **full** account → `409`; phones are digits-only, ≤10.
 
+> **Security caveat — no phone-ownership verification.** Claiming protects *registered accounts*
+> (a phone on a full account can't be taken over — `409`), but a **guest** is just unclaimed points
+> tied to whatever number a cashier typed; there's **no SMS/OTP check**, so whoever claims a number
+> first gets its guest points. To make this airtight (prove the claimant controls the number), add
+> an OTP step to register/link-phone before merging. Not implemented yet.
+
 ---
 
 ## 6. Refunds / cancellation
@@ -143,5 +149,6 @@ Every order carries `channel`, surfaced as a **`channel` dimension** in the `sal
 - Born **paid + completed**; never enters the fulfilment chain.
 - Loyalty only for an **attached** customer (walk-in earns nothing).
 - Phone: **digits only, ≤10**, unique per customer.
-- Guest create + claim are **idempotent / safe** by phone (no duplicates; can't hijack a full account).
+- Guest create + claim are **idempotent** by phone (no duplicates). Claiming can't take over a
+  **registered** account (→ `409`), but guest points have **no OTP/ownership check** — see the caveat in §5.
 - No payment-gateway call and no auto-refund — money is handled at the counter.
