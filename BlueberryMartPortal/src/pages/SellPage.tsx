@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Branch, createInStoreSale, getBranches, InventoryItem, listManagedItems } from '../api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Branch, createInStoreSale, CustomerLite, getBranches, InventoryItem,
+  listManagedItems, searchCustomers,
+} from '../api';
 import { getBranchId, isAdmin } from '../auth';
+
+const MEMBER_RATE = 0.05;   // display-only; the backend applies the configured rate at checkout
 
 /**
  * Point-of-sale screen for store staff: search the branch's catalogue, build a ticket with a
- * running total, take payment, and complete. Each sale posts to /api/orders/manage/in-store-sale,
- * which creates a paid + completed `in_store` order and deducts stock. Sales are anonymous walk-ins
- * (the order has no customer) — attaching a customer for loyalty is a future enhancement.
+ * running total, optionally attach a customer (for loyalty), take payment, and complete. Each sale
+ * posts to /api/orders/manage/in-store-sale, which creates a paid + completed `in_store` order and
+ * deducts stock. With no customer attached the sale is an anonymous walk-in.
+ *
+ * `embedded` trims the page chrome so it can sit inside the staff Dashboard.
  */
-export default function SellPage() {
+export default function SellPage({ embedded = false }: { embedded?: boolean }) {
   const admin = isAdmin();
   const ownBranch = getBranchId();
 
@@ -17,6 +24,7 @@ export default function SellPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Record<string, number>>({});   // itemId → qty
+  const [customer, setCustomer] = useState<CustomerLite | null>(null);
   const [method, setMethod] = useState('cash');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -37,8 +45,10 @@ export default function SellPage() {
   const byId = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items]);
   const visible = items.filter((i) => i.itemName.toLowerCase().includes(search.trim().toLowerCase()));
   const lines = Object.entries(cart).filter(([, q]) => q > 0);
-  const total = lines.reduce((sum, [id, q]) => sum + (byId[id]?.price ?? 0) * q, 0);
+  const subtotal = lines.reduce((sum, [id, q]) => sum + (byId[id]?.price ?? 0) * q, 0);
   const count = lines.reduce((n, [, q]) => n + q, 0);
+  const discount = customer?.isMember ? subtotal * MEMBER_RATE : 0;
+  const total = subtotal - discount;
 
   function setQty(id: string, qty: number) {
     const max = byId[id]?.stockQuantity ?? 0;
@@ -53,10 +63,12 @@ export default function SellPage() {
         branchId: admin ? branchId : undefined,
         items: lines.map(([itemId, quantity]) => ({ itemId, quantity })),
         paymentMethod: method,
+        customerId: customer?.id,
       });
       setReceipt({ orderNumber: res.orderNumber, total: res.totalAmount });
       setCart({});
       setSearch('');
+      setCustomer(null);
       reloadItems();   // stock dropped
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not complete the sale.');
@@ -67,20 +79,31 @@ export default function SellPage() {
 
   return (
     <section>
-      <header className="page-head">
-        <h1>Sell</h1>
-        <span className="count">in-store till</span>
-        {admin && (
-          <select
-            style={{ marginLeft: 'auto' }}
-            value={branchId}
-            onChange={(e) => { setBranchId(e.target.value); setCart({}); setReceipt(null); }}
-          >
+      {!embedded && (
+        <header className="page-head">
+          <h1>Sell</h1>
+          <span className="count">in-store till</span>
+          {admin && (
+            <select
+              style={{ marginLeft: 'auto' }}
+              value={branchId}
+              onChange={(e) => { setBranchId(e.target.value); setCart({}); setCustomer(null); setReceipt(null); }}
+            >
+              <option value="">Select a branch…</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+        </header>
+      )}
+
+      {embedded && admin && (
+        <div style={{ marginBottom: 12 }}>
+          <select value={branchId} onChange={(e) => { setBranchId(e.target.value); setCart({}); setCustomer(null); setReceipt(null); }}>
             <option value="">Select a branch…</option>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-        )}
-      </header>
+        </div>
+      )}
 
       {receipt && (
         <p className="success">
@@ -99,16 +122,19 @@ export default function SellPage() {
               placeholder="Search items…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              autoFocus
+              autoFocus={!embedded}
             />
             <div className="pos-items">
               {visible.map((it) => {
                 const qty = cart[it.id] ?? 0;
+                const low = it.stockQuantity <= 5;
                 return (
-                  <div key={it.id} className="pos-item">
+                  <div key={it.id} className={`pos-item${qty > 0 ? ' in-cart' : ''}`}>
                     <div className="pos-item-info">
                       <strong>{it.itemName}</strong>
-                      <span className="muted">Rs {it.price.toFixed(2)} · {it.stockQuantity} in stock</span>
+                      <span className="muted">
+                        Rs {it.price.toFixed(2)} · <span className={low ? 'warn' : ''}>{it.stockQuantity} in stock</span>
+                      </span>
                     </div>
                     {qty === 0 ? (
                       <button className="btn small primary" onClick={() => setQty(it.id, 1)}>Add</button>
@@ -128,9 +154,10 @@ export default function SellPage() {
 
           {/* Right: the running ticket */}
           <div className="pos-ticket">
-            <h2>Ticket</h2>
+            <CustomerPicker customer={customer} onChange={setCustomer} />
+
             {lines.length === 0 ? (
-              <p className="muted">No items yet — add from the left.</p>
+              <p className="muted pos-empty">No items yet — add from the left.</p>
             ) : (
               <div className="pos-ticket-lines">
                 {lines.map(([id, q]) => {
@@ -151,6 +178,17 @@ export default function SellPage() {
               </div>
             )}
 
+            {discount > 0 && (
+              <div className="pos-subtotal">
+                <span>Subtotal</span><span>Rs {subtotal.toFixed(2)}</span>
+              </div>
+            )}
+            {discount > 0 && (
+              <div className="pos-subtotal discount">
+                <span>Member discount (5%)</span><span>− Rs {discount.toFixed(2)}</span>
+              </div>
+            )}
+
             <div className="pos-total">
               <span>Total{count > 0 ? ` · ${count} item${count === 1 ? '' : 's'}` : ''}</span>
               <strong>Rs {total.toFixed(2)}</strong>
@@ -165,12 +203,69 @@ export default function SellPage() {
                 <option value="esewa">eSewa</option>
               </select>
               <button className="btn primary" disabled={busy || lines.length === 0} onClick={completeSale}>
-                {busy ? 'Completing…' : 'Complete sale'}
+                {busy ? 'Completing…' : `Complete · Rs ${total.toFixed(2)}`}
               </button>
             </div>
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+/** Optional "attach customer" control: search by email, pick a match, or stay anonymous. */
+function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null; onChange: (c: CustomerLite | null) => void }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<CustomerLite[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (customer) return;                       // already attached — don't search
+    if (timer.current) clearTimeout(timer.current);
+    const term = q.trim();
+    if (term.length < 2) { setResults([]); setOpen(false); return; }
+    timer.current = setTimeout(() => {
+      searchCustomers(term)
+        .then((rows) => { setResults(rows); setOpen(true); })
+        .catch(() => { setResults([]); setOpen(false); });
+    }, 250);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [q, customer]);
+
+  if (customer) {
+    return (
+      <div className="pos-customer attached">
+        <div>
+          <strong>{customer.email}</strong>
+          {customer.isMember && <span className="pill member">Member</span>}
+          <div className="muted">{customer.loyaltyPoints} pts · earns loyalty</div>
+        </div>
+        <button className="btn small" onClick={() => { onChange(null); setQ(''); }}>Remove</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pos-customer">
+      <input
+        placeholder="Attach customer by email (optional)…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onFocus={() => { if (results.length) setOpen(true); }}
+      />
+      {open && (
+        <div className="pos-customer-results">
+          {results.length === 0
+            ? <div className="pos-customer-empty muted">No matches.</div>
+            : results.map((c) => (
+              <button key={c.id} className="pos-customer-row" onClick={() => { onChange(c); setOpen(false); setQ(''); }}>
+                <span>{c.email}</span>
+                {c.isMember && <span className="pill member">Member</span>}
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
   );
 }

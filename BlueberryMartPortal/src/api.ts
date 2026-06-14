@@ -208,6 +208,18 @@ export function createInStoreSale(body: {
   });
 }
 
+// Look up shoppers by email to optionally attach to an in-store sale (for loyalty).
+export interface CustomerLite {
+  id: string;
+  email: string;
+  isMember: boolean;
+  loyaltyPoints: number;
+}
+
+export function searchCustomers(q: string): Promise<CustomerLite[]> {
+  return request<CustomerLite[]>(`/api/orders/manage/customers?q=${encodeURIComponent(q)}`);
+}
+
 export function cancelOrder(id: string): Promise<unknown> {
   return request(`/api/orders/manage/${id}/cancel`, { method: 'POST' });
 }

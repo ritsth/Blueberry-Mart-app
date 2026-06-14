@@ -90,6 +90,31 @@ a { color: var(--green); }
 .pos-pay { display: flex; gap: 8px; }
 .pos-pay select { flex: 0 0 auto; }
 .pos-pay .btn { flex: 1; }
+.pos-item.in-cart { background: #f0fdf4; border-radius: 8px; }
+.pos-empty { padding: 8px 2px; }
+.pos-subtotal { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.pos-subtotal.discount { color: var(--green, #16a34a); }
+
+/* Attach-customer control */
+.pos-customer { position: relative; margin-bottom: 12px; }
+.pos-customer > input { width: 100%; }
+.pos-customer.attached { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; }
+.pos-customer.attached .muted { font-size: 12px; }
+.pos-customer-results { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin-top: 4px; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.1); max-height: 240px; overflow-y: auto; }
+.pos-customer-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 9px 11px; cursor: pointer; font: inherit; }
+.pos-customer-row:last-child { border-bottom: 0; }
+.pos-customer-row:hover { background: #f0fdf4; }
+.pos-customer-empty { padding: 9px 11px; }
+.pill.member { background: #ecfccb; color: #3f6212; margin-left: 6px; }
+
+/* Dashboard "Open till" card */
+.till-card { display: flex; align-items: center; gap: 14px; background: #16a34a; color: #fff; border-radius: 12px; padding: 16px 18px; text-decoration: none; margin-bottom: 16px; }
+.till-card:hover { background: #15803d; }
+.till-icon { font-size: 26px; }
+.till-text { display: flex; flex-direction: column; }
+.till-text strong { font-size: 16px; }
+.till-text .muted { color: rgba(255,255,255,0.85); font-size: 13px; }
+.till-go { margin-left: auto; font-size: 22px; }
 
 /* ---- Grid table ---- */
 .grid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }

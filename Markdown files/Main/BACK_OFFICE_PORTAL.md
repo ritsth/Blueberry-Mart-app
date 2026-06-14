@@ -90,11 +90,15 @@ Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing 
   (line items, qty steppers, **running total**) on the right, plus a payment method (cash/card/eSewa)
   and **Complete sale**.
 - Staff/managers sell at their own branch; admins pick a branch first.
+- **Attach customer (optional):** search shoppers by email (`GET /api/orders/manage/customers?q=`)
+  and attach one to credit loyalty / record it in their history; a member shows a 5% discount line.
+  Left blank, the sale is an anonymous walk-in (null `UserId`, shown as "Walk-in").
 - **Complete sale** → `POST /api/orders/manage/in-store-sale`, which creates a paid, `completed`,
   `channel=in_store` order in one shot and deducts stock. Shows a receipt line, clears the ticket,
   and the sale appears on the Orders page as `completed` / `in_store`.
-- Sales are anonymous walk-ins (the order has no customer — `UserId` is null, shown as "Walk-in");
-  attaching a specific customer for loyalty is API-supported but not yet in the UI.
+- **Dashboard placement:** staff land **directly on the till** as their home (it's their main job);
+  managers/admins get the stats Dashboard with a prominent **"Open till"** card. The sidebar **Sell**
+  link works for everyone. The page is reused via a `<SellPage embedded />` prop on the dashboard.
 
 ### Reports
 **Reports** page (manager/admin only): revenue (paid orders), paid-order count, average

@@ -206,6 +206,25 @@ public class ManageOrdersControllerTests
     }
 
     [Fact]
+    public async Task SearchCustomers_FindsShopperByEmail_ExcludesStaff()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var customerEmail = $"shopper_{tag}@blueberrymart.com";
+        await TestHelpers.CreateUserAsync(_factory, customerEmail, "pw");                 // a real shopper
+        await TestHelpers.CreateUserAsync(_factory, $"worker_{tag}@blueberrymart.com", "pw", "staff", _downtown);
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/orders/manage/customers?q={tag}").WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var rows = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.NotNull(rows);
+        Assert.Contains(rows!, r => r.GetProperty("email").GetString() == customerEmail);
+        Assert.DoesNotContain(rows!, r => r.GetProperty("email").GetString()!.StartsWith("worker_"));
+    }
+
+    [Fact]
     public async Task InStoreSale_UnassignedStaff_BadRequest()
     {
         // A staff account with no branch can't ring up a sale (nowhere to sell from).

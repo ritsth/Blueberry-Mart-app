@@ -335,6 +335,35 @@ public class ManageOrdersController(
         }
     }
 
+    // GET /api/orders/manage/customers?q=
+    // Look up shoppers (customer/shareholder) by email so staff can optionally attach one to an
+    // in-store sale (to credit loyalty / put it in their history). Not branch-scoped — customers
+    // aren't tied to a branch. Returns at most 10 matches.
+    [HttpGet("customers")]
+    public async Task<IActionResult> SearchCustomers([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
+            return Ok(Array.Empty<object>());
+
+        var term = $"%{q.Trim().ToLower()}%";
+        var now = DateTime.UtcNow;
+        var matches = await context.Users.AsNoTracking()
+            .Where(u => (u.Role == "customer" || u.Role == "shareholder") && !u.IsBanned
+                        && EF.Functions.ILike(u.Email, term))
+            .OrderBy(u => u.Email)
+            .Take(10)
+            .Select(u => new
+            {
+                u.Id,
+                u.Email,
+                IsMember = u.Role == "shareholder" || (u.MemberUntil.HasValue && u.MemberUntil.Value > now),
+                u.LoyaltyPoints,
+            })
+            .ToListAsync();
+
+        return Ok(matches);
+    }
+
     [HttpPost("{id:guid}/record-payment")]
     public async Task<IActionResult> RecordPayment(Guid id, [FromBody] RecordPaymentRequest request)
     {
