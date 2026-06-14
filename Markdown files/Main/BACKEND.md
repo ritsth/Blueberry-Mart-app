@@ -119,8 +119,13 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
   order's branch.
 
 ## Auth
-JWT bearer. Roles: `Customer`, `Shareholder`. Token carries the user id
-(`NameIdentifier`) and role; controllers gate with `[Authorize(Roles=…)]`.
+JWT bearer. Roles: `Customer`, `Shareholder` (+ back-office `Staff`/`Manager`/`Admin`). Token
+carries the user id (`NameIdentifier`), role, and a `branch` claim for branch-scoped staff;
+controllers gate with `[Authorize(Roles=…)]`.
+
+**Password hashing** (`Security/PasswordHasher`): salted **PBKDF2-HMAC-SHA256** (120k iterations),
+stored as `pbkdf2$sha256$<iter>$<salt>$<hash>`. Legacy unsalted-SHA256 hashes still verify and are
+**transparently upgraded to PBKDF2 on the next successful login** (rehash-on-login) — no mass reset.
 
 ## Config & secrets
 - Local: `appsettings.Development.json` (dev DB + dev JWT). eSewa sandbox defaults

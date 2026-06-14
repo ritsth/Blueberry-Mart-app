@@ -1,10 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Models.Requests;
+using BlueberryMart.Api.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -21,8 +21,17 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         var user = await context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email.ToLower());
 
-        if (user is null || !VerifyPassword(request.Password, user.PasswordHash))
+        if (user is null || !PasswordHasher.Verify(request.Password, user.PasswordHash, out var needsRehash))
             return Unauthorized(new { message = "Invalid email or password." });
+
+        // Transparently upgrade a legacy (unsalted-SHA256) hash to PBKDF2 now that we have the
+        // plaintext — so old accounts migrate on their next successful login, no reset needed.
+        if (needsRehash)
+        {
+            user.PasswordHash = PasswordHasher.Hash(request.Password);
+            user.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+        }
 
         var token = GenerateToken(user.Id, user.Email, user.Role, user.BranchId);
         return Ok(new { token });
@@ -46,7 +55,7 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
         {
             Id = Guid.NewGuid(),
             Email = email,
-            PasswordHash = HashPassword(request.Password),
+            PasswordHash = PasswordHasher.Hash(request.Password),
             Role = "customer",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -88,10 +97,4 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-
-    private static string HashPassword(string plaintext) =>
-        Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
-
-    private static bool VerifyPassword(string plaintext, string storedHash) =>
-        HashPassword(plaintext) == storedHash;
 }

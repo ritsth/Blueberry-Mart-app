@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlueberryMart.Api.Data;
@@ -277,6 +276,5 @@ public static class DataSeeder
 
     private static T Pick<T>(Random rnd, T[] items) => items[rnd.Next(items.Length)];
 
-    private static string Hash(string plaintext) =>
-        Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
+    private static string Hash(string plaintext) => PasswordHasher.Hash(plaintext);
 }

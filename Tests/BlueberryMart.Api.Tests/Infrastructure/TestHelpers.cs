@@ -76,6 +76,14 @@ public static class TestHelpers
         return (await ctx.Users.FirstAsync(u => u.Id == userId)).LoyaltyPoints;
     }
 
+    /// <summary>Reads a user's stored password hash directly from the DB (for hashing/upgrade tests).</summary>
+    public static async Task<string> GetPasswordHashAsync(BlueberryMartApiFactory factory, string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        return (await ctx.Users.FirstAsync(u => u.Email == email.ToLower())).PasswordHash;
+    }
+
     /// <summary>Forces an inventory item's stock directly in the DB (e.g. to 0 to simulate sold-out).</summary>
     public static async Task SetStockAsync(BlueberryMartApiFactory factory, Guid itemId, int stock)
     {
@@ -149,7 +157,8 @@ public static class TestHelpers
         {
             Id = Guid.NewGuid(),
             Email = email.ToLower(),
-            // Matches AuthController's SHA256-base64 hashing so the user can log in.
+            // Seeds a *legacy* unsalted-SHA256 hash — the user can still log in (verified via the
+            // legacy fallback) and gets transparently upgraded to PBKDF2 on first login.
             PasswordHash = Convert.ToBase64String(
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password))),
             Role = role,

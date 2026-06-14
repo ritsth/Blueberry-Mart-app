@@ -220,6 +220,20 @@ export function searchCustomers(q: string): Promise<CustomerLite[]> {
   return request<CustomerLite[]>(`/api/orders/manage/customers?q=${encodeURIComponent(q)}`);
 }
 
+// Public store status — used by the till to read the live member discount rate (so the preview
+// matches what the backend actually charges).
+export interface SystemStatus {
+  maintenanceMode: boolean;
+  maintenanceMessage: string | null;
+  deliveryFee: number;
+  membershipMonthlyFee: number;
+  memberDiscountRate: number;
+}
+
+export function getSystemStatus(): Promise<SystemStatus> {
+  return request<SystemStatus>('/api/system/status');
+}
+
 export function cancelOrder(id: string): Promise<unknown> {
   return request(`/api/orders/manage/${id}/cancel`, { method: 'POST' });
 }

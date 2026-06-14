@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Branch, createInStoreSale, CustomerLite, getBranches, InventoryItem,
+  Branch, createInStoreSale, CustomerLite, getBranches, getSystemStatus, InventoryItem,
   listManagedItems, searchCustomers,
 } from '../api';
 import { getBranchId, isAdmin } from '../auth';
-
-const MEMBER_RATE = 0.05;   // display-only; the backend applies the configured rate at checkout
 
 /**
  * Point-of-sale screen for store staff: search the branch's catalogue, build a ticket with a
@@ -29,9 +27,13 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState<{ orderNumber: number; total: number } | null>(null);
+  const [memberRate, setMemberRate] = useState(0.05);   // live rate from settings; 5% fallback
 
   // Admins choose a branch; everyone else sells at their assigned branch.
   useEffect(() => { if (admin) getBranches().then(setBranches).catch(() => setBranches([])); }, [admin]);
+
+  // The actual member-discount rate the backend will apply (so the preview matches the charge).
+  useEffect(() => { getSystemStatus().then((s) => setMemberRate(s.memberDiscountRate)).catch(() => {}); }, []);
 
   // (Re)load the branch's active, in-stock catalogue.
   const reloadItems = () => {
@@ -48,7 +50,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
   const lines = Object.entries(cart).filter(([, q]) => q > 0);
   const subtotal = lines.reduce((sum, [id, q]) => sum + (byId[id]?.price ?? 0) * q, 0);
   const count = lines.reduce((n, [, q]) => n + q, 0);
-  const discount = customer?.isMember ? subtotal * MEMBER_RATE : 0;
+  const discount = customer?.isMember ? subtotal * memberRate : 0;
   const total = subtotal - discount;
 
   function setQty(id: string, qty: number) {
@@ -142,11 +144,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
                     {qty === 0 ? (
                       <button className="btn small primary" onClick={() => setQty(it.id, 1)}>Add</button>
                     ) : (
-                      <div className="qty-steppers">
-                        <button className="btn small" onClick={() => setQty(it.id, qty - 1)}>−</button>
-                        <span className="qty-n">{qty}</span>
-                        <button className="btn small" disabled={qty >= it.stockQuantity} onClick={() => setQty(it.id, qty + 1)}>+</button>
-                      </div>
+                      <Stepper value={qty} max={it.stockQuantity} onChange={(n) => setQty(it.id, n)} />
                     )}
                   </div>
                 );
@@ -169,11 +167,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
                   return (
                     <div key={id} className="pos-ticket-line">
                       <span className="pos-ticket-name">{it.itemName}</span>
-                      <div className="qty-steppers">
-                        <button className="btn small" onClick={() => setQty(id, q - 1)}>−</button>
-                        <span className="qty-n">{q}</span>
-                        <button className="btn small" disabled={q >= it.stockQuantity} onClick={() => setQty(id, q + 1)}>+</button>
-                      </div>
+                      <Stepper value={q} max={it.stockQuantity} onChange={(n) => setQty(id, n)} />
                       <span className="pos-ticket-amt">Rs {(it.price * q).toFixed(2)}</span>
                     </div>
                   );
@@ -188,7 +182,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
             )}
             {discount > 0 && (
               <div className="pos-subtotal discount">
-                <span>Member discount (5%)</span><span>− Rs {discount.toFixed(2)}</span>
+                <span>Member discount ({(memberRate * 100).toFixed(0)}%)</span><span>− Rs {discount.toFixed(2)}</span>
               </div>
             )}
 
@@ -213,6 +207,25 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** −/＋ buttons around a typable quantity field. The parent's onChange clamps to [0, max]. */
+function Stepper({ value, max, onChange }: { value: number; max: number; onChange: (n: number) => void }) {
+  return (
+    <div className="qty-steppers">
+      <button className="btn small" disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>
+      <input
+        className="qty-input"
+        type="number"
+        min={0}
+        max={max}
+        value={value}
+        onChange={(e) => { const n = parseInt(e.target.value, 10); onChange(Number.isNaN(n) ? 0 : n); }}
+        onFocus={(e) => e.target.select()}
+      />
+      <button className="btn small" disabled={value >= max} onClick={() => onChange(value + 1)}>＋</button>
+    </div>
   );
 }
 

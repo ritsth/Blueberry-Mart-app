@@ -8,10 +8,14 @@ namespace BlueberryMart.Api.Tests;
 [Collection("Integration")]
 public class AuthControllerTests
 {
+    private readonly BlueberryMartApiFactory _factory;
     private readonly HttpClient _client;
 
     public AuthControllerTests(BlueberryMartApiFactory factory)
-        => _client = factory.CreateClient();
+    {
+        _factory = factory;
+        _client = factory.CreateClient();
+    }
 
     [Fact]
     public async Task Login_ValidCustomer_ReturnsToken()
@@ -102,5 +106,33 @@ public class AuthControllerTests
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_StoresPbkdf2Hash()
+    {
+        var email = $"hash_{Guid.NewGuid():N}@blueberrymart.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+
+        Assert.StartsWith("pbkdf2$", await TestHelpers.GetPasswordHashAsync(_factory, email));
+    }
+
+    [Fact]
+    public async Task Login_LegacyHash_UpgradesToPbkdf2OnSuccess()
+    {
+        // A user whose stored hash is the legacy unsalted-SHA256 format.
+        var email = $"legacy_{Guid.NewGuid():N}@blueberrymart.com";
+        await TestHelpers.CreateUserAsync(_factory, email, "secret123");
+        Assert.False((await TestHelpers.GetPasswordHashAsync(_factory, email)).StartsWith("pbkdf2$"));
+
+        var resp = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        // The legacy hash was transparently rehashed to PBKDF2 on this successful login…
+        Assert.StartsWith("pbkdf2$", await TestHelpers.GetPasswordHashAsync(_factory, email));
+
+        // …and the upgraded hash still authenticates.
+        var again = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
     }
 }

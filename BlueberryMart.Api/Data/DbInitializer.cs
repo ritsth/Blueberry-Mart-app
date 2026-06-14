@@ -1,4 +1,5 @@
 using BlueberryMart.Api.Models.Entities;
+using BlueberryMart.Api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -171,8 +172,5 @@ public static class DbInitializer
         context.SaveChanges();
     }
 
-    // Placeholder — replace with a real BCrypt library (e.g. BCrypt.Net-Next) before production.
-    private static string BCrypt(string plaintext) =>
-        Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(plaintext)));
+    private static string BCrypt(string plaintext) => PasswordHasher.Hash(plaintext);
 }
