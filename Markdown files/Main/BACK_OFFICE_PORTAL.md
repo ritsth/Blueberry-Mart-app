@@ -82,12 +82,19 @@ detail modal (line items, totals, delivery address) with contextual actions:
   order can only be cancelled while still `pending`/`confirmed` (pre-fulfilment) — that's a refund,
   so it drops out of revenue (cancelled ∩ paid) while staying analyzable via the Explore
   `order_status` dimension.
-- **New in-store sale** — a "+ New in-store sale" button opens a till modal: pick the branch's
-  in-stock items + quantities, choose a payment method (cash/card/eSewa), and complete. The backend
-  (`POST /api/orders/manage/in-store-sale`) creates a paid, `completed`, `channel=in_store` order in
-  one shot and deducts stock. Staff/managers sell at their own branch; admins choose a branch.
-  Sales are anonymous walk-ins (the order has no customer — `UserId` is null, shown as "Walk-in"
-  in the list); attaching a specific customer for loyalty is API-supported but not yet in the UI.
+In-store walk-in sales are rung up on the dedicated **Sell** page (below), not here.
+
+### Sell (in-store point of sale)
+Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing up walk-ins:
+- Two-pane layout: searchable branch catalogue (active, in-stock) on the left; a running **ticket**
+  (line items, qty steppers, **running total**) on the right, plus a payment method (cash/card/eSewa)
+  and **Complete sale**.
+- Staff/managers sell at their own branch; admins pick a branch first.
+- **Complete sale** → `POST /api/orders/manage/in-store-sale`, which creates a paid, `completed`,
+  `channel=in_store` order in one shot and deducts stock. Shows a receipt line, clears the ticket,
+  and the sale appears on the Orders page as `completed` / `in_store`.
+- Sales are anonymous walk-ins (the order has no customer — `UserId` is null, shown as "Walk-in");
+  attaching a specific customer for loyalty is API-supported but not yet in the UI.
 
 ### Reports
 **Reports** page (manager/admin only): revenue (paid orders), paid-order count, average

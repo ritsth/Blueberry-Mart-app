@@ -35,9 +35,12 @@ and the Explore "Collected revenue only" toggle. See `SALES_EVENT_PIPELINE.md`.
 In-store till sales were added. Every `OrderPlaced` event now carries `Channel` (`online` |
 `in_store`), streamed into a new `channel` column on `sales_order_lines` and surfaced on the view as
 `COALESCE(l.channel, 'online') AS channel` (28 columns; pre-channel rows read as `online`). Explore
-auto-introspects it as a group-by dimension — no service change. **Prod apply:** `ALTER TABLE
-sales_order_lines ADD COLUMN channel STRING` (a re-run of `sales_fact_raw_tables.sql` won't add a
-column to the existing table), then re-run `sales_fact_view.sql`.
+auto-introspects it as a group-by dimension — no service change.
+
+**Prod apply — DONE 2026-06-13:** ran `ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS
+channel STRING` (a re-run of `sales_fact_raw_tables.sql` won't add a column to an existing table),
+then re-applied `sales_fact_view.sql`. Verified: all 754 historical rows read `channel='online'`;
+in-store sales land as `in_store` once the worker streams them.
 
 **Cutover DONE 2026-06-11** (commits `384a474`, `7e382b5`): created `sales_order_status`; seeded
 **313** status rows from prod `orders` (completed 178 / cancelled 64 / processing 25 / confirmed 24

@@ -68,6 +68,28 @@ a { color: var(--green); }
 .success { color: var(--green, #16a34a); font-size: 13px; margin: 0 0 12px; }
 .muted { color: var(--muted); }
 .qty-steppers { display: inline-flex; align-items: center; gap: 6px; }
+.qty-n { min-width: 22px; text-align: center; display: inline-block; font-weight: 600; }
+
+/* ---- Point of sale (Sell page) ---- */
+.pos-grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+.pos-list { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.pos-search { width: 100%; margin-bottom: 10px; }
+.pos-items { max-height: 64vh; overflow-y: auto; display: flex; flex-direction: column; }
+.pos-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 6px; border-bottom: 1px solid var(--line); }
+.pos-item:last-child { border-bottom: 0; }
+.pos-item-info { display: flex; flex-direction: column; gap: 2px; }
+.pos-item-info .muted { font-size: 12px; }
+
+.pos-ticket { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; position: sticky; top: 16px; }
+.pos-ticket h2 { font-size: 16px; margin: 0 0 12px; }
+.pos-ticket-lines { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.pos-ticket-line { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; }
+.pos-ticket-name { font-size: 14px; }
+.pos-ticket-amt { font-variant-numeric: tabular-nums; min-width: 78px; text-align: right; }
+.pos-total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 12px; font-size: 16px; }
+.pos-pay { display: flex; gap: 8px; }
+.pos-pay select { flex: 0 0 auto; }
+.pos-pay .btn { flex: 1; }
 
 /* ---- Grid table ---- */
 .grid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }

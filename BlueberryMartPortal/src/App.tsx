@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ItemsPage from './pages/ItemsPage';
 import OrdersPage from './pages/OrdersPage';
+import SellPage from './pages/SellPage';
 import ReportsPage from './pages/ReportsPage';
 import UsersPage from './pages/UsersPage';
 import ReviewsPage from './pages/ReviewsPage';
@@ -38,6 +39,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="sell" element={<SellPage />} />
         <Route path="items" element={<ItemsPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="reports" element={<RequireManager><ReportsPage /></RequireManager>} />
