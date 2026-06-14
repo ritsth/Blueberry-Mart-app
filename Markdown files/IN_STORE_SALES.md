@@ -90,10 +90,14 @@ walk-in pays in store
                        └─ inherits all loyalty + order history (no new account)
 ```
 
-- **Claim** happens in `POST /api/auth/register` with an optional `phone`. If a guest with that phone
-  exists (no email yet), register upgrades that **same row** to a full account. A phone already on a
-  full account → `409`. (App: the Register screen has an optional Phone field — *"link in-store
-  purchases & loyalty"*.)
+- **Claim at sign-up:** `POST /api/auth/register` with an optional `phone`. If a guest with that
+  phone exists (no email yet), register upgrades that **same row** to a full account. (App: the
+  Register screen has an optional Phone field — *"link in-store purchases & loyalty"*.)
+- **Claim later:** an existing account links its phone via `POST /api/profile/link-phone`, which
+  **merges** the guest into the signed-in account — reassigns the guest's orders, adds its loyalty,
+  and deletes the guest row. (App: the **Account** tab shows the linked phone or a "Link phone"
+  control.)
+- Either way: a phone already on a **full** account → `409`; phones are digits-only, ≤10.
 
 ---
 

@@ -92,6 +92,14 @@ public static class TestHelpers
         return (await ctx.Users.FirstAsync(u => u.Email == email.ToLower())).Id;
     }
 
+    /// <summary>True if a user row with the given id still exists.</summary>
+    public static async Task<bool> UserExistsAsync(BlueberryMartApiFactory factory, Guid id)
+    {
+        using var scope = factory.Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+        return await ctx.Users.AnyAsync(u => u.Id == id);
+    }
+
     /// <summary>Inserts a phone-only "guest" customer (no email/password) and returns its id.</summary>
     public static async Task<Guid> CreateGuestUserAsync(BlueberryMartApiFactory factory, string phone, int loyalty = 0)
     {

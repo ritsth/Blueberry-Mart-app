@@ -73,7 +73,8 @@ attaches `Authorization: Bearer <token>` and reads the token with `getStoredToke
   optional photo (camera or library); submits multipart to `/api/reviews` and earns
   loyalty points.
 - **Membership / Account**: activate/cancel Blueberry Plus, view loyalty points and
-  membership status.
+  membership status, and **link a phone** (`POST /api/profile/link-phone`) to claim in-store
+  purchases made as a guest under that number.
 - **Shareholder**: fixed analytics dashboard with charts (`ShareholderHomeTab`), plus
   a self-service **Explore** tab.
 - **Explore** (`ExploreTab` + `analyticsService`): a self-service report builder for

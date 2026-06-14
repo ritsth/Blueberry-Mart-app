@@ -101,7 +101,8 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `GET /api/payments/esewa/success` | public | eSewa success callback |
 | `GET /api/payments/esewa/failure` | public | eSewa failure callback |
 | `POST /api/reviews` | Customer/Shareholder | Submit a review (multipart) |
-| `GET /api/profile` | any | Profile + orders (with items) + reviews |
+| `GET /api/profile` | any | Profile (incl. `phone`) + orders (with items) + reviews |
+| `POST /api/profile/link-phone` | any | Link a phone to the signed-in account; **merges** a matching till guest (its orders + loyalty) into it |
 | `GET /api/addresses` · `POST` · `PUT /{id}/default` · `DELETE /{id}` | any | Manage addresses |
 | `GET /api/membership/status` · `POST /activate` · `POST /cancel` | any | Blueberry Plus membership |
 | `GET /api/shareholders/analytics` | Shareholder | Sales analytics + charts |
@@ -132,8 +133,11 @@ stored as `pbkdf2$sha256$<iter>$<salt>$<hash>`. Legacy unsalted-SHA256 hashes st
 
 **Account claim:** a till "guest" (phone only, no login) is upgraded to a full account when someone
 registers with that phone — `Register` finds the guest, attaches email+password to the **same row**
-(keeping its loyalty/orders), instead of creating a new one. Phones are digits-only, ≤10
-(`Validation/PhoneNumber`); a phone already on a full account → 409.
+(keeping its loyalty/orders), instead of creating a new one. An **existing** account can also claim
+later via `POST /api/profile/link-phone`, which **merges** the guest into the signed-in account
+(reassigns its orders, adds its loyalty, deletes the guest). Phones are digits-only, ≤10
+(`Validation/PhoneNumber`); a phone already on a full account → 409, and an account that already has
+a phone can't link another.
 
 ## Config & secrets
 - Local: `appsettings.Development.json` (dev DB + dev JWT). eSewa sandbox defaults

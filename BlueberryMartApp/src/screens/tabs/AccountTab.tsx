@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -24,6 +25,7 @@ const DEFAULT_MONTHLY_FEE = 199;
 
 interface ProfileSummary {
   email: string;
+  phone: string | null;
   role: string;
   loyaltyPoints: number;
   memberSince: string;
@@ -43,6 +45,8 @@ export default function AccountTab() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [linking, setLinking] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchProfile(); }, []));
 
@@ -127,6 +131,33 @@ export default function AccountTab() {
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   }
 
+  // Link a phone to claim any in-store "guest" purchases (loyalty + orders) made under that number.
+  async function linkPhone() {
+    const phone = phoneInput.replace(/\D/g, '').slice(0, 10);
+    if (!phone) { Alert.alert('Phone required', 'Enter your phone number.'); return; }
+    setLinking(true);
+    try {
+      const token = await getStoredToken();
+      const res = await fetch(`${API_BASE}/api/profile/link-phone`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert('Could not link phone', body.message ?? 'Please try again.');
+        return;
+      }
+      setPhoneInput('');
+      await fetchProfile();
+      Alert.alert('Phone linked', 'Your in-store purchases and points are now on your account.');
+    } catch {
+      Alert.alert('Error', 'Could not link phone. Check your connection.');
+    } finally {
+      setLinking(false);
+    }
+  }
+
   async function replayTour() {
     await AsyncStorage.removeItem(tourKeyFor(await getStoredUserId()));
     Alert.alert('Tour reset', 'The welcome tour will show next time you open the app.');
@@ -177,6 +208,34 @@ export default function AccountTab() {
         <Stat value={`${profile?.totalOrders ?? 0}`} label="Total orders" />
         <Stat value={`Rs ${(profile?.totalSpent ?? 0).toFixed(0)}`} label="Total spent" />
       </View>
+
+      {/* Phone */}
+      <Text style={styles.sectionLabel}>Phone</Text>
+      {profile?.phone ? (
+        <View style={styles.phoneCard}>
+          <Ionicons name="call-outline" size={18} color="#16a34a" />
+          <Text style={styles.phoneText}>{profile.phone}</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.phoneCard}>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="Phone number"
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              maxLength={10}
+              value={phoneInput}
+              onChangeText={(t) => setPhoneInput(t.replace(/\D/g, '').slice(0, 10))}
+              editable={!linking}
+            />
+            <TouchableOpacity style={[styles.linkBtn, linking && styles.disabled]} onPress={linkPhone} disabled={linking} activeOpacity={0.85}>
+              <Text style={styles.linkBtnText}>{linking ? '…' : 'Link'}</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.phoneHint}>Link the phone you use in store to collect those purchases &amp; points.</Text>
+        </>
+      )}
 
       {/* Membership */}
       <Text style={styles.sectionLabel}>Membership</Text>
@@ -295,6 +354,12 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: '#6b7280', textAlign: 'center' },
 
   sectionLabel: { fontSize: 12, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 4 },
+  phoneCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#e5e7eb' },
+  phoneText: { fontSize: 15, fontWeight: '600', color: '#111827' },
+  phoneInput: { flex: 1, fontSize: 15, color: '#111827', paddingVertical: 4 },
+  linkBtn: { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18 },
+  linkBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
+  phoneHint: { fontSize: 12, color: '#9ca3af', marginTop: 8, marginBottom: 4 },
 
   memberCard: { backgroundColor: '#14532d', borderRadius: 16, padding: 20, marginBottom: 20 },
   memberHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
