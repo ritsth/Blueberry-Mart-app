@@ -95,8 +95,10 @@ Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing 
   and attach one to credit loyalty / record it in their history; a member shows a 5% discount line.
   Left blank, the sale is an anonymous walk-in (null `UserId`, shown as "Walk-in").
 - **Complete sale** → `POST /api/orders/manage/in-store-sale`, which creates a paid, `completed`,
-  `channel=in_store` order in one shot and deducts stock. Shows a receipt line, clears the ticket,
-  and the sale appears on the Orders page as `completed` / `in_store`.
+  `channel=in_store` order in one shot and deducts stock. Pops a **printable receipt** (branch,
+  order #, date, cashier, customer/Walk-in, line items, subtotal/discount/total, payment) with a
+  **Print** button (`@media print` shows only the receipt) and **New sale**; the ticket clears and
+  the sale appears on the Orders page as `completed` / `in_store`.
 - **Dashboard placement:** staff land **directly on the till** as their home (it's their main job),
   via a `<SellPage embedded />` on the dashboard; managers/admins keep the stats Dashboard. The
   sidebar **Sell** link works for everyone.

@@ -147,6 +147,36 @@ a { color: var(--green); }
 .pos-customer-empty { padding: 12px 14px; }
 .pill.member { background: #ecfccb; color: #3f6212; margin-left: 0; flex: 0 0 auto; }
 
+/* In-store receipt */
+.receipt-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.receipt-card { background: #fff; border-radius: 12px; width: 360px; max-width: 100%; max-height: 90vh; overflow: auto; padding: 22px; box-shadow: 0 12px 32px rgba(0,0,0,0.2); }
+.receipt { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #111827; line-height: 1.5; }
+.receipt-head { text-align: center; margin-bottom: 12px; }
+.receipt-logo { font-size: 16px; font-weight: 800; }
+.receipt-sub { color: var(--muted); font-size: 12px; }
+.receipt-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.receipt-meta > div { display: flex; justify-content: space-between; gap: 12px; }
+.receipt-meta span:first-child { color: var(--muted); }
+.receipt-rule { border-top: 1px dashed #9ca3af; margin: 10px 0; }
+.receipt-lines { width: 100%; border-collapse: collapse; }
+.receipt-lines td { padding: 2px 0; vertical-align: top; }
+.receipt-qty { color: var(--muted); text-align: right; padding-right: 10px; white-space: nowrap; }
+.receipt-amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.receipt-totals { display: flex; flex-direction: column; gap: 3px; }
+.receipt-totals > div { display: flex; justify-content: space-between; }
+.receipt-totals .discount { color: var(--green); }
+.receipt-totals .grand { font-size: 15px; font-weight: 700; margin-top: 2px; }
+.receipt-foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.receipt-actions { display: flex; gap: 10px; margin-top: 18px; }
+.receipt-actions .btn { flex: 1; padding: 11px; }
+
+@media print {
+  body * { visibility: hidden !important; }
+  .receipt, .receipt * { visibility: visible !important; }
+  .receipt { position: absolute; left: 0; top: 0; width: 100%; }
+  .receipt-actions { display: none !important; }
+}
+
 /* ---- Grid table ---- */
 .grid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .grid th, .grid td { text-align: left; padding: 11px 14px; font-size: 14px; border-bottom: 1px solid var(--line); }

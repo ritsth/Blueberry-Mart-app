@@ -3,7 +3,20 @@ import {
   Branch, createInStoreSale, CustomerLite, getBranches, getSystemStatus, InventoryItem,
   listManagedItems, searchCustomers,
 } from '../api';
-import { getBranchId, isAdmin } from '../auth';
+import { getBranchId, getEmail, isAdmin } from '../auth';
+
+interface Receipt {
+  orderNumber: number;
+  at: Date;
+  branchName: string;
+  cashier: string;
+  customerEmail: string | null;
+  lines: { name: string; qty: number; unitPrice: number }[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  method: string;
+}
 
 /**
  * Point-of-sale screen for store staff: search the branch's catalogue, build a ticket with a
@@ -26,11 +39,12 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
   const [method, setMethod] = useState('cash');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [receipt, setReceipt] = useState<{ orderNumber: number; total: number } | null>(null);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [memberRate, setMemberRate] = useState(0.05);   // live rate from settings; 5% fallback
 
-  // Admins choose a branch; everyone else sells at their assigned branch.
-  useEffect(() => { if (admin) getBranches().then(setBranches).catch(() => setBranches([])); }, [admin]);
+  // Branch list (admins pick from it; everyone uses it to resolve the branch name for the receipt).
+  useEffect(() => { getBranches().then(setBranches).catch(() => setBranches([])); }, []);
+  const branchName = branches.find((b) => b.id === branchId)?.name ?? 'Blueberry Mart';
 
   // The actual member-discount rate the backend will apply (so the preview matches the charge).
   useEffect(() => { getSystemStatus().then((s) => setMemberRate(s.memberDiscountRate)).catch(() => {}); }, []);
@@ -68,7 +82,20 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
         paymentMethod: method,
         customerId: customer?.id,
       });
-      setReceipt({ orderNumber: res.orderNumber, total: res.totalAmount });
+      // Snapshot the ticket into a printable receipt before clearing it. The grand total comes
+      // from the server response (authoritative); subtotal/discount are the matching breakdown.
+      setReceipt({
+        orderNumber: res.orderNumber,
+        at: new Date(),
+        branchName,
+        cashier: getEmail(),
+        customerEmail: customer?.email ?? null,
+        lines: lines.map(([id, q]) => ({ name: byId[id]?.itemName ?? '', qty: q, unitPrice: byId[id]?.price ?? 0 })),
+        subtotal,
+        discount,
+        total: res.totalAmount,
+        method,
+      });
       setCart({});
       setSearch('');
       setCustomer(null);
@@ -109,11 +136,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      {receipt && (
-        <p className="success">
-          ✓ Sale completed — order #{receipt.orderNumber}, Rs {receipt.total.toFixed(2)}. Start the next sale below.
-        </p>
-      )}
+      {receipt && <ReceiptOverlay receipt={receipt} onClose={() => setReceipt(null)} />}
 
       {!branchId ? (
         <p className="muted">{admin ? 'Choose a branch to start selling.' : 'Your account is not assigned to a branch.'}</p>
@@ -207,6 +230,59 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Printable in-store receipt shown after a completed sale. `@media print` (styles.css) hides
+ *  everything but the `.receipt` block, so "Print" produces a clean slip. */
+function ReceiptOverlay({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
+  const r = receipt;
+  return (
+    <div className="receipt-overlay" onClick={onClose}>
+      <div className="receipt-card" onClick={(e) => e.stopPropagation()}>
+        <div className="receipt">
+          <div className="receipt-head">
+            <div className="receipt-logo">🫐 Blueberry Mart</div>
+            <div className="receipt-sub">{r.branchName}</div>
+          </div>
+          <div className="receipt-meta">
+            <div><span>Order</span><strong>#{r.orderNumber}</strong></div>
+            <div><span>Date</span><span>{r.at.toLocaleString()}</span></div>
+            <div><span>Cashier</span><span>{r.cashier}</span></div>
+            <div><span>Customer</span><span>{r.customerEmail ?? 'Walk-in'}</span></div>
+          </div>
+          <div className="receipt-rule" />
+          <table className="receipt-lines">
+            <tbody>
+              {r.lines.map((l, i) => (
+                <tr key={i}>
+                  <td>{l.name}</td>
+                  <td className="receipt-qty">{l.qty} × {l.unitPrice.toFixed(2)}</td>
+                  <td className="receipt-amt">Rs {(l.qty * l.unitPrice).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="receipt-rule" />
+          <div className="receipt-totals">
+            {r.discount > 0 && (
+              <>
+                <div><span>Subtotal</span><span>Rs {r.subtotal.toFixed(2)}</span></div>
+                <div className="discount"><span>Member discount</span><span>− Rs {r.discount.toFixed(2)}</span></div>
+              </>
+            )}
+            <div className="grand"><span>Total</span><strong>Rs {r.total.toFixed(2)}</strong></div>
+            <div><span>Paid ({r.method})</span><span>Rs {r.total.toFixed(2)}</span></div>
+          </div>
+          <div className="receipt-rule" />
+          <div className="receipt-foot">Thank you for shopping at Blueberry Mart!</div>
+        </div>
+        <div className="receipt-actions">
+          <button className="btn" onClick={() => window.print()}>Print</button>
+          <button className="btn primary" onClick={onClose}>New sale</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
