@@ -222,7 +222,7 @@ public class ManageInventoryController(
             .Select(s => new StockAdjustmentResponse
             {
                 CreatedAt = s.CreatedAt,
-                UserEmail = s.User.Email,
+                UserEmail = s.User.Email ?? "",   // adjustments are made by staff (always have an email)
                 Delta = s.Delta,
                 NewQuantity = s.NewQuantity,
                 Reason = s.Reason,

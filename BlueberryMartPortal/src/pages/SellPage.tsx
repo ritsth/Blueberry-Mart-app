@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Branch, createInStoreSale, CustomerLite, getBranches, getSystemStatus, InventoryItem,
-  listManagedItems, searchCustomers,
+  Branch, createGuestCustomer, createInStoreSale, CustomerLite, customerLabel, getBranches,
+  getSystemStatus, InventoryItem, listManagedItems, searchCustomers,
 } from '../api';
 import { getBranchId, getEmail, isAdmin } from '../auth';
 
@@ -10,7 +10,7 @@ interface Receipt {
   at: Date;
   branchName: string;
   cashier: string;
-  customerEmail: string | null;
+  customer: string | null;
   lines: { name: string; qty: number; unitPrice: number }[];
   subtotal: number;
   discount: number;
@@ -89,7 +89,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
         at: new Date(),
         branchName,
         cashier: getEmail(),
-        customerEmail: customer?.email ?? null,
+        customer: customer ? customerLabel(customer) : null,
         lines: lines.map(([id, q]) => ({ name: byId[id]?.itemName ?? '', qty: q, unitPrice: byId[id]?.price ?? 0 })),
         subtotal,
         discount,
@@ -249,7 +249,7 @@ function ReceiptOverlay({ receipt, onClose }: { receipt: Receipt; onClose: () =>
             <div><span>Order</span><strong>#{r.orderNumber}</strong></div>
             <div><span>Date</span><span>{r.at.toLocaleString()}</span></div>
             <div><span>Cashier</span><span>{r.cashier}</span></div>
-            <div><span>Customer</span><span>{r.customerEmail ?? 'Walk-in'}</span></div>
+            <div><span>Customer</span><span>{r.customer ?? 'Walk-in'}</span></div>
           </div>
           <div className="receipt-rule" />
           <table className="receipt-lines">
@@ -305,11 +305,15 @@ function Stepper({ value, max, onChange }: { value: number; max: number; onChang
   );
 }
 
-/** Optional "attach customer" control: search by email, pick a match, or stay anonymous. */
+/** Optional "attach customer" control: search by email/phone, pick a match, quick-create a guest
+ *  by phone, or stay anonymous (walk-in). */
 function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null; onChange: (c: CustomerLite | null) => void }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<CustomerLite[]>([]);
   const [open, setOpen] = useState(false);
+  const [newPhone, setNewPhone] = useState<string | null>(null);   // non-null = the "new customer" form is open
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -325,17 +329,57 @@ function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null;
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [q, customer]);
 
+  async function createGuest() {
+    const phone = (newPhone ?? '').trim();
+    if (!phone) { setError('Enter a phone number.'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      const c = await createGuestCustomer(phone);
+      onChange(c);
+      setNewPhone(null); setQ('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the customer.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (customer) {
+    const label = customerLabel(customer);
     return (
       <div className="pos-customer attached">
         <div className="pos-customer-info">
           <div className="pos-customer-email">
-            <strong title={customer.email}>{customer.email}</strong>
+            <strong title={label}>{label}</strong>
             {customer.isMember && <span className="pill member">Member</span>}
           </div>
-          <div className="muted">{customer.loyaltyPoints} pts · earns loyalty</div>
+          <div className="muted">
+            {customer.email && customer.phone ? `${customer.phone} · ` : ''}{customer.loyaltyPoints} pts · earns loyalty
+          </div>
         </div>
         <button className="btn small" onClick={() => { onChange(null); setQ(''); }}>Remove</button>
+      </div>
+    );
+  }
+
+  // "New customer" (guest by phone) form.
+  if (newPhone !== null) {
+    return (
+      <div className="pos-customer">
+        <div className="pos-newcust">
+          <input
+            placeholder="Customer phone…"
+            value={newPhone}
+            inputMode="tel"
+            autoFocus
+            onChange={(e) => setNewPhone(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') createGuest(); }}
+          />
+          <button className="btn primary" disabled={busy} onClick={createGuest}>Create &amp; attach</button>
+          <button className="btn" disabled={busy} onClick={() => { setNewPhone(null); setError(''); }}>Cancel</button>
+        </div>
+        {error && <p className="error">{error}</p>}
       </div>
     );
   }
@@ -343,21 +387,26 @@ function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null;
   return (
     <div className="pos-customer">
       <input
-        placeholder="Attach customer by email (optional)…"
+        placeholder="Attach customer by email or phone (optional)…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onFocus={() => { if (results.length) setOpen(true); }}
       />
+      <button className="pos-newcust-link" onClick={() => { setNewPhone(q.trim()); setOpen(false); }}>+ New customer</button>
       {open && (
         <div className="pos-customer-results">
-          {results.length === 0
-            ? <div className="pos-customer-empty muted">No matches.</div>
-            : results.map((c) => (
-              <button key={c.id} className="pos-customer-row" onClick={() => { onChange(c); setOpen(false); setQ(''); }} title={c.email}>
-                <span className="pos-customer-row-email">{c.email}</span>
+          {results.map((c) => {
+            const label = customerLabel(c);
+            return (
+              <button key={c.id} className="pos-customer-row" onClick={() => { onChange(c); setOpen(false); setQ(''); }} title={label}>
+                <span className="pos-customer-row-email">{label}</span>
                 {c.isMember && <span className="pill member">Member</span>}
               </button>
-            ))}
+            );
+          })}
+          <button className="pos-customer-row pos-customer-new" onClick={() => { setNewPhone(q.trim()); setOpen(false); }}>
+            + New customer{results.length === 0 ? ' (no matches)' : ''}
+          </button>
         </div>
       )}
     </div>

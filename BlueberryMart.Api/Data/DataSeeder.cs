@@ -236,7 +236,7 @@ public static class DataSeeder
     private static async Task ClearAsync(BlueberryMartDbContext ctx)
     {
         var seedUserIds = await ctx.Users
-            .Where(u => u.Email.EndsWith(SeedDomain))
+            .Where(u => u.Email != null && u.Email.EndsWith(SeedDomain))
             .Select(u => u.Id)
             .ToListAsync();
         var orderIds = await ctx.Orders

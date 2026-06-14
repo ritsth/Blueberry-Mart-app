@@ -33,7 +33,7 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
             await context.SaveChangesAsync();
         }
 
-        var token = GenerateToken(user.Id, user.Email, user.Role, user.BranchId);
+        var token = GenerateToken(user.Id, user.Email!, user.Role, user.BranchId);
         return Ok(new { token });
     }
 

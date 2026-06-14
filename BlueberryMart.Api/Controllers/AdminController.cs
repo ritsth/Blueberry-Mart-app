@@ -40,7 +40,7 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = $"%{search.Trim().ToLower()}%";
-            query = query.Where(u => EF.Functions.ILike(u.Email, term));
+            query = query.Where(u => EF.Functions.ILike(u.Email!, term) || EF.Functions.ILike(u.Phone!, term));
         }
         if (!string.IsNullOrWhiteSpace(role))
             query = query.Where(u => u.Role == role.ToLower());
@@ -56,6 +56,7 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
             {
                 Id = u.Id,
                 Email = u.Email,
+                Phone = u.Phone,
                 Role = u.Role,
                 BranchId = u.BranchId,
                 BranchName = u.BranchId != null ? u.Branch!.Name : null,
@@ -131,7 +132,7 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
             .Select(r => new AdminReviewResponse
             {
                 Id = r.Id,
-                UserEmail = r.User.Email,
+                UserEmail = r.User.Email ?? "",   // reviewers are registered users (always have an email)
                 ItemName = r.Item.ItemName,
                 Rating = r.Rating,
                 Comment = r.Comment,

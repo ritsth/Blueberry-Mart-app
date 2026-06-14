@@ -29,7 +29,9 @@ wwwroot/       static files (eSewa result pages)
 
 ## Data model (`Models/Entities/`)
 - **User** — email, password hash, `role`, loyalty points, membership window
-  (`MemberSince`/`MemberUntil`/`MembershipCancelled`, computed `IsMember`).
+  (`MemberSince`/`MemberUntil`/`MembershipCancelled`, computed `IsMember`). `Email`/`PasswordHash`
+  are **nullable** and `Phone` (**unique**) identifies a **guest** customer quick-created at the till
+  by phone only (no app login until they claim the account).
 - **Branch** — store location.
 - **Inventory** — item per branch (name, price, stock, `IsBulkOnly`).
 - **Order** — `OrderNumber` (sequential from 1001), `UserId` (**nullable** — null for an
@@ -81,7 +83,8 @@ All tables use `uuid` PKs (`gen_random_uuid()`); timestamps are `TIMESTAMPTZ` (U
 | `POST /api/orders/{id}/receive` | Customer/Shareholder | Mark a **ready** order received (→ completed; owner only) |
 | `POST /api/orders/{id}/cancel` | Customer/Shareholder | Self-cancel own **pending** (unpaid) order + restock (owner only) |
 | `POST /api/orders/manage/in-store-sale` | Staff/Manager/Admin | Ring up a walk-in sale: creates a paid, `completed`, `channel=in_store` order at the staff's branch (admin passes `branchId`); deducts stock. **Retail only — bulk items rejected.** No `customerId` → null owner (anonymous); pass one to credit loyalty |
-| `GET /api/orders/manage/customers?q=` | Staff/Manager/Admin | Look up shoppers (customer/shareholder) by email to attach to an in-store sale (id, email, isMember, loyaltyPoints; ≤10) |
+| `GET /api/orders/manage/customers?q=` | Staff/Manager/Admin | Look up shoppers (customer/shareholder) by email **or phone** to attach to an in-store sale (id, email, phone, isMember, loyaltyPoints; ≤10) |
+| `POST /api/orders/manage/customers` | Staff/Manager/Admin | Quick-create a **guest** customer from `{ phone }` (idempotent — returns the existing user if the phone is already known); lets a first-time walk-in start earning loyalty |
 | `GET /api/branches` | any | List branches |
 | `GET /api/inventory/customer?branchId=` | Customer/Shareholder | In-stock, non-bulk items |
 | `GET /api/inventory/bulk?branchId=` | Customer/Shareholder | Bulk catalog (members only) |

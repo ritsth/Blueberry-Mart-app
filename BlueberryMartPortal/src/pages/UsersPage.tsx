@@ -40,7 +40,7 @@ export default function UsersPage() {
   useEffect(() => { getBranches().then(setBranches).catch(() => setBranches([])); }, []);
 
   async function onBan(u: AdminUser) {
-    const reason = window.prompt(`Ban ${u.email}?\nOptional reason:`, '');
+    const reason = window.prompt(`Ban ${u.email ?? u.phone}?\nOptional reason:`, '');
     if (reason === null) return; // cancelled
     try {
       await banUser(u.id, reason);
@@ -51,7 +51,7 @@ export default function UsersPage() {
   }
 
   async function onUnban(u: AdminUser) {
-    if (!window.confirm(`Unban ${u.email}?`)) return;
+    if (!window.confirm(`Unban ${u.email ?? u.phone}?`)) return;
     try {
       await unbanUser(u.id);
       await load();
@@ -72,7 +72,7 @@ export default function UsersPage() {
       }
       branchId = u.branchId ?? branches[0].id;
     }
-    if (!window.confirm(`Change ${u.email} from "${u.role}" to "${newRole}"?`)) {
+    if (!window.confirm(`Change ${u.email ?? u.phone} from "${u.role}" to "${newRole}"?`)) {
       await load(); // revert the select to the real value
       return;
     }
@@ -138,7 +138,7 @@ export default function UsersPage() {
         <tbody>
           {data?.items.map((u) => (
             <tr key={u.id} className={u.isBanned ? 'banned-row' : ''}>
-              <td>{u.email}</td>
+              <td>{u.email ?? (u.phone ? `${u.phone} (guest)` : '—')}</td>
               <td>
                 <select
                   className={`role-select role-${u.role}`}

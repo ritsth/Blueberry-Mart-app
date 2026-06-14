@@ -91,9 +91,11 @@ Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing 
   a payment method (cash/card/eSewa) and **Complete sale**. Bulk is members-only wholesale, so it
   isn't sold at the walk-in till (the API rejects bulk items too).
 - Staff/managers sell at their own branch; admins pick a branch first.
-- **Attach customer (optional):** search shoppers by email (`GET /api/orders/manage/customers?q=`)
-  and attach one to credit loyalty / record it in their history; a member shows a 5% discount line.
-  Left blank, the sale is an anonymous walk-in (null `UserId`, shown as "Walk-in").
+- **Attach customer (optional):** search shoppers by email **or phone**
+  (`GET /api/orders/manage/customers?q=`) and attach one to credit loyalty / record it in their
+  history; a member shows a discount line. **+ New customer** quick-creates a *guest* from just a
+  phone (`POST /api/orders/manage/customers`, idempotent by phone) so first-timers start earning
+  loyalty. Left blank, the sale is an anonymous walk-in (null `UserId`, shown as "Walk-in").
 - **Complete sale** → `POST /api/orders/manage/in-store-sale`, which creates a paid, `completed`,
   `channel=in_store` order in one shot and deducts stock. Pops a **printable receipt** (branch,
   order #, date, cashier, customer/Walk-in, line items, subtotal/discount/total, payment) with a

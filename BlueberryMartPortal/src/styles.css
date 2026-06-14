@@ -145,6 +145,11 @@ a { color: var(--green); }
 .pos-customer-row:hover { background: #f0fdf4; }
 .pos-customer-row-email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-customer-empty { padding: 12px 14px; }
+.pos-customer-new { color: var(--green); font-weight: 700; }
+.pos-newcust-link { background: none; border: 0; color: var(--green); font-weight: 600; font-size: 13px; cursor: pointer; padding: 6px 2px 0; }
+.pos-newcust { display: flex; gap: 8px; }
+.pos-newcust input { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
+.pos-newcust input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,0.14); }
 .pill.member { background: #ecfccb; color: #3f6212; margin-left: 0; flex: 0 0 auto; }
 
 /* In-store receipt */

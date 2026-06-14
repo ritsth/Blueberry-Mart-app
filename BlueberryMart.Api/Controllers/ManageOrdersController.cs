@@ -90,7 +90,7 @@ public class ManageOrdersController(
             {
                 Id = o.Id,
                 OrderNumber = o.OrderNumber,
-                CustomerEmail = o.User != null ? o.User.Email : "Walk-in",
+                CustomerEmail = o.User != null ? (o.User.Email ?? o.User.Phone ?? "Walk-in") : "Walk-in",
                 BranchId = o.BranchId,
                 BranchName = o.Branch.Name,
                 OrderType = o.OrderType,
@@ -129,7 +129,7 @@ public class ManageOrdersController(
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
-            CustomerEmail = order.User?.Email ?? "Walk-in",
+            CustomerEmail = order.User?.Email ?? order.User?.Phone ?? "Walk-in",
             BranchId = order.BranchId,
             BranchName = order.Branch.Name,
             OrderType = order.OrderType,
@@ -341,9 +341,9 @@ public class ManageOrdersController(
     }
 
     // GET /api/orders/manage/customers?q=
-    // Look up shoppers (customer/shareholder) by email so staff can optionally attach one to an
-    // in-store sale (to credit loyalty / put it in their history). Not branch-scoped — customers
-    // aren't tied to a branch. Returns at most 10 matches.
+    // Look up shoppers (customer/shareholder) by email or phone so staff can optionally attach one
+    // to an in-store sale (to credit loyalty / put it in their history). Not branch-scoped —
+    // customers aren't tied to a branch. Returns at most 10 matches.
     [HttpGet("customers")]
     public async Task<IActionResult> SearchCustomers([FromQuery] string q)
     {
@@ -354,19 +354,50 @@ public class ManageOrdersController(
         var now = DateTime.UtcNow;
         var matches = await context.Users.AsNoTracking()
             .Where(u => (u.Role == "customer" || u.Role == "shareholder") && !u.IsBanned
-                        && EF.Functions.ILike(u.Email, term))
+                        && (EF.Functions.ILike(u.Email!, term) || EF.Functions.ILike(u.Phone!, term)))
             .OrderBy(u => u.Email)
             .Take(10)
             .Select(u => new
             {
                 u.Id,
                 u.Email,
+                u.Phone,
                 IsMember = u.Role == "shareholder" || (u.MemberUntil.HasValue && u.MemberUntil.Value > now),
                 u.LoyaltyPoints,
             })
             .ToListAsync();
 
         return Ok(matches);
+    }
+
+    // POST /api/orders/manage/customers  { phone }
+    // Quick-create a "guest" customer at the till from just a phone number (no app login until they
+    // claim the account), so a first-time walk-in can start earning loyalty. Idempotent: if a user
+    // with that phone already exists it's returned, so repeat visits don't create duplicates.
+    [HttpPost("customers")]
+    public async Task<IActionResult> CreateGuestCustomer([FromBody] GuestCustomerRequest request)
+    {
+        var phone = request.Phone?.Trim();
+        if (string.IsNullOrWhiteSpace(phone))
+            return BadRequest(new { message = "A phone number is required." });
+
+        var now = DateTime.UtcNow;
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+        if (user is null)
+        {
+            user = new User { Id = Guid.NewGuid(), Phone = phone, Role = "customer", CreatedAt = now, UpdatedAt = now };
+            context.Users.Add(user);
+            await context.SaveChangesAsync();
+        }
+
+        return Ok(new
+        {
+            user.Id,
+            user.Email,
+            user.Phone,
+            IsMember = user.Role == "shareholder" || (user.MemberUntil.HasValue && user.MemberUntil.Value > now),
+            user.LoyaltyPoints,
+        });
     }
 
     [HttpPost("{id:guid}/record-payment")]

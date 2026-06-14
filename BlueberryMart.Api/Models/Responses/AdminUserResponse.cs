@@ -4,7 +4,8 @@ namespace BlueberryMart.Api.Models.Responses;
 public class AdminUserResponse
 {
     public Guid Id { get; set; }
-    public string Email { get; set; } = null!;
+    public string? Email { get; set; }      // null for a guest customer (created at the till by phone)
+    public string? Phone { get; set; }
     public string Role { get; set; } = null!;
     public Guid? BranchId { get; set; }
     public string? BranchName { get; set; }

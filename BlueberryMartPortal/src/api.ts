@@ -31,7 +31,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 // ---- Types mirroring the API's admin responses ----
 export interface AdminUser {
   id: string;
-  email: string;
+  email: string | null;   // null for a guest customer (created at the till by phone)
+  phone: string | null;
   role: string;
   branchId: string | null;
   branchName: string | null;
@@ -208,16 +209,31 @@ export function createInStoreSale(body: {
   });
 }
 
-// Look up shoppers by email to optionally attach to an in-store sale (for loyalty).
+// Look up / create shoppers to optionally attach to an in-store sale (for loyalty).
 export interface CustomerLite {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   isMember: boolean;
   loyaltyPoints: number;
 }
 
 export function searchCustomers(q: string): Promise<CustomerLite[]> {
   return request<CustomerLite[]>(`/api/orders/manage/customers?q=${encodeURIComponent(q)}`);
+}
+
+// Quick-create a guest customer at the till by phone (idempotent — returns the existing one if the
+// phone already exists), so a first-time walk-in can start earning loyalty.
+export function createGuestCustomer(phone: string): Promise<CustomerLite> {
+  return request<CustomerLite>('/api/orders/manage/customers', {
+    method: 'POST',
+    body: JSON.stringify({ phone }),
+  });
+}
+
+/** Display label for a customer: email if they have one, else phone. */
+export function customerLabel(c: CustomerLite): string {
+  return c.email ?? c.phone ?? 'Customer';
 }
 
 // Public store status — used by the till to read the live member discount rate (so the preview

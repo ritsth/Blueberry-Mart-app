@@ -32,7 +32,7 @@ public static class PasswordHasher
     /// new PBKDF2 format and the legacy unsalted-SHA256-base64 format; for a valid legacy hash it
     /// sets <paramref name="needsRehash"/> so the caller can upgrade it on the spot.
     /// </summary>
-    public static bool Verify(string password, string storedHash, out bool needsRehash)
+    public static bool Verify(string password, string? storedHash, out bool needsRehash)
     {
         needsRehash = false;
         if (string.IsNullOrEmpty(storedHash)) return false;

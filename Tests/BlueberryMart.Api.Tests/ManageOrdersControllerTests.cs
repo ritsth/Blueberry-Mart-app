@@ -258,4 +258,75 @@ public class ManageOrdersControllerTests
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
+
+    // ---- Guest customers (quick-create at the till) ----
+
+    private async Task<(string id, HttpStatusCode status)> CreateGuestAsync(string token, string phone)
+    {
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Post, "/api/orders/manage/customers")
+            { Content = JsonContent.Create(new { phone }) }.WithBearer(token));
+        if (resp.StatusCode != HttpStatusCode.OK) return ("", resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return (json.GetProperty("id").GetString()!, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateGuestCustomer_ThenInStoreSale_CreditsLoyalty()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var phone = $"98{Guid.NewGuid():N}"[..10];
+
+        var (id, status) = await CreateGuestAsync(staff, phone);
+        Assert.Equal(HttpStatusCode.OK, status);
+        var customerId = Guid.Parse(id);
+
+        var before = await TestHelpers.GetLoyaltyPointsAsync(_factory, customerId);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(_factory, _downtown, $"Guest {Guid.NewGuid():N}", stock: 10);
+        var sale = await _client.SendAsync(InStoreSale(new
+        {
+            items = new[] { new { itemId, quantity = 1 } },
+            paymentMethod = "cash",
+            customerId
+        }).WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.OK, sale.StatusCode);
+        Assert.True(await TestHelpers.GetLoyaltyPointsAsync(_factory, customerId) > before);
+    }
+
+    [Fact]
+    public async Task CreateGuestCustomer_ExistingPhone_ReturnsSameRecord()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var phone = $"97{Guid.NewGuid():N}"[..10];
+
+        var first = await CreateGuestAsync(staff, phone);
+        var second = await CreateGuestAsync(staff, phone);
+
+        Assert.Equal(HttpStatusCode.OK, second.status);
+        Assert.Equal(first.id, second.id);   // idempotent dedup by phone
+    }
+
+    [Fact]
+    public async Task SearchCustomers_FindsGuestByPhone()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var phone = $"96{Guid.NewGuid():N}"[..10];
+        await CreateGuestAsync(staff, phone);
+
+        var resp = await _client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/orders/manage/customers?q={phone}").WithBearer(staff));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var rows = await resp.Content.ReadFromJsonAsync<JsonElement[]>();
+        Assert.Contains(rows!, r => r.GetProperty("phone").GetString() == phone);
+    }
+
+    [Fact]
+    public async Task CreateGuestCustomer_EmptyPhone_BadRequest()
+    {
+        var staff = await RoleTokenAsync("staff", _downtown);
+        var (_, status) = await CreateGuestAsync(staff, "   ");
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+    }
 }

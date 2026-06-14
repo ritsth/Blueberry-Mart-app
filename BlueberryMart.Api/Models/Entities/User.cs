@@ -5,8 +5,12 @@ namespace BlueberryMart.Api.Models.Entities;
 public class User
 {
     public Guid Id { get; set; }
-    public string Email { get; set; } = null!;
-    public string PasswordHash { get; set; } = null!;
+
+    // Email + PasswordHash are null for a "guest" customer created at the till by phone only
+    // (no app login until they claim the account). Phone is the guest's unique lookup key.
+    public string? Email { get; set; }
+    public string? PasswordHash { get; set; }
+    public string? Phone { get; set; }
     public string Role { get; set; } = "customer";
 
     // For back-office field roles (staff/manager): the branch they operate.
