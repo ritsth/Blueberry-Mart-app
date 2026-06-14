@@ -54,15 +54,6 @@ function ManagerDashboard({ email, role, branchId }: { email: string; role: stri
         )}
       </div>
 
-      <Link to="/sell" className="till-card">
-        <span className="till-icon">🛒</span>
-        <span className="till-text">
-          <strong>Open till</strong>
-          <span className="muted">Ring up an in-store sale</span>
-        </span>
-        <span className="till-go">→</span>
-      </Link>
-
       <div className="stats">
         <Link to="/items" className="stat">
           <span className={`stat-num ${summary && summary.lowStockItems > 0 ? 'warn' : ''}`}>

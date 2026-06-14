@@ -85,6 +85,7 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
           <span className="count">in-store till</span>
           {admin && (
             <select
+              className="pos-branch"
               style={{ marginLeft: 'auto' }}
               value={branchId}
               onChange={(e) => { setBranchId(e.target.value); setCart({}); setCustomer(null); setReceipt(null); }}
@@ -97,8 +98,8 @@ export default function SellPage({ embedded = false }: { embedded?: boolean }) {
       )}
 
       {embedded && admin && (
-        <div style={{ marginBottom: 12 }}>
-          <select value={branchId} onChange={(e) => { setBranchId(e.target.value); setCart({}); setCustomer(null); setReceipt(null); }}>
+        <div className="pos-branch-row">
+          <select className="pos-branch" value={branchId} onChange={(e) => { setBranchId(e.target.value); setCart({}); setCustomer(null); setReceipt(null); }}>
             <option value="">Select a branch…</option>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>

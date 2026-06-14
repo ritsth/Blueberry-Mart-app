@@ -96,9 +96,9 @@ Portal **Sell** page (`SellPage`, all back-office roles) — a till for ringing 
 - **Complete sale** → `POST /api/orders/manage/in-store-sale`, which creates a paid, `completed`,
   `channel=in_store` order in one shot and deducts stock. Shows a receipt line, clears the ticket,
   and the sale appears on the Orders page as `completed` / `in_store`.
-- **Dashboard placement:** staff land **directly on the till** as their home (it's their main job);
-  managers/admins get the stats Dashboard with a prominent **"Open till"** card. The sidebar **Sell**
-  link works for everyone. The page is reused via a `<SellPage embedded />` prop on the dashboard.
+- **Dashboard placement:** staff land **directly on the till** as their home (it's their main job),
+  via a `<SellPage embedded />` on the dashboard; managers/admins keep the stats Dashboard. The
+  sidebar **Sell** link works for everyone.
 
 ### Reports
 **Reports** page (manager/admin only): revenue (paid orders), paid-order count, average
