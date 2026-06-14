@@ -239,9 +239,11 @@ function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null;
   if (customer) {
     return (
       <div className="pos-customer attached">
-        <div>
-          <strong>{customer.email}</strong>
-          {customer.isMember && <span className="pill member">Member</span>}
+        <div className="pos-customer-info">
+          <div className="pos-customer-email">
+            <strong title={customer.email}>{customer.email}</strong>
+            {customer.isMember && <span className="pill member">Member</span>}
+          </div>
           <div className="muted">{customer.loyaltyPoints} pts · earns loyalty</div>
         </div>
         <button className="btn small" onClick={() => { onChange(null); setQ(''); }}>Remove</button>
@@ -262,8 +264,8 @@ function CustomerPicker({ customer, onChange }: { customer: CustomerLite | null;
           {results.length === 0
             ? <div className="pos-customer-empty muted">No matches.</div>
             : results.map((c) => (
-              <button key={c.id} className="pos-customer-row" onClick={() => { onChange(c); setOpen(false); setQ(''); }}>
-                <span>{c.email}</span>
+              <button key={c.id} className="pos-customer-row" onClick={() => { onChange(c); setOpen(false); setQ(''); }} title={c.email}>
+                <span className="pos-customer-row-email">{c.email}</span>
                 {c.isMember && <span className="pill member">Member</span>}
               </button>
             ))}
