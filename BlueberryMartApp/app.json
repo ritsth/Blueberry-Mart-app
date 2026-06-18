@@ -11,6 +11,8 @@
       "bundleIdentifier": "com.ritsth.BlueberryMartApp"
     },
     "android": {
+      "package": "com.ritsth.BlueberryMartApp",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -21,6 +23,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3bbda575-f718-4332-b5b8-4edf68983ef3"
+      }
+    },
+    "owner": "ritsth"
   }
 }
