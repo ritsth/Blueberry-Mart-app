@@ -151,6 +151,7 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
         user.Email = null;
         user.PasswordHash = null;
         user.Phone = null;
+        user.GoogleId = null;   // so a later Google sign-in starts a fresh account, not this one
         user.MembershipCancelled = true;
         user.DeletedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;

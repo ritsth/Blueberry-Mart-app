@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { login, WorkAccountError } from '../services/authService';
+import { Ionicons } from '@expo/vector-icons';
+import { googleSignIn, GoogleCancelledError, login, WorkAccountError } from '../services/authService';
 import type { RootStackParamList } from '../../App';
 
 type Props = {
@@ -42,6 +43,26 @@ export default function LoginScreen({ navigation }: Props) {
       }
     } catch (e) {
       setError(e instanceof WorkAccountError ? e.message : 'Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { role } = await googleSignIn();
+      navigation.replace(role === 'Shareholder' ? 'ShareholderTabs' : 'CustomerTabs');
+    } catch (e) {
+      if (e instanceof GoogleCancelledError) {
+        // User dismissed the picker — not an error.
+      } else if (e instanceof WorkAccountError) {
+        setError(e.message);
+      } else {
+        setError('Could not sign in with Google. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -90,6 +111,22 @@ export default function LoginScreen({ navigation }: Props) {
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.buttonText}>Sign In</Text>}
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.googleButton, loading && styles.googleButtonDisabled]}
+          onPress={handleGoogleSignIn}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="logo-google" size={18} color="#4285F4" />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -174,6 +211,41 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#9ca3af',
+    fontSize: 13,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingVertical: 13,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleButtonText: {
+    color: '#374151',
+    fontSize: 15,
     fontWeight: '600',
   },
   linkRow: {

@@ -28,6 +28,9 @@
         "projectId": "3bbda575-f718-4332-b5b8-4edf68983ef3"
       }
     },
-    "owner": "ritsth"
+    "owner": "ritsth",
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ]
   }
 }

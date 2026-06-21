@@ -163,6 +163,60 @@ public class AuthControllerTests
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 
+    // Fake validator (registered in the factory) reads tokens shaped "sub|email|verified".
+    private Task<HttpResponseMessage> GoogleSignIn(string sub, string email, bool verified = true) =>
+        _client.PostAsJsonAsync("/api/auth/google",
+            new { idToken = $"{sub}|{email}|{(verified ? "true" : "false")}" });
+
+    [Fact]
+    public async Task Google_NewUser_CreatesCustomerAndReturnsToken()
+    {
+        var sub = $"g-{Guid.NewGuid():N}";
+        var email = $"g_{Guid.NewGuid():N}@gmail.com";
+
+        var resp = await GoogleSignIn(sub, email);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(string.IsNullOrWhiteSpace(json.GetProperty("token").GetString()));
+
+        // The account now exists, and signing in again with the same Google id reuses it (no dup).
+        var id1 = await TestHelpers.GetUserIdByEmailAsync(_factory, email);
+        await GoogleSignIn(sub, email);
+        Assert.Equal(id1, await TestHelpers.GetUserIdByEmailAsync(_factory, email));
+    }
+
+    [Fact]
+    public async Task Google_ExistingEmail_LinksAccountNoDuplicate()
+    {
+        // A password account already exists with this email.
+        var email = $"link_{Guid.NewGuid():N}@gmail.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+        var existingId = await TestHelpers.GetUserIdByEmailAsync(_factory, email);
+
+        // Signing in with Google for the same (verified) email links onto the same row.
+        var resp = await GoogleSignIn($"g-{Guid.NewGuid():N}", email);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(existingId, await TestHelpers.GetUserIdByEmailAsync(_factory, email));
+
+        // Password still works — linking doesn't disturb the existing credentials.
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task Google_UnverifiedEmail_ReturnsUnauthorized()
+    {
+        var resp = await GoogleSignIn($"g-{Guid.NewGuid():N}", $"u_{Guid.NewGuid():N}@gmail.com", verified: false);
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Google_InvalidToken_ReturnsUnauthorized()
+    {
+        var resp = await _client.PostAsJsonAsync("/api/auth/google", new { idToken = "not-a-valid-token" });
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
     [Fact]
     public async Task Login_LegacyHash_UpgradesToPbkdf2OnSuccess()
     {

@@ -13,6 +13,11 @@ public class User
     public string? Phone { get; set; }
     public string Role { get; set; } = "customer";
 
+    // Google account id (the OAuth `sub`) when the user signed in with Google. Null for
+    // password-only accounts. A Google sign-in with no matching account creates a customer
+    // with PasswordHash null. Cleared on account deletion so it can't be resurrected.
+    public string? GoogleId { get; set; }
+
     // For back-office field roles (staff/manager): the branch they operate.
     // Null for customers, shareholders, and admins, who aren't tied to one branch.
     public Guid? BranchId { get; set; }

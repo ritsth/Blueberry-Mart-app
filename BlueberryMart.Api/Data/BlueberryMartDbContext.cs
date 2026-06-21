@@ -38,6 +38,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.Email).HasColumnName("email").HasMaxLength(255);
             e.Property(u => u.PasswordHash).HasColumnName("password_hash");
             e.Property(u => u.Phone).HasColumnName("phone").HasMaxLength(32);
+            e.Property(u => u.GoogleId).HasColumnName("google_id").HasMaxLength(255);
             e.Property(u => u.Role).HasColumnName("role").HasDefaultValue("customer");
             e.Property(u => u.BranchId).HasColumnName("branch_id");
             e.Property(u => u.LoyaltyPoints).HasColumnName("loyalty_points").HasDefaultValue(0);
@@ -52,6 +53,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.HasOne(u => u.Branch).WithMany().HasForeignKey(u => u.BranchId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(u => u.Email).IsUnique();
             e.HasIndex(u => u.Phone).IsUnique();
+            e.HasIndex(u => u.GoogleId).IsUnique();   // null for password accounts; Postgres allows multiple NULLs
             e.HasIndex(u => u.BranchId);
         });
 

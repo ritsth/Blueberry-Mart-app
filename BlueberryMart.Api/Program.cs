@@ -142,6 +142,10 @@ builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.ISettingsServic
 builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IOrderExpiryService,
     BlueberryMart.Api.Services.OrderExpiryService>();
 
+// Verifies Google ID tokens for "Continue with Google" sign-in.
+builder.Services.AddScoped<BlueberryMart.Api.Security.IGoogleTokenValidator,
+    BlueberryMart.Api.Security.GoogleTokenValidator>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
