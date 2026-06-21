@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using BlueberryMart.Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 
 namespace BlueberryMart.Api.Tests;
 
@@ -234,5 +237,23 @@ public class AuthControllerTests
         // …and the upgraded hash still authenticates.
         var again = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_TooManyAttempts_ReturnsTooManyRequests()
+    {
+        // A separate host with a low limit (own limiter state) so the shared client is unaffected.
+        using var strict = _factory.WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["RateLimiting:Auth:PermitLimit"] = "2" })));
+        var client = strict.CreateClient();
+        var body = new { email = "nobody@example.com", password = "wrong" };
+
+        // Rate limiting runs before the action, so invalid creds still count toward the limit.
+        await client.PostAsJsonAsync("/api/auth/login", body);   // 1 (401)
+        await client.PostAsJsonAsync("/api/auth/login", body);   // 2 (401)
+        var third = await client.PostAsJsonAsync("/api/auth/login", body); // 3 → throttled
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
     }
 }

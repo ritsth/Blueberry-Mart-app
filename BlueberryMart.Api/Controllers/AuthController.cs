@@ -7,6 +7,7 @@ using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Security;
 using BlueberryMart.Api.Validation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -14,6 +15,7 @@ namespace BlueberryMart.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]
 public class AuthController(
     BlueberryMartDbContext context,
     IConfiguration config,
