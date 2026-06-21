@@ -9,7 +9,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://blueberrymart-api-278293545480.us-central1.run.app",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074158639574-pdq7bbmdngah6o06o873aq935gcnsu0m.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -19,14 +19,14 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://blueberrymart-api-278293545480.us-central1.run.app",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074158639574-pdq7bbmdngah6o06o873aq935gcnsu0m.apps.googleusercontent.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://blueberrymart-api-278293545480.us-central1.run.app",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074158639574-pdq7bbmdngah6o06o873aq935gcnsu0m.apps.googleusercontent.com"
       }
     }
   },
