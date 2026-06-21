@@ -14,7 +14,10 @@ namespace BlueberryMart.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController(BlueberryMartDbContext context, IConfiguration config) : ControllerBase
+public class AuthController(
+    BlueberryMartDbContext context,
+    IConfiguration config,
+    IGoogleTokenValidator googleValidator) : ControllerBase
 {
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -94,6 +97,54 @@ public class AuthController(BlueberryMartDbContext context, IConfiguration confi
 
         // Public sign-up always creates a customer, who is never tied to a branch.
         var token = GenerateToken(user.Id, user.Email!, user.Role, branchId: null);
+        return Ok(new { token });
+    }
+
+    // POST /api/auth/google — "Continue with Google". The client sends a Google ID token; we verify
+    // it server-side, then find-or-link-or-create the account and issue our own JWT (same shape as
+    // password login, so the rest of the app is unchanged).
+    [HttpPost("google")]
+    public async Task<IActionResult> Google([FromBody] GoogleSignInRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.IdToken))
+            return BadRequest(new { message = "Missing Google token." });
+
+        var identity = await googleValidator.ValidateAsync(request.IdToken);
+        if (identity is null || !identity.EmailVerified || string.IsNullOrWhiteSpace(identity.Email))
+            return Unauthorized(new { message = "Could not verify your Google account." });
+
+        var email = identity.Email.ToLower();
+
+        // 1) Returning Google user. 2) Existing email account → link Google to it (email is
+        // Google-verified, so this is safe). 3) Otherwise create a new customer.
+        var user = await context.Users.FirstOrDefaultAsync(u => u.GoogleId == identity.Subject);
+        if (user is null)
+        {
+            user = await context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user is not null)
+            {
+                user.GoogleId = identity.Subject;
+                user.UpdatedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+            }
+            else
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Email = email,
+                    GoogleId = identity.Subject,
+                    PasswordHash = null,
+                    Role = "customer",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                context.Users.Add(user);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        var token = GenerateToken(user.Id, user.Email!, user.Role, user.BranchId);
         return Ok(new { token });
     }
 

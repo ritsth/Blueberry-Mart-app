@@ -1,6 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
+
+// Configure Google Sign-In once. webClientId is the Google OAuth *Web* client id — it's also the
+// audience the backend validates the returned ID token against. Set per build in eas.json `env`.
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+});
 
 export type UserRole = 'Customer' | 'Shareholder';
 
@@ -18,6 +25,14 @@ export class WorkAccountError extends Error {
   constructor() {
     super('This is a staff account. Please sign in at the Blueberry Mart portal instead.');
     this.name = 'WorkAccountError';
+  }
+}
+
+/** Thrown when the user dismisses the Google account picker — callers can ignore it silently. */
+export class GoogleCancelledError extends Error {
+  constructor() {
+    super('Google sign-in was cancelled.');
+    this.name = 'GoogleCancelledError';
   }
 }
 
@@ -62,6 +77,47 @@ export async function login(email: string, password: string): Promise<AuthResult
   await AsyncStorage.setItem('jwt_token', token);
   await AsyncStorage.setItem('user_role', role);
 
+  return { token, role };
+}
+
+/**
+ * "Continue with Google". Opens the native Google account picker, sends the resulting ID token to
+ * the backend (which verifies it and creates/links the account), then stores our own JWT — same
+ * result as password login. Throws GoogleCancelledError if the user dismisses the picker.
+ */
+export async function googleSignIn(): Promise<AuthResult> {
+  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+  const googleResult = await GoogleSignin.signIn();
+  if (!isSuccessResponse(googleResult)) {
+    throw new GoogleCancelledError();
+  }
+
+  const idToken = googleResult.data.idToken;
+  if (!idToken) {
+    throw new Error('Google did not return a sign-in token.');
+  }
+
+  const response = await fetch(`${API_BASE}/api/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Could not sign in with Google. Please try again.');
+  }
+
+  const { token } = await response.json();
+
+  // Same back-office guard as password login: staff/manager/admin belong in the portal, not here.
+  if (!APP_ROLES.includes(rawRole(token) as (typeof APP_ROLES)[number])) {
+    throw new WorkAccountError();
+  }
+
+  const role = parseRole(token);
+  await AsyncStorage.setItem('jwt_token', token);
+  await AsyncStorage.setItem('user_role', role);
   return { token, role };
 }
 

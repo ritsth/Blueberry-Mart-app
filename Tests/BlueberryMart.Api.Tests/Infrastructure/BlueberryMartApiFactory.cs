@@ -38,6 +38,10 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 ["Admin:Email"] = AdminEmail,
                 ["Admin:Password"] = AdminPassword
             }));
+
+        // Swap real Google token validation (calls Google) for a fake that parses test tokens.
+        builder.ConfigureServices(services =>
+            services.AddScoped<BlueberryMart.Api.Security.IGoogleTokenValidator, FakeGoogleTokenValidator>());
     }
 
     public async Task InitializeAsync()
