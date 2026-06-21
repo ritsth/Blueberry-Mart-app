@@ -195,6 +195,7 @@ a { color: var(--green); }
 .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .pill.active { background: #ecfdf5; color: var(--green-dark); }
 .pill.banned { background: #fee2e2; color: var(--red); }
+.pill.deleted { background: #e5e7eb; color: #4b5563; }
 .role-customer { background: #eff6ff; color: #1d4ed8; }
 .role-shareholder { background: #f5f3ff; color: #6d28d9; }
 .role-staff { background: #ecfeff; color: #0e7490; }

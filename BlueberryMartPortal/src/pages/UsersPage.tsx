@@ -138,7 +138,9 @@ export default function UsersPage() {
         <tbody>
           {data?.items.map((u) => (
             <tr key={u.id} className={u.isBanned ? 'banned-row' : ''}>
-              <td>{u.email ?? (u.phone ? `${u.phone} (guest)` : '—')}</td>
+              <td>{u.deletedAt
+                ? <span className="muted">(deleted account)</span>
+                : u.email ?? (u.phone ? `${u.phone} (guest)` : '—')}</td>
               <td>
                 <select
                   className={`role-select role-${u.role}`}
@@ -164,13 +166,15 @@ export default function UsersPage() {
               <td>{u.isMember ? '✓' : '—'}</td>
               <td>{u.loyaltyPoints}</td>
               <td>
-                {u.isBanned
-                  ? <span className="pill banned" title={u.banReason ?? ''}>Banned</span>
-                  : <span className="pill active">Active</span>}
+                {u.deletedAt
+                  ? <span className="pill deleted" title={`Deleted ${new Date(u.deletedAt).toLocaleDateString()}`}>Deleted</span>
+                  : u.isBanned
+                    ? <span className="pill banned" title={u.banReason ?? ''}>Banned</span>
+                    : <span className="pill active">Active</span>}
               </td>
               <td>{new Date(u.createdAt).toLocaleDateString()}</td>
               <td className="actions">
-                {u.role === 'admin'
+                {u.deletedAt || u.role === 'admin'
                   ? <span className="muted">—</span>
                   : u.isBanned
                     ? <button className="btn small" onClick={() => onUnban(u)}>Unban</button>

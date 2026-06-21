@@ -66,6 +66,7 @@ public class AdminController(BlueberryMartDbContext context, ISettingsService se
                 IsBanned = u.IsBanned,
                 BannedAt = u.BannedAt,
                 BanReason = u.BanReason,
+                DeletedAt = u.DeletedAt,
                 CreatedAt = u.CreatedAt,
             })
             .ToListAsync();
