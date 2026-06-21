@@ -126,4 +126,37 @@ public class ProfileController(BlueberryMartDbContext context) : ControllerBase
 
         return Ok(new { user.Phone, user.LoyaltyPoints });
     }
+
+    // DELETE /api/profile — the user deletes their own account (required by Google Play).
+    // A hard delete is impossible (Orders/Reviews/StockAdjustments use ON DELETE RESTRICT and
+    // feed the sales_fact analytics), so we anonymize instead: scrub the user's PII and remove
+    // their personal data (addresses, notifications, stock subscriptions, saved reports), while
+    // keeping order/review rows linked to the now-anonymized account. DeletedAt blocks any
+    // further sign-in or use of an outstanding token (see Program.cs OnTokenValidated).
+    [HttpDelete]
+    public async Task<IActionResult> DeleteAccount()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await context.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+        if (user.DeletedAt is not null) return NoContent();
+
+        await using var tx = await context.Database.BeginTransactionAsync();
+
+        await context.Addresses.Where(a => a.UserId == userId).ExecuteDeleteAsync();
+        await context.Notifications.Where(n => n.UserId == userId).ExecuteDeleteAsync();
+        await context.StockSubscriptions.Where(s => s.UserId == userId).ExecuteDeleteAsync();
+        await context.SavedReports.Where(r => r.ShareholderId == userId).ExecuteDeleteAsync();
+
+        user.Email = null;
+        user.PasswordHash = null;
+        user.Phone = null;
+        user.MembershipCancelled = true;
+        user.DeletedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        await tx.CommitAsync();
+        return NoContent();
+    }
 }

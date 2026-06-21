@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getStoredToken, getStoredUserId, logout } from '../../services/authService';
+import { deleteAccount, getStoredToken, getStoredUserId, logout } from '../../services/authService';
 import { fetchStoreSettings } from '../../services/storeSettings';
 import { tourKeyFor } from '../../components/OnboardingTour';
 import type { RootStackParamList } from '../../../App';
@@ -129,6 +129,32 @@ export default function AccountTab() {
   async function handleLogout() {
     await logout();
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+  }
+
+  // Permanently delete the account (Google Play requirement). The backend anonymizes the
+  // account and keeps order history anonymized; we warn clearly and require confirmation.
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account and removes your personal details (email, phone, ' +
+        'saved addresses and notifications). Your past orders are kept in anonymized form. ' +
+        'This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+            } catch (e) {
+              Alert.alert('Could not delete account', (e as Error).message);
+            }
+          },
+        },
+      ],
+    );
   }
 
   // Link a phone to claim any in-store "guest" purchases (loyalty + orders) made under that number.
@@ -292,6 +318,7 @@ export default function AccountTab() {
       {/* Account rows */}
       <Text style={styles.sectionLabel}>Account</Text>
       <Row icon="refresh-outline" label="Replay app tour" onPress={replayTour} />
+      <Row icon="trash-outline" label="Delete account" danger onPress={confirmDeleteAccount} />
       <Row icon="log-out-outline" label="Sign out" danger onPress={handleLogout} />
 
       <View style={{ height: 24 }} />
