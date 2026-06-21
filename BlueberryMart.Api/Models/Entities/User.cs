@@ -41,6 +41,11 @@ public class User
     public DateTime? BannedAt { get; set; }
     public string? BanReason { get; set; }
 
+    // Set when the user deletes their own account (Google Play requirement). The row is kept and
+    // anonymized — Email/PasswordHash/Phone are scrubbed — so orders/reviews stay intact for
+    // analytics, but the account can no longer sign in (enforced like a ban, per-request).
+    public DateTime? DeletedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

@@ -169,13 +169,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
                 var db = ctx.HttpContext.RequestServices
                     .GetRequiredService<BlueberryMartDbContext>();
-                var banned = await db.Users
+                var status = await db.Users
                     .Where(u => u.Id == userId)
-                    .Select(u => (bool?)u.IsBanned)
+                    .Select(u => new { u.IsBanned, u.DeletedAt })
                     .FirstOrDefaultAsync();
 
-                if (banned is null) ctx.Fail("Account no longer exists.");
-                else if (banned.Value) ctx.Fail("Account is banned.");
+                if (status is null) ctx.Fail("Account no longer exists.");
+                else if (status.DeletedAt is not null) ctx.Fail("Account has been deleted.");
+                else if (status.IsBanned) ctx.Fail("Account is banned.");
             }
         };
     });

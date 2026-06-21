@@ -93,6 +93,25 @@ export async function logout(): Promise<void> {
   await AsyncStorage.removeItem('user_role');
 }
 
+/**
+ * Permanently deletes the signed-in user's account. The backend anonymizes the account
+ * (scrubs email/phone/password, removes addresses & notifications) and keeps order history
+ * in anonymized form. On success the local session is cleared.
+ */
+export async function deleteAccount(): Promise<void> {
+  const token = await getStoredToken();
+  const response = await fetch(`${API_BASE}/api/profile`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    throw new Error('Could not delete your account. Please try again.');
+  }
+
+  await logout();
+}
+
 export async function getStoredToken(): Promise<string | null> {
   return AsyncStorage.getItem('jwt_token');
 }

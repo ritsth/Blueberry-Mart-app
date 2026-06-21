@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BlueberryMart.Api.Tests;
 
@@ -104,5 +108,71 @@ public class ProfileControllerTests
     {
         var token = await RegisterCustomerAsync();
         Assert.Equal(HttpStatusCode.BadRequest, (await LinkPhone(token, "123456789012")).StatusCode);
+    }
+
+    private Task<HttpResponseMessage> DeleteAccount(string token) =>
+        _client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/api/profile").WithBearer(token));
+
+    [Fact]
+    public async Task DeleteAccount_AnonymizesUser_RemovesPersonalData_KeepsOrder()
+    {
+        // A customer with a phone, an address, and an order.
+        var email = $"del_{Guid.NewGuid():N}@blueberrymart.com";
+        var registerResp = await _client.PostAsJsonAsync(
+            "/api/auth/register", new { email, password = "secret123", phone = RandomPhone() });
+        var token = (await registerResp.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("token").GetString()!;
+        var userId = await TestHelpers.GetUserIdByEmailAsync(_factory, email);
+
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtown, $"Del {Guid.NewGuid():N}", stock: 10);
+        var orderId = await TestHelpers.PlaceOrderAsync(_client, token, _downtown, itemId);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+            db.Addresses.Add(new Address
+            {
+                UserId = userId,
+                Label = "Home",
+                AddressLine = "123 Test St",
+                City = "Kathmandu",
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var resp = await DeleteAccount(token);
+        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+            var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId);
+            Assert.Null(user.Email);            // PII scrubbed
+            Assert.Null(user.Phone);
+            Assert.Null(user.PasswordHash);
+            Assert.NotNull(user.DeletedAt);     // marked deleted
+            Assert.Empty(await db.Addresses.Where(a => a.UserId == userId).ToListAsync()); // personal data gone
+            Assert.True(await db.Orders.AnyAsync(o => o.Id == orderId && o.UserId == userId)); // order kept, still linked
+        }
+
+        // The outstanding token is rejected immediately (no waiting for expiry).
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await _client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/profile").WithBearer(token))).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_FreesEmailForReRegistration()
+    {
+        var email = $"reuse_{Guid.NewGuid():N}@blueberrymart.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+        var token = await TestHelpers.GetTokenAsync(_client, email, "secret123");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await DeleteAccount(token)).StatusCode);
+
+        // Same email can be registered again after deletion (it was nulled, not held).
+        var reRegister = await _client.PostAsJsonAsync(
+            "/api/auth/register", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.OK, reRegister.StatusCode);
     }
 }
