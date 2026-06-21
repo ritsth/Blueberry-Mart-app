@@ -41,6 +41,7 @@ export interface AdminUser {
   isBanned: boolean;
   bannedAt: string | null;
   banReason: string | null;
+  deletedAt: string | null;   // set when the user deleted their own account (anonymized)
   createdAt: string;
 }
 export interface Page<T> { items: T[]; total: number; page: number; pageSize: number; }

@@ -14,6 +14,7 @@ public class AdminUserResponse
     public bool IsBanned { get; set; }
     public DateTime? BannedAt { get; set; }
     public string? BanReason { get; set; }
+    public DateTime? DeletedAt { get; set; }   // set when the user deleted their own account (anonymized)
     public DateTime CreatedAt { get; set; }
 }
 
