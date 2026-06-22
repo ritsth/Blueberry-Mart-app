@@ -36,7 +36,11 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
                 ["Jwt:Secret"] = "test-only-secret-key-not-used-in-production-32x",
                 ["Admin:Email"] = AdminEmail,
-                ["Admin:Password"] = AdminPassword
+                ["Admin:Password"] = AdminPassword,
+                // The suite hammers /api/auth/* from one loopback IP — raise the auth rate limit
+                // so it never throttles. The throttling behavior itself is covered by a dedicated
+                // test that lowers this via WithWebHostBuilder.
+                ["RateLimiting:Auth:PermitLimit"] = "100000"
             }));
 
         // Swap real Google token validation (calls Google) for a fake that parses test tokens.

@@ -1,6 +1,8 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using BlueberryMart.Api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -187,6 +189,44 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Brute-force protection for the public auth endpoints (login/register/google). Limits are
+// config-driven so the test suite (which hammers these from one loopback IP) can raise them.
+const string AuthRateLimit = "auth";
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy(AuthRateLimit, httpContext =>
+    {
+        // Read limits from the *resolved* configuration (not builder.Configuration, which doesn't
+        // yet see test/factory-injected overrides before Build()).
+        var cfg = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+        var permit = cfg.GetValue("RateLimiting:Auth:PermitLimit", 5);
+        var window = cfg.GetValue("RateLimiting:Auth:WindowSeconds", 60);
+
+        // Partition by real client IP. On Cloud Run RemoteIpAddress is the proxy, so prefer the
+        // left-most X-Forwarded-For hop. NOTE: X-Forwarded-For is client-spoofable — this is a
+        // brute-force speed bump, not a hard identity boundary.
+        var fwd = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var clientIp = !string.IsNullOrWhiteSpace(fwd)
+            ? fwd.Split(',')[0].Trim()
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permit,
+            Window = TimeSpan.FromSeconds(window),
+            QueueLimit = 0
+        });
+    });
+    options.OnRejected = async (ctx, token) =>
+    {
+        ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            ctx.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString();
+        await ctx.HttpContext.Response.WriteAsJsonAsync(
+            new { message = "Too many attempts. Please wait a moment and try again." }, token);
+    };
+});
+
 // CORS for the separate admin web portal (static SPA on a different origin).
 const string PortalCors = "AdminPortal";
 var portalOrigins = builder.Configuration.GetSection("Cors:PortalOrigins").Get<string[]>()
@@ -237,6 +277,7 @@ app.UseStaticFiles();
 app.UseCors(PortalCors);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.Run();
