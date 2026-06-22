@@ -113,7 +113,7 @@ jobs:
             --image ${{ env.IMAGE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff" \
+            --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff,Google__WebClientId=1074158639574-pdq7bbmdngah6o06o873aq935gcnsu0m.apps.googleusercontent.com" \
             --quiet
 
       # Keep the Kafka consumer worker on the same image as the API. This only

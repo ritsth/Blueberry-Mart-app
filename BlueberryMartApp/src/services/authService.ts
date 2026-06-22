@@ -1,13 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
 
-// Configure Google Sign-In once. webClientId is the Google OAuth *Web* client id — it's also the
-// audience the backend validates the returned ID token against. Set per build in eas.json `env`.
-GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-});
+// Google Sign-In is a *native* module that isn't bundled into Expo Go. Importing it at module load
+// (or calling GoogleSignin.configure() up top) throws while the bundle is evaluating, which prevents
+// the root component from registering — Expo Go then shows "App entry not found" and nothing loads.
+// So we (a) detect Expo Go and refuse early, and (b) require the module lazily, only when the user
+// actually taps "Continue with Google" in a real dev/standalone build.
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let googleConfigured = false;
+function loadGoogleSignin() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require('@react-native-google-signin/google-signin');
+  if (!googleConfigured) {
+    // webClientId is the Google OAuth *Web* client id — also the audience the backend validates the
+    // returned ID token against. Set per build in eas.json `env`.
+    mod.GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    });
+    googleConfigured = true;
+  }
+  return mod;
+}
 
 export type UserRole = 'Customer' | 'Shareholder';
 
@@ -86,6 +102,12 @@ export async function login(email: string, password: string): Promise<AuthResult
  * result as password login. Throws GoogleCancelledError if the user dismisses the picker.
  */
 export async function googleSignIn(): Promise<AuthResult> {
+  // Expo Go can't run the native Google module — surface a clear message instead of crashing.
+  if (isExpoGo) {
+    throw new Error('Google sign-in needs a dev build — it doesn’t work in Expo Go. Use email & password here.');
+  }
+
+  const { GoogleSignin, isSuccessResponse } = loadGoogleSignin();
   await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
   const googleResult = await GoogleSignin.signIn();
