@@ -39,9 +39,9 @@ public class ResendEmailSender : IEmailSender
         using var resp = await _http.SendAsync(req, ct);
         if (!resp.IsSuccessStatusCode)
         {
-            // Don't leak the recipient/body into logs; surface enough to debug deliverability.
-            var detail = await resp.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Resend email send failed ({Status}): {Detail}", (int)resp.StatusCode, detail);
+            // Log only the status code — never the response body or recipient — so no PII or token
+            // can end up in logs. The status is enough to spot a misconfiguration/deliverability issue.
+            _logger.LogError("Resend email send failed with status {Status}.", (int)resp.StatusCode);
             throw new InvalidOperationException($"Email send failed with status {(int)resp.StatusCode}.");
         }
     }
