@@ -56,6 +56,11 @@ public class User
     // analytics, but the account can no longer sign in (enforced like a ban, per-request).
     public DateTime? DeletedAt { get; set; }
 
+    // Stamped when the password is changed via a reset. Any JWT issued before this instant is
+    // rejected per-request (see the JwtBearer OnTokenValidated hook), so resetting the password
+    // logs out every existing session. Null for accounts that have never reset (no invalidation).
+    public DateTime? PasswordChangedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

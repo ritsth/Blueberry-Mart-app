@@ -46,7 +46,7 @@ builder.Services.AddDbContext<BlueberryMartDbContext>(options =>
 builder.Services.Configure<BlueberryMart.Api.Configuration.EsewaOptions>(
     builder.Configuration.GetSection("Esewa"));
 builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IEsewaPaymentService,
-    BlueberryMart.Api.Services.EsewaPaymentService>();
+    BlueberryMart.Api.Services.EsewaPaymentService>(c => c.Timeout = TimeSpan.FromSeconds(10));
 
 // Image storage (review photos, item photos): GCS when a bucket is configured, else local.
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Gcs:BucketName"]))
@@ -128,7 +128,7 @@ builder.Services.Configure<BlueberryMart.Api.Configuration.ChatOptions>(
     builder.Configuration.GetSection("Chat"));
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Chat:ApiKey"]))
     builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IChatService,
-        BlueberryMart.Api.Services.LlmChatService>();
+        BlueberryMart.Api.Services.LlmChatService>(c => c.Timeout = TimeSpan.FromSeconds(30));
 else
     builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IChatService,
         BlueberryMart.Api.Services.DisabledChatService>();
@@ -154,7 +154,7 @@ builder.Services.Configure<BlueberryMart.Api.Configuration.EmailOptions>(
     builder.Configuration.GetSection("Email"));
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Email:ApiKey"]))
     builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IEmailSender,
-        BlueberryMart.Api.Services.ResendEmailSender>();
+        BlueberryMart.Api.Services.ResendEmailSender>(c => c.Timeout = TimeSpan.FromSeconds(10));
 else
     builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IEmailSender,
         BlueberryMart.Api.Services.LoggingEmailSender>();
@@ -192,23 +192,63 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     .GetRequiredService<BlueberryMartDbContext>();
                 var status = await db.Users
                     .Where(u => u.Id == userId)
-                    .Select(u => new { u.IsBanned, u.DeletedAt })
+                    .Select(u => new { u.IsBanned, u.DeletedAt, u.PasswordChangedAt })
                     .FirstOrDefaultAsync();
 
-                if (status is null) ctx.Fail("Account no longer exists.");
-                else if (status.DeletedAt is not null) ctx.Fail("Account has been deleted.");
-                else if (status.IsBanned) ctx.Fail("Account is banned.");
+                if (status is null) { ctx.Fail("Account no longer exists."); return; }
+                if (status.DeletedAt is not null) { ctx.Fail("Account has been deleted."); return; }
+                if (status.IsBanned) { ctx.Fail("Account is banned."); return; }
+
+                // A password reset stamps PasswordChangedAt; reject any token issued before it so
+                // stolen/older sessions stop working immediately.
+                if (status.PasswordChangedAt is { } changedAt)
+                {
+                    var iat = ctx.Principal?.FindFirst(
+                        System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Iat)?.Value;
+                    var changedUnix = new DateTimeOffset(
+                        DateTime.SpecifyKind(changedAt, DateTimeKind.Utc)).ToUnixTimeSeconds();
+                    if (long.TryParse(iat, out var iatUnix) && iatUnix < changedUnix)
+                        ctx.Fail("Session expired, please sign in again.");
+                }
             }
         };
     });
 
 builder.Services.AddAuthorization();
 
-// Brute-force protection for the public auth endpoints (login/register/google). Limits are
-// config-driven so the test suite (which hammers these from one loopback IP) can raise them.
+// Brute-force protection for the public auth endpoints (login/register/google), a per-user cap on
+// the cost-bearing LLM chat endpoint, and a generous global backstop so every endpoint has *some*
+// limit. Limits are config-driven so the test suite (which hammers endpoints from one loopback IP)
+// can raise them.
 const string AuthRateLimit = "auth";
+const string ChatRateLimit = "chat";
 builder.Services.AddRateLimiter(options =>
 {
+    // Real client IP. On Cloud Run RemoteIpAddress is the proxy, so prefer the left-most
+    // X-Forwarded-For hop. NOTE: X-Forwarded-For is client-spoofable — this is a speed bump,
+    // not a hard identity boundary.
+    static string ClientIp(HttpContext ctx)
+    {
+        var fwd = ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        return !string.IsNullOrWhiteSpace(fwd)
+            ? fwd.Split(',')[0].Trim()
+            : ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
+
+    // Global backstop applied to every request (partitioned by client IP).
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var cfg = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+        var permit = cfg.GetValue("RateLimiting:Global:PermitLimit", 300);
+        var window = cfg.GetValue("RateLimiting:Global:WindowSeconds", 60);
+        return RateLimitPartition.GetFixedWindowLimiter(ClientIp(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permit,
+            Window = TimeSpan.FromSeconds(window),
+            QueueLimit = 0
+        });
+    });
+
     options.AddPolicy(AuthRateLimit, httpContext =>
     {
         // Read limits from the *resolved* configuration (not builder.Configuration, which doesn't
@@ -216,15 +256,23 @@ builder.Services.AddRateLimiter(options =>
         var cfg = httpContext.RequestServices.GetRequiredService<IConfiguration>();
         var permit = cfg.GetValue("RateLimiting:Auth:PermitLimit", 5);
         var window = cfg.GetValue("RateLimiting:Auth:WindowSeconds", 60);
+        return RateLimitPartition.GetFixedWindowLimiter(ClientIp(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permit,
+            Window = TimeSpan.FromSeconds(window),
+            QueueLimit = 0
+        });
+    });
 
-        // Partition by real client IP. On Cloud Run RemoteIpAddress is the proxy, so prefer the
-        // left-most X-Forwarded-For hop. NOTE: X-Forwarded-For is client-spoofable — this is a
-        // brute-force speed bump, not a hard identity boundary.
-        var fwd = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        var clientIp = !string.IsNullOrWhiteSpace(fwd)
-            ? fwd.Split(',')[0].Trim()
-            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+    // LLM calls cost real money — throttle per authenticated user (fall back to IP if unauthenticated).
+    options.AddPolicy(ChatRateLimit, httpContext =>
+    {
+        var cfg = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+        var permit = cfg.GetValue("RateLimiting:Chat:PermitLimit", 10);
+        var window = cfg.GetValue("RateLimiting:Chat:WindowSeconds", 60);
+        var key = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? ClientIp(httpContext);
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = permit,
             Window = TimeSpan.FromSeconds(window),

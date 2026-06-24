@@ -153,6 +153,34 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task ResetPassword_InvalidatesTokensIssuedBeforeReset()
+    {
+        // A verified customer with a live session (token issued at login).
+        var email = $"revoke_{Guid.NewGuid():N}@blueberrymart.com";
+        var oldToken = await TestHelpers.RegisterAndVerifyAsync(_factory, _client, email, "oldpass123");
+
+        // The pre-reset token works against a protected endpoint.
+        Assert.Equal(HttpStatusCode.OK,
+            (await _client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/profile").WithBearer(oldToken)))
+            .StatusCode);
+
+        // iat has whole-second granularity — ensure the reset lands in a strictly later second.
+        await Task.Delay(1100);
+
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+        var link = _factory.Emails.LastLink(email);
+        Assert.NotNull(link);
+        var reset = await _client.PostAsJsonAsync("/api/auth/reset-password",
+            new { uid = link!.Value.Uid, token = link.Value.Token, newPassword = "newpass456" });
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+
+        // The previously-issued token is now rejected (resetting logs out old sessions).
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await _client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/profile").WithBearer(oldToken)))
+            .StatusCode);
+    }
+
+    [Fact]
     public async Task VerificationStatus_ReflectsWhetherEmailIsVerified()
     {
         var email = $"status_{Guid.NewGuid():N}@blueberrymart.com";

@@ -196,6 +196,7 @@ public class AuthController(
 
         user.PasswordHash = PasswordHasher.Hash(request.NewPassword);
         user.EmailVerified = true;   // they proved control of the inbox
+        user.PasswordChangedAt = DateTime.UtcNow;   // invalidate any tokens issued before now
         user.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return Ok(new { message = "Your password has been updated." });
@@ -264,7 +265,11 @@ public class AuthController(
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new(JwtRegisteredClaimNames.Email, email),
             new(ClaimTypes.Role, normalizedRole),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            // Issued-at (Unix seconds). The auth pipeline rejects tokens issued before the user's
+            // PasswordChangedAt, so a password reset invalidates every older token.
+            new(JwtRegisteredClaimNames.Iat,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         };
 
         // Branch claim drives back-office branch scoping (staff/manager).

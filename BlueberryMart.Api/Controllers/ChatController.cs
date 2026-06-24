@@ -3,6 +3,7 @@ using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BlueberryMart.Api.Controllers;
 
@@ -13,6 +14,7 @@ namespace BlueberryMart.Api.Controllers;
 [ApiController]
 [Route("api/chat")]
 [Authorize(Roles = "Customer,Shareholder")]
+[EnableRateLimiting("chat")]
 public class ChatController(IChatService chat) : ControllerBase
 {
     [HttpPost]

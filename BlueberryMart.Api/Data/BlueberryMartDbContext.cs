@@ -50,6 +50,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.IsBanned).HasColumnName("is_banned").HasDefaultValue(false);
             e.Property(u => u.BannedAt).HasColumnName("banned_at");
             e.Property(u => u.BanReason).HasColumnName("ban_reason").HasMaxLength(500);
+            e.Property(u => u.PasswordChangedAt).HasColumnName("password_changed_at");
             e.Property(u => u.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(u => u.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(u => u.Branch).WithMany().HasForeignKey(u => u.BranchId).OnDelete(DeleteBehavior.Restrict);

@@ -275,12 +275,9 @@ public class ManageInventoryController(
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadImage(IFormFile image)
     {
-        if (image is null || image.Length == 0)
-            return BadRequest(new { message = "No image provided." });
-
-        var ext = IImageStorage.ResolveExtension(image.ContentType);
+        var (ext, error) = await IImageStorage.ValidateImageAsync(image);
         if (ext is null)
-            return BadRequest(new { message = "Only JPEG, PNG, and WebP images are allowed." });
+            return BadRequest(new { message = error });
 
         var url = await imageStorage.SaveAsync(image, ext, "items");
         return Ok(new { url });

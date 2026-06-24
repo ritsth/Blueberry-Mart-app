@@ -39,10 +39,12 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 ["Jwt:Secret"] = "test-only-secret-key-not-used-in-production-32x",
                 ["Admin:Email"] = AdminEmail,
                 ["Admin:Password"] = AdminPassword,
-                // The suite hammers /api/auth/* from one loopback IP — raise the auth rate limit
-                // so it never throttles. The throttling behavior itself is covered by a dedicated
-                // test that lowers this via WithWebHostBuilder.
-                ["RateLimiting:Auth:PermitLimit"] = "100000"
+                // The suite hammers the API from one loopback IP — raise every rate limit so it
+                // never throttles. The throttling behavior itself is covered by dedicated tests
+                // that lower these via WithWebHostBuilder.
+                ["RateLimiting:Auth:PermitLimit"] = "100000",
+                ["RateLimiting:Chat:PermitLimit"] = "100000",
+                ["RateLimiting:Global:PermitLimit"] = "100000"
             }));
 
         builder.ConfigureServices(services =>

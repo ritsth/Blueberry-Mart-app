@@ -1,7 +1,37 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5027';
+
+// The JWT is a credential, so it lives in the OS keychain/keystore (encrypted) rather than plain
+// AsyncStorage. The non-sensitive role stays in AsyncStorage. `setToken`/`getToken`/`clearToken`
+// are the only paths that touch the token; getToken also migrates any token left in AsyncStorage
+// by a previous app version so existing sessions survive the upgrade.
+const TOKEN_KEY = 'jwt_token';
+
+async function setToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(TOKEN_KEY, token);
+}
+
+async function clearToken(): Promise<void> {
+  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await AsyncStorage.removeItem(TOKEN_KEY);   // clear any legacy copy too
+}
+
+async function getToken(): Promise<string | null> {
+  const secure = await SecureStore.getItemAsync(TOKEN_KEY);
+  if (secure) return secure;
+
+  // One-time migration: a token written by an older build lives in AsyncStorage. Move it into
+  // SecureStore and drop the plaintext copy, so the user isn't logged out by the update.
+  const legacy = await AsyncStorage.getItem(TOKEN_KEY);
+  if (legacy) {
+    await SecureStore.setItemAsync(TOKEN_KEY, legacy);
+    await AsyncStorage.removeItem(TOKEN_KEY);
+  }
+  return legacy;
+}
 
 // Google Sign-In is a *native* module that isn't bundled into Expo Go. Importing it at module load
 // (or calling GoogleSignin.configure() up top) throws while the bundle is evaluating, which prevents
@@ -111,7 +141,7 @@ export async function login(email: string, password: string): Promise<AuthResult
 
   const role = parseRole(token);
 
-  await AsyncStorage.setItem('jwt_token', token);
+  await setToken(token);
   await AsyncStorage.setItem('user_role', role);
 
   return { token, role };
@@ -159,7 +189,7 @@ export async function googleSignIn(): Promise<AuthResult> {
   }
 
   const role = parseRole(token);
-  await AsyncStorage.setItem('jwt_token', token);
+  await setToken(token);
   await AsyncStorage.setItem('user_role', role);
   return { token, role };
 }
@@ -223,7 +253,7 @@ export async function forgotPassword(email: string): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
-  await AsyncStorage.removeItem('jwt_token');
+  await clearToken();
   await AsyncStorage.removeItem('user_role');
 }
 
@@ -247,7 +277,7 @@ export async function deleteAccount(): Promise<void> {
 }
 
 export async function getStoredToken(): Promise<string | null> {
-  return AsyncStorage.getItem('jwt_token');
+  return getToken();
 }
 
 export async function getStoredRole(): Promise<UserRole | null> {
@@ -257,7 +287,7 @@ export async function getStoredRole(): Promise<UserRole | null> {
 
 /** Stable identifier for the signed-in user (from the JWT), used e.g. to key the first-login tour per customer. */
 export async function getStoredUserId(): Promise<string | null> {
-  const token = await AsyncStorage.getItem('jwt_token');
+  const token = await getToken();
   if (!token) return null;
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
