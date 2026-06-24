@@ -1,9 +1,11 @@
 using BlueberryMart.Api.Data;
+using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlueberryMart.Api.Tests.Infrastructure;
 
@@ -43,10 +45,20 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 ["RateLimiting:Auth:PermitLimit"] = "100000"
             }));
 
-        // Swap real Google token validation (calls Google) for a fake that parses test tokens.
         builder.ConfigureServices(services =>
-            services.AddScoped<BlueberryMart.Api.Security.IGoogleTokenValidator, FakeGoogleTokenValidator>());
+        {
+            // Swap real Google token validation (calls Google) for a fake that parses test tokens.
+            services.AddScoped<BlueberryMart.Api.Security.IGoogleTokenValidator, FakeGoogleTokenValidator>();
+
+            // Capture emails instead of sending them, so tests can complete verification/reset flows.
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<FakeEmailSender>();
+            services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<FakeEmailSender>());
+        });
     }
+
+    /// <summary>The in-memory email capture used to read verification/reset links in tests.</summary>
+    public FakeEmailSender Emails => Services.GetRequiredService<FakeEmailSender>();
 
     public async Task InitializeAsync()
     {

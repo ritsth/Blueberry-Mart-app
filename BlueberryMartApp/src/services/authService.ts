@@ -52,6 +52,19 @@ export class GoogleCancelledError extends Error {
   }
 }
 
+/**
+ * Thrown when a password login is attempted on an account whose email isn't confirmed yet. The
+ * backend has already re-sent a verification link; the screen routes the user to CheckEmailScreen.
+ */
+export class EmailNotVerifiedError extends Error {
+  email: string;
+  constructor(email: string) {
+    super('Please verify your email before logging in.');
+    this.name = 'EmailNotVerifiedError';
+    this.email = email;
+  }
+}
+
 // Only these two roles belong to the customer mobile app; staff/manager/admin are portal-only.
 const APP_ROLES = ['customer', 'shareholder'] as const;
 
@@ -75,6 +88,14 @@ export async function login(email: string, password: string): Promise<AuthResult
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
+
+  // 403 = the password was right but the email isn't verified yet (the backend just re-sent a link).
+  if (response.status === 403) {
+    const body = await response.json().catch(() => ({}));
+    if (body.requiresVerification) {
+      throw new EmailNotVerifiedError(body.email ?? email);
+    }
+  }
 
   if (!response.ok) {
     throw new Error('Invalid email or password.');
@@ -145,7 +166,14 @@ export async function googleSignIn(): Promise<AuthResult> {
 
 // `phone` is optional — when given, the backend links this sign-up to a "guest" account created at
 // the till with the same phone, so in-store loyalty/orders carry over (account claim).
-export async function register(email: string, password: string, phone?: string): Promise<AuthResult> {
+// Registration no longer logs the user straight in: the account starts unverified, the backend emails
+// a confirmation link, and login is blocked until it's used. We return the email so the caller can
+// route to CheckEmailScreen.
+export async function register(
+  email: string,
+  password: string,
+  phone?: string,
+): Promise<{ email: string }> {
   const response = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -157,13 +185,41 @@ export async function register(email: string, password: string, phone?: string):
     throw new Error(body.message ?? 'Could not create account.');
   }
 
-  const { token } = await response.json();
-  const role = parseRole(token);
+  const body = await response.json().catch(() => ({}));
+  return { email: body.email ?? email };
+}
 
-  await AsyncStorage.setItem('jwt_token', token);
-  await AsyncStorage.setItem('user_role', role);
+/** Polls whether the given email has been verified yet (used to auto-advance after the user taps
+ * the link in their browser). Returns false on any error so callers can simply keep polling. */
+export async function isEmailVerified(email: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/auth/verification-status?email=${encodeURIComponent(email)}`,
+    );
+    if (!res.ok) return false;
+    const body = await res.json();
+    return body.verified === true;
+  } catch {
+    return false;
+  }
+}
 
-  return { token, role };
+/** Ask the backend to re-send the verification link. Always resolves (no account enumeration). */
+export async function resendVerification(email: string): Promise<void> {
+  await fetch(`${API_BASE}/api/auth/resend-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }).catch(() => undefined);
+}
+
+/** Ask the backend to email a password-reset link. Always resolves (no account enumeration). */
+export async function forgotPassword(email: string): Promise<void> {
+  await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }).catch(() => undefined);
 }
 
 export async function logout(): Promise<void> {

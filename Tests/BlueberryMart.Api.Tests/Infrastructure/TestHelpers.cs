@@ -198,12 +198,34 @@ public static class TestHelpers
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password))),
             Role = role,
             BranchId = branchId,
+            EmailVerified = true,   // a directly-seeded test account can log in without the email flow
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         ctx.Users.Add(user);
         await ctx.SaveChangesAsync();
         return user.Id;
+    }
+
+    /// <summary>
+    /// Registers a customer through the real endpoint, then completes email verification by reading
+    /// the link from the captured email and hitting it — returning a usable login token. Use this
+    /// wherever a test needs a freshly-registered, logged-in customer (registration alone no longer
+    /// returns a token, and login is blocked until the email is verified).
+    /// </summary>
+    public static async Task<string> RegisterAndVerifyAsync(
+        BlueberryMartApiFactory factory, HttpClient client, string email, string password, string? phone = null)
+    {
+        var reg = await client.PostAsJsonAsync("/api/auth/register", new { email, password, phone });
+        reg.EnsureSuccessStatusCode();
+
+        var link = factory.Emails.LastLink(email)
+            ?? throw new InvalidOperationException($"No verification email was captured for {email}.");
+        var verify = await client.GetAsync(
+            $"/api/auth/verify-email?uid={link.Uid}&t={Uri.EscapeDataString(link.Token)}");
+        verify.EnsureSuccessStatusCode();
+
+        return await GetTokenAsync(client, email, password);
     }
 
     /// <summary>Demotes every admin except the given email — makes "last admin" assertions deterministic

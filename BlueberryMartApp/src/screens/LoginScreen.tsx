@@ -10,19 +10,32 @@ import {
   View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { googleSignIn, GoogleCancelledError, login, WorkAccountError } from '../services/authService';
+import {
+  EmailNotVerifiedError,
+  googleSignIn,
+  GoogleCancelledError,
+  login,
+  WorkAccountError,
+} from '../services/authService';
 import type { RootStackParamList } from '../../App';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
+  route: RouteProp<RootStackParamList, 'Login'>;
 };
 
-export default function LoginScreen({ navigation }: Props) {
-  const [email, setEmail]       = useState('');
+export default function LoginScreen({ navigation, route }: Props) {
+  // Arrives set when the user just verified their email — pre-fill it and show a confirmation.
+  const verifiedEmail = route.params?.verifiedEmail;
+  const [email, setEmail]       = useState(verifiedEmail ?? '');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [notice, setNotice]     = useState<string | null>(
+    verifiedEmail ? 'Email verified! Sign in to continue.' : null,
+  );
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
@@ -31,6 +44,7 @@ export default function LoginScreen({ navigation }: Props) {
     }
 
     setError(null);
+    setNotice(null);
     setLoading(true);
 
     try {
@@ -42,6 +56,10 @@ export default function LoginScreen({ navigation }: Props) {
         navigation.replace('CustomerTabs');
       }
     } catch (e) {
+      if (e instanceof EmailNotVerifiedError) {
+        navigation.navigate('CheckEmail', { email: e.email });
+        return;
+      }
       setError(e instanceof WorkAccountError ? e.message : 'Invalid email or password.');
     } finally {
       setLoading(false);
@@ -100,6 +118,7 @@ export default function LoginScreen({ navigation }: Props) {
           onSubmitEditing={handleLogin}
         />
 
+        {notice && <Text style={styles.notice}>{notice}</Text>}
         {error && <Text style={styles.error}>{error}</Text>}
 
         <TouchableOpacity
@@ -111,6 +130,14 @@ export default function LoginScreen({ navigation }: Props) {
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.buttonText}>Sign In</Text>}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.forgotRow}
+          onPress={() => navigation.navigate('ForgotPassword')}
+          disabled={loading}
+        >
+          <Text style={styles.forgotText}>Forgot password?</Text>
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
@@ -198,6 +225,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
+  notice: {
+    color: '#16a34a',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   button: {
     backgroundColor: '#16a34a',
     borderRadius: 10,
@@ -259,5 +293,14 @@ const styles = StyleSheet.create({
   linkAccent: {
     color: '#16a34a',
     fontWeight: '700',
+  },
+  forgotRow: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  forgotText: {
+    fontSize: 13,
+    color: '#16a34a',
+    fontWeight: '600',
   },
 });

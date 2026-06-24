@@ -19,6 +19,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
     public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
     public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<AuthCode> AuthCodes => Set<AuthCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(u => u.Phone).HasColumnName("phone").HasMaxLength(32);
             e.Property(u => u.GoogleId).HasColumnName("google_id").HasMaxLength(255);
             e.Property(u => u.Role).HasColumnName("role").HasDefaultValue("customer");
+            e.Property(u => u.EmailVerified).HasColumnName("email_verified").HasDefaultValue(false);
             e.Property(u => u.BranchId).HasColumnName("branch_id");
             e.Property(u => u.LoyaltyPoints).HasColumnName("loyalty_points").HasDefaultValue(0);
             e.Property(u => u.MemberSince).HasColumnName("member_since");
@@ -255,6 +257,21 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(r => r.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(r => r.Shareholder).WithMany().HasForeignKey(r => r.ShareholderId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(r => r.ShareholderId);
+        });
+
+        modelBuilder.Entity<AuthCode>(e =>
+        {
+            e.ToTable("auth_codes");
+            e.HasKey(a => a.Id);
+            e.Property(a => a.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(a => a.UserId).HasColumnName("user_id");
+            e.Property(a => a.Purpose).HasColumnName("purpose").HasMaxLength(32).IsRequired();
+            e.Property(a => a.CodeHash).HasColumnName("code_hash").IsRequired();
+            e.Property(a => a.ExpiresAt).HasColumnName("expires_at");
+            e.Property(a => a.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            e.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
+            // At most one active code per (user, purpose); also the lookup the upsert uses.
+            e.HasIndex(a => new { a.UserId, a.Purpose }).IsUnique();
         });
 
         modelBuilder.Entity<OutboxMessage>(e =>

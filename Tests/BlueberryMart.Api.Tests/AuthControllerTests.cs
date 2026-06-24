@@ -73,18 +73,113 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Register_NewEmail_ReturnsTokenAndCanLogin()
+    public async Task Register_NewEmail_RequiresVerification_NoToken()
     {
         var email = $"new_{Guid.NewGuid():N}@blueberrymart.com";
 
         var resp = await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.False(string.IsNullOrWhiteSpace(json.GetProperty("token").GetString()));
+        // Registration no longer logs the user in — it asks them to verify, and returns no token.
+        Assert.True(json.GetProperty("requiresVerification").GetBoolean());
+        Assert.False(json.TryGetProperty("token", out _));
+    }
 
-        // The freshly created account can log in.
+    [Fact]
+    public async Task Login_UnverifiedAccount_ReturnsForbiddenRequiresVerification()
+    {
+        var email = $"unverified_{Guid.NewGuid():N}@blueberrymart.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
+        var json = await login.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(json.GetProperty("requiresVerification").GetBoolean());
+    }
+
+    [Fact]
+    public async Task VerifyEmail_ValidLink_VerifiesAndEnablesLogin()
+    {
+        var email = $"verify_{Guid.NewGuid():N}@blueberrymart.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+
+        // Tap the link from the (captured) verification email.
+        var link = _factory.Emails.LastLink(email);
+        Assert.NotNull(link);
+        var verify = await _client.GetAsync(
+            $"/api/auth/verify-email?uid={link!.Value.Uid}&t={Uri.EscapeDataString(link.Value.Token)}");
+        Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
+
+        // Now the account can log in.
         var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_InvalidLink_DoesNotVerify()
+    {
+        var email = $"badlink_{Guid.NewGuid():N}@blueberrymart.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+
+        // A wrong token for a real uid is rejected (page returns 200 HTML, but no verification happens).
+        var link = _factory.Emails.LastLink(email);
+        Assert.NotNull(link);
+        await _client.GetAsync($"/api/auth/verify-email?uid={link!.Value.Uid}&t=not-the-real-secret");
+
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
+        Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task ForgotThenReset_ChangesPassword_OldOneStopsWorking()
+    {
+        // A verified, logged-in customer.
+        var email = $"reset_{Guid.NewGuid():N}@blueberrymart.com";
+        await TestHelpers.RegisterAndVerifyAsync(_factory, _client, email, "oldpass123");
+
+        // Request a reset and follow the link the page would submit.
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+        var link = _factory.Emails.LastLink(email);
+        Assert.NotNull(link);
+        var reset = await _client.PostAsJsonAsync("/api/auth/reset-password",
+            new { uid = link!.Value.Uid, token = link.Value.Token, newPassword = "newpass456" });
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+
+        // New password works; old one no longer does.
+        Assert.Equal(HttpStatusCode.OK,
+            (await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "newpass456" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "oldpass123" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task VerificationStatus_ReflectsWhetherEmailIsVerified()
+    {
+        var email = $"status_{Guid.NewGuid():N}@blueberrymart.com";
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
+
+        // Unverified right after registration…
+        var before = await _client.GetFromJsonAsync<JsonElement>(
+            $"/api/auth/verification-status?email={Uri.EscapeDataString(email)}");
+        Assert.False(before.GetProperty("verified").GetBoolean());
+
+        // …and true once the link is opened.
+        var link = _factory.Emails.LastLink(email);
+        Assert.NotNull(link);
+        await _client.GetAsync($"/api/auth/verify-email?uid={link!.Value.Uid}&t={Uri.EscapeDataString(link.Value.Token)}");
+
+        var after = await _client.GetFromJsonAsync<JsonElement>(
+            $"/api/auth/verification-status?email={Uri.EscapeDataString(email)}");
+        Assert.True(after.GetProperty("verified").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ForgotPassword_UnknownEmail_StillReturnsOk()
+    {
+        // No account enumeration: an unknown email gets the same 200 as a known one.
+        var resp = await _client.PostAsJsonAsync("/api/auth/forgot-password",
+            new { email = $"ghost_{Guid.NewGuid():N}@blueberrymart.com" });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
     [Fact]
@@ -135,7 +230,11 @@ public class AuthControllerTests
         Assert.Equal(guestId, await TestHelpers.GetUserIdByEmailAsync(_factory, email));
         Assert.Equal(320, await TestHelpers.GetLoyaltyPointsAsync(_factory, guestId));
 
-        // The claimed account can now log in.
+        // The newly-attached email must be verified before the claimed account can log in.
+        var link = _factory.Emails.LastLink(email);
+        Assert.NotNull(link);
+        await _client.GetAsync($"/api/auth/verify-email?uid={link!.Value.Uid}&t={Uri.EscapeDataString(link.Value.Token)}");
+
         var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "secret123" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
     }

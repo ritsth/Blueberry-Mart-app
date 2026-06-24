@@ -75,6 +75,7 @@ public static class DbInitializer
                 Email = email,
                 PasswordHash = BCrypt(password),
                 Role = "admin",
+                EmailVerified = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
@@ -143,6 +144,7 @@ public static class DbInitializer
                 PasswordHash = BCrypt("customer1_password"),
                 Role = "customer",
                 LoyaltyPoints = 320,
+                EmailVerified = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             },
@@ -153,6 +155,7 @@ public static class DbInitializer
                 PasswordHash = BCrypt("customer2_password"),
                 Role = "customer",
                 LoyaltyPoints = 0,
+                EmailVerified = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             },
@@ -163,6 +166,7 @@ public static class DbInitializer
                 PasswordHash = BCrypt("shareholder1_password"),
                 Role = "shareholder",
                 LoyaltyPoints = 0,
+                EmailVerified = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             },
