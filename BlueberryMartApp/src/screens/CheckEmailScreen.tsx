@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,15 +26,25 @@ export default function CheckEmailScreen({ navigation, route }: Props) {
   // Verification happens in the browser, so poll the backend; the moment the link is opened,
   // send the user to sign-in (email pre-filled) instead of making them navigate back manually.
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (advanced.current) return;
+    let cancelled = false;
+    async function check() {
+      if (advanced.current || cancelled) return;
       if (await isEmailVerified(email)) {
         advanced.current = true;
-        clearInterval(interval);
         navigation.replace('Login', { verifiedEmail: email });
       }
-    }, 3000);
-    return () => clearInterval(interval);
+    }
+    // Poll as a fallback, and — crucially — check the instant the app returns to the foreground,
+    // which is exactly when the user switches back from the browser after tapping the link.
+    const interval = setInterval(check, 2000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') check();
+    });
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      sub.remove();
+    };
   }, [email, navigation]);
 
   async function handleResend() {
