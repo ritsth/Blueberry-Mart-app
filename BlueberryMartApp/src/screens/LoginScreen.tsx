@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -88,9 +90,11 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.logo}>🫐</Text>
         <Text style={styles.title}>Blueberry Mart</Text>
@@ -166,11 +170,17 @@ export default function LoginScreen({ navigation, route }: Props) {
           </Text>
         </TouchableOpacity>
       </View>
+      </View>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: '#f0fdf4',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f0fdf4',
