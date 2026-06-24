@@ -148,6 +148,21 @@ builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IOrderExpirySer
 builder.Services.AddScoped<BlueberryMart.Api.Security.IGoogleTokenValidator,
     BlueberryMart.Api.Security.GoogleTokenValidator>();
 
+// Transactional email (verification + password-reset links): Resend when an API key is configured,
+// otherwise a logging sender that just writes the email (incl. the link) to logs — local dev + tests.
+builder.Services.Configure<BlueberryMart.Api.Configuration.EmailOptions>(
+    builder.Configuration.GetSection("Email"));
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Email:ApiKey"]))
+    builder.Services.AddHttpClient<BlueberryMart.Api.Services.Interfaces.IEmailSender,
+        BlueberryMart.Api.Services.ResendEmailSender>();
+else
+    builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IEmailSender,
+        BlueberryMart.Api.Services.LoggingEmailSender>();
+
+// Issues + validates email-verification and password-reset link tokens.
+builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IAuthCodeService,
+    BlueberryMart.Api.Services.AuthCodeService>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {

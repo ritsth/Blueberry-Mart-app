@@ -107,13 +107,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # NOTE: Email (verification + password-reset) needs two more settings that are NOT in this
+      # file because one is a secret and the other depends on the sending domain:
+      #   - Email__ApiKey      → Resend API key, set via Secret Manager (like JWT__SECRET), and
+      #   - Email__FromAddress → e.g. noreply@<your-verified-domain>
+      # Set both out-of-band on the Cloud Run service. Until they are set, IEmailSender falls back
+      # to logging only (no mail is sent) — and since verification is required before login, NEW
+      # sign-ups would be unable to receive their link. Configure them before relying on email.
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE }} \
             --image ${{ env.IMAGE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff,Google__WebClientId=1074158639574-pdq7bbmdngah6o06o873aq935gcnsu0m.apps.googleusercontent.com" \
+            --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Gcs__BucketName=blueberrymart-review-images-278293545480,ESEWA__APIBASEURL=https://blueberrymart-api-278293545480.us-central1.run.app,ESEWA__SUCCESSDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-success.html,ESEWA__FAILUREDEEPLINK=https://blueberrymart-api-278293545480.us-central1.run.app/payment-failure.html,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff,Google__WebClientId=1074158639574-pdq7bbmdngah6o06o873aq935gcnsu0m.apps.googleusercontent.com,Email__PublicBaseUrl=https://blueberrymart-api-278293545480.us-central1.run.app" \
             --quiet
 
       # Keep the Kafka consumer worker on the same image as the API. This only

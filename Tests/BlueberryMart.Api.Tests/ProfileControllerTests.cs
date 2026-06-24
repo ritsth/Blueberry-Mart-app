@@ -25,13 +25,11 @@ public class ProfileControllerTests
 
     private static string RandomPhone() => "98" + Random.Shared.Next(10_000_000, 99_999_999);
 
-    // Registers a fresh customer (optionally with a phone) and returns its bearer token.
+    // Registers a fresh customer (optionally with a phone), verifies the email, and returns its token.
     private async Task<string> RegisterCustomerAsync(string? phone = null)
     {
         var email = $"link_{Guid.NewGuid():N}@blueberrymart.com";
-        var resp = await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123", phone });
-        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        return json.GetProperty("token").GetString()!;
+        return await TestHelpers.RegisterAndVerifyAsync(_factory, _client, email, "secret123", phone);
     }
 
     private Task<HttpResponseMessage> LinkPhone(string token, string phone) =>
@@ -118,10 +116,7 @@ public class ProfileControllerTests
     {
         // A customer with a phone, an address, and an order.
         var email = $"del_{Guid.NewGuid():N}@blueberrymart.com";
-        var registerResp = await _client.PostAsJsonAsync(
-            "/api/auth/register", new { email, password = "secret123", phone = RandomPhone() });
-        var token = (await registerResp.Content.ReadFromJsonAsync<JsonElement>())
-            .GetProperty("token").GetString()!;
+        var token = await TestHelpers.RegisterAndVerifyAsync(_factory, _client, email, "secret123", RandomPhone());
         var userId = await TestHelpers.GetUserIdByEmailAsync(_factory, email);
 
         var itemId = await TestHelpers.CreateInventoryItemAsync(
@@ -165,8 +160,7 @@ public class ProfileControllerTests
     public async Task DeleteAccount_FreesEmailForReRegistration()
     {
         var email = $"reuse_{Guid.NewGuid():N}@blueberrymart.com";
-        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "secret123" });
-        var token = await TestHelpers.GetTokenAsync(_client, email, "secret123");
+        var token = await TestHelpers.RegisterAndVerifyAsync(_factory, _client, email, "secret123");
 
         Assert.Equal(HttpStatusCode.NoContent, (await DeleteAccount(token)).StatusCode);
 

@@ -13,6 +13,11 @@ public class User
     public string? Phone { get; set; }
     public string Role { get; set; } = "customer";
 
+    // New password sign-ups must confirm their email (via a one-time link) before they can log in.
+    // Existing rows are grandfathered to true in the migration; Google sign-ins are set true since
+    // Google already vouches for the address. Guests (phone-only) stay false until they claim+verify.
+    public bool EmailVerified { get; set; }
+
     // Google account id (the OAuth `sub`) when the user signed in with Google. Null for
     // password-only accounts. A Google sign-in with no matching account creates a customer
     // with PasswordHash null. Cleared on account deletion so it can't be resurrected.

@@ -9,6 +9,8 @@ import MaintenanceBanner from './src/components/MaintenanceBanner';
 
 import LoginScreen       from './src/screens/LoginScreen';
 import RegisterScreen    from './src/screens/RegisterScreen';
+import CheckEmailScreen  from './src/screens/CheckEmailScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ReviewScreen      from './src/screens/ReviewScreen';
 import AddressesScreen   from './src/screens/AddressesScreen';
 import AlertsScreen      from './src/screens/AlertsScreen';
@@ -20,8 +22,10 @@ import ShareholderTabs   from './src/navigation/ShareholderTabs';
 import { Branch, CartProvider }  from './src/context/CartContext';
 
 export type RootStackParamList = {
-  Login:            undefined;
+  Login:            { verifiedEmail: string } | undefined;
   Register:         undefined;
+  CheckEmail:       { email: string };
+  ForgotPassword:   undefined;
   CustomerTabs:     undefined;
   ShareholderTabs:  undefined;
   ReviewScreen:     { orderId: string; items: { id: string; name: string }[] };
@@ -46,6 +50,8 @@ export default function App() {
               <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Login"           component={LoginScreen} />
                 <Stack.Screen name="Register"        component={RegisterScreen} />
+                <Stack.Screen name="CheckEmail"      component={CheckEmailScreen} />
+                <Stack.Screen name="ForgotPassword"  component={ForgotPasswordScreen} />
                 <Stack.Screen name="CustomerTabs"    component={CustomerTabs} />
                 <Stack.Screen name="ShareholderTabs" component={ShareholderTabs} />
                 <Stack.Screen name="ReviewScreen"    component={ReviewScreen} />

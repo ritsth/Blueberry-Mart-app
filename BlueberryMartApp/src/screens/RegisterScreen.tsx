@@ -45,8 +45,13 @@ export default function RegisterScreen({ navigation }: Props) {
     try {
       // Public sign-up always creates a customer account; an optional phone claims any
       // in-store "guest" account with the same number (so loyalty/orders carry over).
-      await register(email.trim().toLowerCase(), password, phone.trim() || undefined);
-      navigation.replace('CustomerTabs');
+      // The account starts unverified — route to CheckEmail to confirm via the emailed link.
+      const { email: registeredEmail } = await register(
+        email.trim().toLowerCase(),
+        password,
+        phone.trim() || undefined,
+      );
+      navigation.replace('CheckEmail', { email: registeredEmail });
     } catch (e: any) {
       setError(e.message ?? 'Could not create account.');
     } finally {

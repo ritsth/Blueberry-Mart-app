@@ -116,6 +116,7 @@ public static class DataSeeder
                 PasswordHash = Hash("seed_password"),
                 Role = "customer",
                 LoyaltyPoints = 0,
+                EmailVerified = true,
                 MemberSince = isMember ? created : null,
                 MemberUntil = isMember ? DateTime.UtcNow.AddDays(rnd.Next(5, 60)) : null,
                 CreatedAt = created,
