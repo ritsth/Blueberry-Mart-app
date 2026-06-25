@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using BlueberryMart.Api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -289,6 +290,10 @@ builder.Services.AddRateLimiter(options =>
             new { message = "Too many attempts. Please wait a moment and try again." }, token);
     };
 });
+
+// Global multipart cap — individual upload endpoints enforce 5 MB via ValidateImageAsync, but
+// this stops an oversized request from reaching any controller at all.
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 10 * 1024 * 1024);
 
 // CORS for the separate admin web portal (static SPA on a different origin).
 const string PortalCors = "AdminPortal";
