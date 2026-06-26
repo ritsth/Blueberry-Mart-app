@@ -8,8 +8,9 @@ A full-stack grocery retail platform built for multi-branch operations, serving 
 
 | Resource | Link |
 |---|---|
-| **API (Swagger UI)** | [blueberrymart-api-278293545480.us-central1.run.app/swagger](https://blueberrymart-api-278293545480.us-central1.run.app/swagger) |
+| **Admin portal** | [blueberrymart-admin.web.app](https://blueberrymart-admin.web.app) |
 | **Mobile app (Android)** | Google Play — internal testing (request access) |
+| **API (Swagger UI)** | `http://localhost:5027/swagger` — dev only (disabled in prod) |
 
 ---
 
