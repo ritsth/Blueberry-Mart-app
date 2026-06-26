@@ -132,6 +132,77 @@ public class OrdersControllerTests
     }
 
     [Fact]
+    public async Task PlaceOrder_SameIdempotencyKey_ReturnsOriginalOrderAndDeductsStockOnce()
+    {
+        var token  = await TestHelpers.GetCustomerTokenAsync(_client);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtownBranchId, $"Idem {Guid.NewGuid():N}", stock: 5);
+        var key    = Guid.NewGuid().ToString();
+
+        HttpRequestMessage Build()
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, "/api/orders")
+            {
+                Content = JsonContent.Create(new
+                {
+                    branchId  = _downtownBranchId,
+                    orderType = "pickup",
+                    items     = new[] { new { itemId, quantity = 2 } }
+                })
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            req.Headers.Add("Idempotency-Key", key);
+            return req;
+        }
+
+        var first  = await _client.SendAsync(Build());
+        var second = await _client.SendAsync(Build());   // same key — a double-tap / retry
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);   // replayed, not newly created
+
+        var firstJson  = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var secondJson = await second.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(firstJson.GetProperty("id").GetGuid(), secondJson.GetProperty("id").GetGuid());
+        Assert.Equal(firstJson.GetProperty("orderNumber").GetInt32(),
+                     secondJson.GetProperty("orderNumber").GetInt32());
+
+        // Stock was deducted exactly once: 5 − 2 = 3 (a duplicate would have dropped it to 1).
+        Assert.Equal(3, await TestHelpers.GetStockAsync(_factory, itemId));
+    }
+
+    [Fact]
+    public async Task PlaceOrder_DifferentIdempotencyKeys_CreateSeparateOrders()
+    {
+        var token  = await TestHelpers.GetCustomerTokenAsync(_client);
+        var itemId = await TestHelpers.CreateInventoryItemAsync(
+            _factory, _downtownBranchId, $"Idem {Guid.NewGuid():N}", stock: 5);
+
+        async Task<Guid> PlaceWithKey(string key)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, "/api/orders")
+            {
+                Content = JsonContent.Create(new
+                {
+                    branchId  = _downtownBranchId,
+                    orderType = "pickup",
+                    items     = new[] { new { itemId, quantity = 1 } }
+                })
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            req.Headers.Add("Idempotency-Key", key);
+            var resp = await _client.SendAsync(req);
+            Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            return json.GetProperty("id").GetGuid();
+        }
+
+        var a = await PlaceWithKey(Guid.NewGuid().ToString());
+        var b = await PlaceWithKey(Guid.NewGuid().ToString());
+        Assert.NotEqual(a, b);   // distinct keys are distinct orders
+    }
+
+    [Fact]
     public async Task GetOrder_OwnOrder_ReturnsStatusAndUnpaidPayment()
     {
         var token = await TestHelpers.GetCustomerTokenAsync(_client);

@@ -156,6 +156,7 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(o => o.DiscountAmount).HasColumnName("discount_amount").HasColumnType("numeric(12,2)").HasDefaultValue(0);
             e.Property(o => o.DeliveryAddress).HasColumnName("delivery_address");
             e.Property(o => o.DeliveryFee).HasColumnName("delivery_fee").HasColumnType("numeric(12,2)").HasDefaultValue(0);
+            e.Property(o => o.IdempotencyKey).HasColumnName("idempotency_key");
             e.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.Property(o => o.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
             e.HasOne(o => o.User).WithMany(u => u.Orders).HasForeignKey(o => o.UserId).OnDelete(DeleteBehavior.Restrict);
@@ -164,6 +165,11 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.HasIndex(o => o.BranchId);
             e.HasIndex(o => o.Status);
             e.HasIndex(o => o.CreatedAt);
+            // Idempotent order placement: at most one order per (user, key). Filtered so the many
+            // rows with no key (in-store sales, pre-idempotency clients) don't collide.
+            e.HasIndex(o => new { o.UserId, o.IdempotencyKey })
+                .IsUnique()
+                .HasFilter("idempotency_key IS NOT NULL");
         });
 
         modelBuilder.Entity<Address>(e =>

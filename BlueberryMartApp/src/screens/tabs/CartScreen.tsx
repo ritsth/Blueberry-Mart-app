@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -15,6 +15,13 @@ const DEFAULT_DELIVERY_FEE = 100;
 
 type OrderMode = 'pickup' | 'delivery';
 interface Address { id: string; label: string; addressLine: string; city: string; isDefault: boolean; }
+
+// Unique per checkout attempt. Sent as the Idempotency-Key header and reused across retries of the
+// same order, so if a response is lost to a timeout the retry de-dupes server-side instead of
+// placing a second order. Not security-sensitive, so a UUID-strength source isn't required.
+function newIdempotencyKey(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
 
 const PALETTE = ['#4f46e5', '#0284c7', '#059669', '#d97706', '#7c3aed', '#db2777'];
 function branchColor(name: string) {
@@ -35,6 +42,8 @@ export default function CartScreen() {
   const [selectedAddressId, setSelectedAddressId] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [placingId, setPlacingId] = useState<string | null>(null);
+  // Idempotency key per branch checkout; held until the order succeeds so retries reuse it.
+  const idempotencyKeys = useRef<Record<string, string>>({});
   const [payOrder, setPayOrder] = useState<{ id: string; orderNumber: number; total: number; mode: OrderMode; items: { id: string; name: string }[] } | null>(null);
 
   useFocusEffect(useCallback(() => { fetchMembership(); fetchAddresses(); }, []));
@@ -79,11 +88,17 @@ export default function CartScreen() {
       return;
     }
     setPlacingId(branchId);
+    // Reuse an existing key for this branch (a retry of the same attempt); otherwise mint one.
+    const idempotencyKey = idempotencyKeys.current[branchId] ??= newIdempotencyKey();
     try {
       const token = await getStoredToken();
       const res = await fetch(`${API_BASE}/api/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify({
           branchId,
           orderType: mode === 'delivery' ? 'Delivery' : 'Pickup',
@@ -98,6 +113,7 @@ export default function CartScreen() {
       }
       const data = await res.json();
       const orderedItems = bc.items.map(c => ({ id: c.itemId, name: c.itemName }));
+      delete idempotencyKeys.current[branchId];   // order placed — next order mints a fresh key
       clearBranch(branchId);
       setPayOrder({ id: data.id, orderNumber: data.orderNumber, total: data.totalAmount, mode, items: orderedItems });
     } catch {

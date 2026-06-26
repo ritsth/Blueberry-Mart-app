@@ -21,6 +21,14 @@ public class Order
     public decimal DiscountAmount { get; set; }
     public string? DeliveryAddress { get; set; }
     public decimal DeliveryFee { get; set; }
+
+    /// <summary>
+    /// Client-supplied idempotency key for the placement request. When present, a unique index on
+    /// (UserId, IdempotencyKey) makes a retried/double-tapped POST /api/orders return the original
+    /// order instead of creating a duplicate. Null for in-store sales and pre-idempotency clients.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

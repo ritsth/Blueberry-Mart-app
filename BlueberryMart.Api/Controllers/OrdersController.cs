@@ -7,6 +7,7 @@ using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace BlueberryMart.Api.Controllers;
 
@@ -131,6 +132,23 @@ public class OrdersController(
 
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        // Idempotent placement: a double-tap or a network-timeout retry carrying the same
+        // Idempotency-Key returns the order that was already created instead of a duplicate.
+        // Optional — pre-idempotency clients send no header and behave exactly as before.
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            idempotencyKey = null;
+        else if (idempotencyKey.Length > 200)
+            return BadRequest(new { message = "Idempotency-Key is too long." });
+
+        if (idempotencyKey is not null)
+        {
+            var prior = await context.Orders.AsNoTracking()
+                .FirstOrDefaultAsync(o => o.UserId == userId && o.IdempotencyKey == idempotencyKey);
+            if (prior is not null)
+                return Ok(BuildOrderResponse(prior));
+        }
+
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
@@ -210,6 +228,7 @@ public class OrdersController(
                 DiscountAmount = discount,
                 DeliveryAddress = deliveryAddressSnapshot,
                 DeliveryFee = deliveryFee,
+                IdempotencyKey = idempotencyKey,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -272,24 +291,45 @@ public class OrdersController(
                     OccurredAt: DateTime.UtcNow));
             }
 
-            return CreatedAtAction(nameof(PlaceOrder), new { id = order.Id }, new
-            {
-                order.Id,
-                order.OrderNumber,
-                order.Status,
-                Subtotal = subtotal,
-                order.DiscountAmount,
-                order.DeliveryFee,
-                order.TotalAmount,
-                order.OrderType,
-                order.DeliveryAddress,
-                LoyaltyPointsEarned = (int)Math.Floor(goodsTotal)
-            });
+            return CreatedAtAction(nameof(PlaceOrder), new { id = order.Id }, BuildOrderResponse(order));
+        }
+        catch (DbUpdateException ex) when (idempotencyKey is not null
+            && ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // A concurrent request with the same key won the insert race — return that order
+            // (the unique index guarantees only one of the duplicates committed).
+            await transaction.RollbackAsync();
+            var winner = await context.Orders.AsNoTracking()
+                .FirstOrDefaultAsync(o => o.UserId == userId && o.IdempotencyKey == idempotencyKey);
+            if (winner is not null)
+                return Ok(BuildOrderResponse(winner));
+            throw;
         }
         catch
         {
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    // Shapes the placement response. Shared by the create path and the idempotent-replay paths so
+    // a retried request gets a byte-identical body. All fields derive from stored columns:
+    // goodsTotal = total − deliveryFee, subtotal = goodsTotal + discount, points = ⌊goodsTotal⌋.
+    private static object BuildOrderResponse(Order order)
+    {
+        var goodsTotal = order.TotalAmount - order.DeliveryFee;
+        return new
+        {
+            order.Id,
+            order.OrderNumber,
+            order.Status,
+            Subtotal = goodsTotal + order.DiscountAmount,
+            order.DiscountAmount,
+            order.DeliveryFee,
+            order.TotalAmount,
+            order.OrderType,
+            order.DeliveryAddress,
+            LoyaltyPointsEarned = (int)Math.Floor(goodsTotal)
+        };
     }
 }
