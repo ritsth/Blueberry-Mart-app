@@ -6,8 +6,9 @@ production-readiness items.
 
 **Status legend:** ✅ Done · ⚠️ Partial / acceptable for now · 🔜 Planned (deferred) · ❌ Missing
 
-_Last reviewed: 2026-06-25 (P2 batch 1 — commit `df6b2f2`: Dependabot, request-body cap, CORS
-confirmed; built on the P0+P1 pass in `eb2e30d`)._
+_Last reviewed: 2026-06-25 (P2 batch 2 — CSP shipped report-only on the hosted pages; CI-secret
+cleanup reviewed and deliberately skipped as non-prod test values. Batch 1 = `df6b2f2`:
+Dependabot, request-body cap, CORS; on top of the P0+P1 pass in `eb2e30d`)._
 
 ---
 
@@ -32,8 +33,10 @@ confirmed; built on the P0+P1 pass in `eb2e30d`)._
 - Prod secrets (JWT, Resend, eSewa, Kafka, BigQuery) live in **Google Secret Manager**, injected via
   **Workload Identity Federation** — no long-lived keys in the repo or git history.
 - `appsettings.Development.json` and `.env.local` are gitignored.
-- **Minor cleanup (🔜):** the CI/test Postgres password and the eSewa **sandbox** secret are
-  committed (low risk — local/test only). Don't reuse that DB password anywhere real.
+- **Reviewed, no action (2026-06-25):** the committed CI/test Postgres password and eSewa
+  **sandbox** key are both non-production test values (the eSewa one is eSewa's publicly
+  documented sandbox HMAC key, used as a test vector). Not real secrets; left as-is. Just don't
+  reuse that DB password anywhere real.
 - **Where we are:** Good.
 
 ### 4. Access control — *Can a user modify requests to gain access?* ✅
@@ -82,7 +85,11 @@ confirmed; built on the P0+P1 pass in `eb2e30d`)._
 - **HTTPS everywhere** ✅ — enforced on client and server; no HTTP fallback.
 - **CORS** ✅ — confirmed scoped via `WithOrigins(portalOrigins)` (config-driven admin-portal
   origin); no `AllowAnyOrigin()` anywhere.
-- **Security headers** 🔜 — add a CSP to the hosted pages (HSTS already via HTTPS redirect).
+- **Security headers** ⚠️ — CSP added to the hosted pages in **report-only mode**
+  (`Content-Security-Policy-Report-Only`, set via `UseStaticFiles` `OnPrepareResponse` so API JSON
+  is untouched). Logs violations without blocking; flip to enforcing (`Content-Security-Policy`)
+  once the live reset/payment pages are confirmed clean in the browser console. HSTS already via
+  HTTPS redirect.
 
 ### Reliability & correctness
 - **Idempotency** 🔜 — add idempotency keys on order/payment submit to survive double-taps and
@@ -117,6 +124,11 @@ _Done in batch 1 (`df6b2f2`): Dependabot ✅ · request-body-size cap ✅ · COR
 2. **(GCP console)** Add error tracking + a billing budget alert.
 3. **(GCP console)** Set Cloud Run max-instances / concurrency / cost ceiling.
 4. Pagination on the unbounded list endpoints.
-5. CSP header on hosted pages; idempotency keys on order/payment.
-6. Stop committing the CI Postgres / eSewa-sandbox secrets.
+5. Idempotency keys on order/payment. _(CSP shipped report-only — flip to enforcing after a live
+   browser-console check of the reset/payment pages.)_
+6. ~~Stop committing the CI Postgres / eSewa-sandbox secrets.~~ **Decided not worth it
+   (2026-06-25):** both are non-production test values — the Postgres password is a throwaway
+   CI-container password, and the eSewa "secret" is eSewa's *publicly documented* sandbox HMAC key
+   used as a test vector. No real secret is exposed; moving them to GitHub secrets adds test
+   friction for ~zero gain.
 7. (Later, if scale demands) refresh-token rotation; cache the per-request user lookup.

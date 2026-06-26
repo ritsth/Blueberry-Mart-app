@@ -341,7 +341,32 @@ app.MapGet("/", () => Results.Ok(new { service = "BlueberryMart API", status = "
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// Content-Security-Policy for the hosted pages (reset-password / payment-success|failure /
+// privacy-policy / delete-account). Applied only to static-file responses, so API JSON is
+// untouched. Shipped REPORT-ONLY first: the browser logs any violation to the console but
+// nothing is blocked, so we can confirm the tester-critical reset + eSewa pages still render
+// before switching the header name to the enforcing `Content-Security-Policy`.
+//   - script-src: hash of reset-password.html's inline <script> (the only inline script). If
+//     that script is ever edited, recompute the sha256 or the page's JS will be reported/blocked.
+//   - style-src 'unsafe-inline': every page uses an inline <style> block (low-risk for static pages).
+//   - connect-src 'self': the reset page fetches /api/auth/reset-password same-origin.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["Content-Security-Policy-Report-Only"] =
+            "default-src 'self'; " +
+            "script-src 'self' 'sha256-xA9fR4tM0hWiCGCfOBUJWbcCrZWxPqPKlVMZHl/8wOc='; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data:; " +
+            "connect-src 'self'; " +
+            "form-action 'self'; " +
+            "base-uri 'self'; " +
+            "frame-ancestors 'none'; " +
+            "object-src 'none'";
+    }
+});
 app.UseCors(PortalCors);
 app.UseAuthentication();
 app.UseAuthorization();
