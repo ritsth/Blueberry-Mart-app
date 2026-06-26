@@ -6,9 +6,10 @@ production-readiness items.
 
 **Status legend:** ✅ Done · ⚠️ Partial / acceptable for now · 🔜 Planned (deferred) · ❌ Missing
 
-_Last reviewed: 2026-06-25 (P2 batch 2 — CSP shipped report-only on the hosted pages; CI-secret
-cleanup reviewed and deliberately skipped as non-prod test values. Batch 1 = `df6b2f2`:
-Dependabot, request-body cap, CORS; on top of the P0+P1 pass in `eb2e30d`)._
+_Last reviewed: 2026-06-25 (P2 batch 2 — idempotent order placement (`897d430`); CSP shipped
+report-only on the hosted pages; CI-secret cleanup reviewed and deliberately skipped as non-prod
+test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap, CORS; on top of the P0+P1 pass in
+`eb2e30d`)._
 
 ---
 
@@ -92,8 +93,10 @@ Dependabot, request-body cap, CORS; on top of the P0+P1 pass in `eb2e30d`)._
   HTTPS redirect.
 
 ### Reliability & correctness
-- **Idempotency** 🔜 — add idempotency keys on order/payment submit to survive double-taps and
-  callback retries.
+- **Idempotency** ✅ — order placement takes an optional `Idempotency-Key` header, enforced by a
+  filtered unique index on `(user_id, idempotency_key)`, so a double-tap or lost-response retry
+  replays the original order instead of duplicating it. The eSewa payment callback was already
+  idempotent (`TransactionUuid` + completed-status guard + status-API re-confirm).
 - **Transactions** ✅ — order placement, payments, stock adjustments use DB transactions with
   rollback.
 - **Event pipeline** ✅ — sales/stock events via a transactional outbox → Kafka → BigQuery.
@@ -124,8 +127,8 @@ _Done in batch 1 (`df6b2f2`): Dependabot ✅ · request-body-size cap ✅ · COR
 2. **(GCP console)** Add error tracking + a billing budget alert.
 3. **(GCP console)** Set Cloud Run max-instances / concurrency / cost ceiling.
 4. Pagination on the unbounded list endpoints.
-5. Idempotency keys on order/payment. _(CSP shipped report-only — flip to enforcing after a live
-   browser-console check of the reset/payment pages.)_
+5. ~~Idempotency keys on order/payment~~ ✅ (`897d430`). _CSP shipped report-only — flip to
+   enforcing after a live browser-console check of the reset/payment pages._
 6. ~~Stop committing the CI Postgres / eSewa-sandbox secrets.~~ **Decided not worth it
    (2026-06-25):** both are non-production test values — the Postgres password is a throwaway
    CI-container password, and the eSewa "secret" is eSewa's *publicly documented* sandbox HMAC key
