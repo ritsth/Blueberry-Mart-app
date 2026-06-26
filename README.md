@@ -4,6 +4,15 @@ A full-stack grocery retail platform built for multi-branch operations, serving 
 
 ---
 
+## Live Demo
+
+| Resource | Link |
+|---|---|
+| **API (Swagger UI)** | [blueberrymart-api-278293545480.us-central1.run.app/swagger](https://blueberrymart-api-278293545480.us-central1.run.app/swagger) |
+| **Mobile app (Android)** | Google Play — internal testing (request access) |
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -126,7 +135,7 @@ Customer places order
 |---|---|
 | Framework | Expo (React Native) — iOS, Android, Web |
 | Navigation | React Navigation (Native Stack) |
-| Auth Storage | AsyncStorage |
+| Auth Storage | Expo SecureStore (Keychain / Keystore) |
 | HTTP | Fetch API |
 
 ### Infrastructure
@@ -155,15 +164,7 @@ Customer places order
 cp BlueberryMart.Api/appsettings.Development.example.json \
    BlueberryMart.Api/appsettings.Development.json
 
-# 2. Apply database migrations
-PGPASSWORD=your_password psql -h localhost -U postgres -d blueberry_mart \
-  -f Database/Migrations/01_InitSchema.sql
-PGPASSWORD=your_password psql -h localhost -U postgres -d blueberry_mart \
-  -f Database/Migrations/02_AddReviews.sql
-PGPASSWORD=your_password psql -h localhost -U postgres -d blueberry_mart \
-  -f Database/Migrations/03_AddOrderItems.sql
-
-# 3. Run the API (seeds mock data on first start)
+# 2. Run the API — EF Core migrations apply automatically on startup
 dotnet run --project BlueberryMart.Api
 # Swagger UI → http://localhost:5027/swagger
 ```
@@ -200,13 +201,15 @@ Sensitive values are **never committed**. Set them in `appsettings.Development.j
 
 ## Database Migrations
 
-Migrations are plain SQL files applied in order. They are **never run automatically** — apply them manually or via a deploy script.
+Schema is managed by **EF Core migrations** (`BlueberryMart.Api/Migrations/`). Migrations are applied automatically when the API starts (`DbInitializer.Initialize` calls `context.Database.Migrate()`), so deploying new code is enough — no manual step needed.
+
+To add a new migration after editing an entity:
 
 ```bash
-psql "$CONNECTION_STRING" -f Database/Migrations/01_InitSchema.sql
-psql "$CONNECTION_STRING" -f Database/Migrations/02_AddReviews.sql
-psql "$CONNECTION_STRING" -f Database/Migrations/03_AddOrderItems.sql
+dotnet dotnet-ef migrations add <Name> --project BlueberryMart.Api --output-dir Migrations
 ```
+
+The raw SQL files in `Database/Migrations/` are kept for history only and are no longer the source of truth.
 
 ---
 
@@ -233,4 +236,4 @@ Integration tests run against a dedicated `blueberry_mart_test` PostgreSQL datab
 dotnet test Tests/BlueberryMart.Api.Tests
 ```
 
-**21 tests** covering auth, inventory access control, order validation, review submission, and analytics.
+**138 tests** covering auth, inventory access control, order validation, review submission, analytics, and idempotency.
