@@ -4,6 +4,12 @@ A full-stack grocery retail platform built for multi-branch operations, serving 
 
 ---
 
+## Why I built this
+
+I wanted to build a grocery platform the way a real multi-branch retailer would need it — not a single-store CRUD demo. That meant two very different users sharing one backend (customers shopping a branch, shareholders watching revenue across all branches), inventory that stays correct under concurrent orders, and analytics that don't slow down checkout. Those constraints are what pushed the design toward event streaming (Kafka), a read cache (Redis), and a separate analytical warehouse (BigQuery) rather than a single database doing everything.
+
+---
+
 ## Live Demo
 
 | Resource | Link |
@@ -16,8 +22,10 @@ A full-stack grocery retail platform built for multi-branch operations, serving 
 
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [Overview](#overview)
 - [Architecture](#architecture)
+- [Design Decisions & Tradeoffs](#design-decisions--tradeoffs)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Local Development](#local-development)
@@ -25,6 +33,25 @@ A full-stack grocery retail platform built for multi-branch operations, serving 
 - [Database Migrations](#database-migrations)
 - [API Endpoints](#api-endpoints)
 - [Running Tests](#running-tests)
+- [What I Learned](#what-i-learned)
+
+---
+
+## Screenshots
+
+<p align="center"><img src="docs/demo.gif" alt="Blueberry Mart demo" width="280"></p>
+
+**Customer app**
+
+| Shop by branch | Product catalog | Bulk orders (Plus) | AI assistant | Account & loyalty |
+| --- | --- | --- | --- | --- |
+| <img src="docs/shop-branches.png" width="150"> | <img src="docs/product-catalog.png" width="150"> | <img src="docs/bulk-orders.png" width="150"> | <img src="docs/assistant.png" width="150"> | <img src="docs/account.png" width="150"> |
+
+**Shareholder analytics portal**
+
+| Revenue dashboard | Revenue by branch | Top-selling items |
+| --- | --- | --- |
+| <img src="docs/analytics-revenue.png" width="150"> | <img src="docs/analytics-branches.png" width="150"> | <img src="docs/analytics-top-items.png" width="150"> |
 
 ---
 
@@ -113,6 +140,19 @@ Customer places order
         ├──► Consumer: stream event → BigQuery (orders_stream)
         └──► Consumer: send confirmation → push notification
 ```
+
+---
+
+## Design Decisions & Tradeoffs
+
+A few choices I'd defend in a code review:
+
+- **Kafka for order events instead of doing the work inline.** Placing an order only writes to Cloud SQL and emits `order.placed`; inventory deduction, BigQuery streaming, and notifications are independent consumers. A slow or failing consumer can't block checkout, and adding a new side effect (e.g., analytics) is a *new consumer*, not a change to the write path.
+- **Redis in front of Cloud SQL, not as the source of truth.** Inventory lookups are read-heavy and hot, so they're cached; Cloud SQL stays authoritative. The tradeoff is cache-invalidation discipline — the `order.placed` consumer must keep Redis consistent after every stock change.
+- **BigQuery separate from Postgres (OLAP vs OLTP).** Shareholder analytics (revenue over time, top items) are heavy aggregations that would compete with transactional writes if run on Cloud SQL. Streaming events into BigQuery keeps customer checkout fast and makes large aggregations cheap.
+- **One role-based API over two services.** Customer and Shareholder access is enforced by JWT role claims on scoped endpoints (`/inventory/customer` vs `/inventory/shareholder`), so the data is segregated without the operational cost of two deployments — the right call for this scope.
+- **At-least-once delivery → idempotent consumers.** Kafka can redeliver, so consumers are written to be idempotent (an order can't be double-deducted). This is covered explicitly in the test suite.
+- **EF Core migrations auto-apply on startup.** Deploying new code is enough — no manual migration step. The tradeoff is that a bad migration ships with the deploy, which is acceptable given the migrations are tested in CI.
 
 ---
 
@@ -238,3 +278,12 @@ dotnet test Tests/BlueberryMart.Api.Tests
 ```
 
 **138 tests** covering auth, inventory access control, order validation, review submission, analytics, and idempotency.
+
+---
+
+## What I Learned
+
+- **Designing the event flow first made features additive.** Once `order.placed` existed as an event, adding BigQuery streaming and push notifications was a matter of attaching consumers — no rewrites of the order path. Getting the seams right early paid off repeatedly.
+- **Separating OLTP from OLAP is a real architectural lever.** Moving analytical queries off Cloud SQL into BigQuery is what kept customer checkout fast while shareholders run heavy aggregations — I now reach for that split deliberately instead of bolting reporting onto the transactional DB.
+- **A cache is only a win with invalidation discipline.** Redis sped up inventory reads, but the value depended entirely on the consumer keeping it consistent with Cloud SQL after every order — caching is as much about invalidation as about speed.
+- **At-least-once delivery forces you to think in idempotency.** Kafka redelivering a message would have double-deducted stock if consumers weren't idempotent; building (and testing) that in up front avoided a whole class of data-correctness bugs.
