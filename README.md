@@ -6,7 +6,7 @@ A full-stack grocery retail platform built for multi-branch operations, serving 
 
 ## Why I built this
 
-I wanted to build a grocery platform the way a real multi-branch retailer would need it — not a single-store CRUD demo. That meant two very different users sharing one backend (customers shopping a branch, shareholders watching revenue across all branches), inventory that stays correct under concurrent orders, and analytics that don't slow down checkout. Those constraints are what pushed the design toward event streaming (Kafka), a read cache (Redis), and a separate analytical warehouse (BigQuery) rather than a single database doing everything.
+My dad is opening a grocery mart in Nepal, and I'm handling the digital infrastructure for it. So this isn't a CRUD demo — it's built around what a real multi-branch retailer actually needs: two very different users sharing one backend (customers shopping a branch, shareholders watching revenue across all branches), inventory that stays correct under concurrent orders, and analytics that don't slow down checkout. Those real constraints are what pushed the design toward event streaming (Kafka), a read cache (Redis), and a separate analytical warehouse (BigQuery) rather than a single database doing everything.
 
 ---
 
