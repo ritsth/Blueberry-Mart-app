@@ -38,6 +38,13 @@ test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap, CORS; on top of 
   **sandbox** key are both non-production test values (the eSewa one is eSewa's publicly
   documented sandbox HMAC key, used as a test vector). Not real secrets; left as-is. Just don't
   reuse that DB password anywhere real.
+- **Fixed (2026-07-02):** `DbInitializer` was seeding demo login accounts (`customer1`, `customer2`,
+  `shareholder1`) into **Production**, and `shareholder1`'s password was published in
+  `ChatBot.md` — a public repo reader could log in with real Shareholder access (full inventory +
+  analytics). Fixed: demo accounts no longer seed when `IHostEnvironment.IsProduction()`; the
+  already-seeded Production copies have their password hash rotated to a fresh random value on
+  every Production startup (nobody knows it — equivalent to disabling those accounts). Doc scrubbed
+  of the plaintext password. Demo accounts still seed normally in Development/Testing/CI.
 - **Where we are:** Good.
 
 ### 4. Access control — *Can a user modify requests to gain access?* ✅

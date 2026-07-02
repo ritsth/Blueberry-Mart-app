@@ -130,16 +130,22 @@ gcloud run services update blueberrymart-api --region us-central1 --project proj
 
 ## Verify (this is live and working)
 
+Log in with a real shareholder account (Production no longer seeds demo login accounts — see
+`SECURITY_POSTURE.md`), then hit `/api/chat` with that token:
+
 ```bash
 PROD=https://blueberrymart-api-278293545480.us-central1.run.app
 TOKEN=$(curl -s -X POST $PROD/api/auth/login -H 'Content-Type: application/json' \
-  -d '{"email":"shareholder1@blueberrymart.com","password":"shareholder1_password"}' \
+  -d '{"email":"<your-shareholder-email>","password":"<your-password>"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
 curl -s -X POST $PROD/api/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"Is Brown Eggs in stock and how much?"}]}'
 ```
-Confirmed reply: *"Yes, Brown Eggs (12 pack) are in stock at Blueberry Mart Downtown, with 41
-packs available, and they cost Rs 180."* — grounded in the live catalog.
+Confirmed reply (2026-06): *"Yes, Brown Eggs (12 pack) are in stock at Blueberry Mart Downtown,
+with 41 packs available, and they cost Rs 180."* — grounded in the live catalog.
+
+For local/dev testing, the demo `shareholder1@blueberrymart.com` account is still seeded
+automatically (Development/Testing only).
 
 ---
 

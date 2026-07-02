@@ -317,7 +317,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
-    DbInitializer.Initialize(context, app.Configuration);
+    DbInitializer.Initialize(context, app.Configuration, app.Environment);
 }
 
 // One-off data seeding: `dotnet run --project BlueberryMart.Api -- seed [--orders N …]`
