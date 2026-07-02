@@ -6,6 +6,8 @@ on:
     paths:
       - 'BlueberryMartPortal/**'
       - '.github/workflows/portal-ci.yml'
+  pull_request:
+    branches: [main]
 
 jobs:
   # Each check is its own job so it shows as a separate status line and runs in
