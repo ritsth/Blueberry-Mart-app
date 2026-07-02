@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace BlueberryMart.Api.Tests.Infrastructure;
 
@@ -70,7 +71,8 @@ public class BlueberryMartApiFactory : WebApplicationFactory<Program>, IAsyncLif
         await context.Database.EnsureDeletedAsync();
         // DbInitializer.Initialize runs Migrate() to build the schema from migrations, then seeds
         var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        DbInitializer.Initialize(context, config);
+        var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+        DbInitializer.Initialize(context, config, env);
 
         DowntownBranchId = (await context.Branches.FirstAsync(b => b.Name == "Blueberry Mart Downtown")).Id;
         SuburbsBranchId  = (await context.Branches.FirstAsync(b => b.Name == "Blueberry Mart Suburbs")).Id;

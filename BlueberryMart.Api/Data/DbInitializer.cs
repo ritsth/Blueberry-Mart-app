@@ -2,6 +2,7 @@ using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace BlueberryMart.Api.Data;
 
@@ -11,15 +12,25 @@ public static class DbInitializer
     /// cleanup below can remove it. In-store walk-in sales now use a null <c>Order.UserId</c>.</summary>
     private const string LegacyWalkInEmail = "walkin@system.blueberrymart.local";
 
-    public static void Initialize(BlueberryMartDbContext context, IConfiguration config)
+    /// <summary>Demo login accounts previously seeded in every environment, including Production,
+    /// with passwords published in project docs. See <see cref="RotateLegacyDemoAccountPasswords"/>.</summary>
+    private static readonly string[] LegacyDemoAccountEmails =
+    [
+        "customer1@blueberrymart.com",
+        "customer2@blueberrymart.com",
+        "shareholder1@blueberrymart.com"
+    ];
+
+    public static void Initialize(BlueberryMartDbContext context, IConfiguration config, IHostEnvironment env)
     {
         // Apply any pending EF Core migrations (creates the schema on a fresh DB,
         // brings an existing DB up to date). Replaces the old EnsureCreated().
         context.Database.Migrate();
 
-        SeedDemoData(context);
+        SeedDemoData(context, env);
         EnsureAdmin(context, config);
         RemoveLegacyWalkInCustomer(context);
+        RotateLegacyDemoAccountPasswords(context, env);
         EnsureSettings(context);
     }
 
@@ -83,7 +94,7 @@ public static class DbInitializer
         context.SaveChanges();
     }
 
-    private static void SeedDemoData(BlueberryMartDbContext context)
+    private static void SeedDemoData(BlueberryMartDbContext context, IHostEnvironment env)
     {
         if (context.Branches.Any() || context.Users.Any()) return;
 
@@ -135,6 +146,11 @@ public static class DbInitializer
         context.Inventory.AddRange(inventory);
         context.SaveChanges();
 
+        // Demo login accounts are a local/dev/CI convenience only. Never seed them in Production —
+        // a known email+password (one of them Shareholder-level) would grant real access to a
+        // live system. Admins/testers create real accounts through normal registration instead.
+        if (env.IsProduction()) return;
+
         var users = new List<User>
         {
             new()
@@ -173,6 +189,30 @@ public static class DbInitializer
         };
 
         context.Users.AddRange(users);
+        context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Earlier deploys seeded the demo accounts in <see cref="LegacyDemoAccountEmails"/> into
+    /// Production too, with passwords that were published in project docs. Production no longer
+    /// seeds them (see <see cref="SeedDemoData"/>), but any copies an earlier deploy already
+    /// created still have the old, now-public password. On every Production startup, overwrite
+    /// their hash with a fresh random value that is never logged or stored anywhere — the
+    /// published passwords stop working immediately. No-op once the accounts are gone, and
+    /// a no-op everywhere but Production.
+    /// </summary>
+    private static void RotateLegacyDemoAccountPasswords(BlueberryMartDbContext context, IHostEnvironment env)
+    {
+        if (!env.IsProduction()) return;
+
+        var accounts = context.Users.Where(u => LegacyDemoAccountEmails.Contains(u.Email)).ToList();
+        if (accounts.Count == 0) return;
+
+        foreach (var account in accounts)
+        {
+            account.PasswordHash = BCrypt(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+            account.UpdatedAt = DateTime.UtcNow;
+        }
         context.SaveChanges();
     }
 
