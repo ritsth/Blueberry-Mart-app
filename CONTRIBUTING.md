@@ -1,7 +1,8 @@
 # Contributing to Blueberry Mart
 
 Thanks for helping out. This doc covers the workflow, conventions, and gates for this repo.
-For architecture, tech stack, and local setup, start with the [README](README.md).
+For architecture, tech stack, and local setup, start with the [README](README.md). By
+participating, you're expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
