@@ -4,27 +4,28 @@ using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Models.Requests;
 using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace BlueberryMart.Api.Services;
 
 /// <summary>
-/// Reads/writes the single StoreSettings row, caching a detached snapshot so the
-/// per-checkout read doesn't hit the DB every time. The cache is invalidated on update.
+/// Reads/writes the single StoreSettings row, caching a detached snapshot so the per-checkout read
+/// doesn't hit the DB every time. Uses the shared distributed cache (write-through on update), so a
+/// settings change is seen across all instances immediately — not stuck in one process's memory.
 /// </summary>
-public class SettingsService(BlueberryMartDbContext context, IMemoryCache cache) : ISettingsService
+public class SettingsService(BlueberryMartDbContext context, ICacheService cache) : ISettingsService
 {
     private const string CacheKey = "store_settings";
+    private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(5);
 
     public async Task<StoreSettingsDto> GetAsync(CancellationToken ct = default)
     {
-        if (cache.TryGetValue(CacheKey, out StoreSettingsDto? cached) && cached is not null)
-            return cached;
+        var cached = await cache.GetAsync<StoreSettingsDto>(CacheKey, ct);
+        if (cached is not null) return cached;
 
         var row = await context.StoreSettings.AsNoTracking().FirstOrDefaultAsync(ct)
                   ?? new StoreSettings(); // defaults if the row somehow isn't seeded yet
         var dto = ToDto(row);
-        cache.Set(CacheKey, dto);
+        await cache.SetAsync(CacheKey, dto, Ttl, ct);
         return dto;
     }
 
@@ -49,7 +50,7 @@ public class SettingsService(BlueberryMartDbContext context, IMemoryCache cache)
         await context.SaveChangesAsync(ct);
 
         var dto = ToDto(row);
-        cache.Set(CacheKey, dto);
+        await cache.SetAsync(CacheKey, dto, Ttl, ct);
         return dto;
     }
 

@@ -40,8 +40,12 @@ builder.Services.AddControllers()
     .AddJsonOptions(o =>
         o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
 
-builder.Services.AddDbContext<BlueberryMartDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Scoped so its per-save state (keys to evict) belongs to one DbContext at a time. Resolved from
+// the scoped provider below so each DbContext gets its own instance.
+builder.Services.AddScoped<CacheInvalidationInterceptor>();
+builder.Services.AddDbContext<BlueberryMartDbContext>((sp, options) =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+        .AddInterceptors(sp.GetRequiredService<CacheInvalidationInterceptor>()));
 
 // eSewa payment integration
 builder.Services.Configure<BlueberryMart.Api.Configuration.EsewaOptions>(
@@ -135,10 +139,30 @@ else
         BlueberryMart.Api.Services.DisabledChatService>();
 
 // Admin-editable global settings (delivery fee, membership fee, maintenance mode…),
-// cached in memory and read on every checkout.
-builder.Services.AddMemoryCache();
+// read on every checkout and cached via the shared distributed cache below.
 builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.ISettingsService,
     BlueberryMart.Api.Services.SettingsService>();
+
+// Shared distributed cache. Real Redis (Memorystore) in prod when Redis:ConnectionString is set;
+// otherwise an in-process distributed cache so local dev / CI / tests need no Redis. The app only
+// ever talks to IDistributedCache through the resilient ICacheService wrapper, so the two backends
+// are interchangeable. Redis is configured to never hang startup or fail requests if it's down.
+builder.Services.Configure<BlueberryMart.Api.Configuration.RedisOptions>(
+    builder.Configuration.GetSection("Redis"));
+var redisConnection = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(redisConnection))
+    builder.Services.AddStackExchangeRedisCache(o =>
+    {
+        o.InstanceName = builder.Configuration["Redis:InstanceName"] ?? "bbm:";
+        o.ConfigurationOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
+        o.ConfigurationOptions.AbortOnConnectFail = false;
+        o.ConfigurationOptions.ConnectTimeout = 2000;
+    });
+else
+    builder.Services.AddDistributedMemoryCache();
+
+builder.Services.AddSingleton<BlueberryMart.Api.Services.Interfaces.ICacheService,
+    BlueberryMart.Api.Services.DistributedCacheService>();
 
 // Releases stock reserved by unpaid orders after a hold window. The periodic sweeper
 // (OrderExpirySweeper) runs only on the worker; this service holds the logic so it's testable.
@@ -164,6 +188,10 @@ else
 builder.Services.AddScoped<BlueberryMart.Api.Services.Interfaces.IAuthCodeService,
     BlueberryMart.Api.Services.AuthCodeService>();
 
+// Captured once for the per-request auth-status cache below (avoids resolving IOptions per request).
+var authStatusTtl = TimeSpan.FromSeconds(
+    builder.Configuration.GetValue<int?>("Redis:AuthStatusTtlSeconds") ?? 60);
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
@@ -179,8 +207,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]!))
         };
 
-        // Per-request ban enforcement: even a still-valid token is rejected the
-        // moment a user is banned. One indexed lookup per authenticated request.
+        // Per-request ban enforcement: even a still-valid token is rejected the moment a user is
+        // banned/deleted or resets their password. The status is cached briefly per user to avoid a
+        // DB hit on every request; the cache is evicted the instant any of those fields change
+        // (CacheInvalidationInterceptor), so revocation stays effectively immediate. A cache fault
+        // falls through to the DB — fail-safe, never fail-open.
         o.Events = new JwtBearerEvents
         {
             OnTokenValidated = async ctx =>
@@ -189,14 +220,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 if (!Guid.TryParse(sub, out var userId)) { ctx.Fail("Invalid subject."); return; }
 
-                var db = ctx.HttpContext.RequestServices
-                    .GetRequiredService<BlueberryMartDbContext>();
-                var status = await db.Users
-                    .Where(u => u.Id == userId)
-                    .Select(u => new { u.IsBanned, u.DeletedAt, u.PasswordChangedAt })
-                    .FirstOrDefaultAsync();
+                var services = ctx.HttpContext.RequestServices;
+                var cache = services.GetRequiredService<BlueberryMart.Api.Services.Interfaces.ICacheService>();
+                var cacheKey = BlueberryMart.Api.Services.Interfaces.CacheKeys.UserStatus(userId);
 
-                if (status is null) { ctx.Fail("Account no longer exists."); return; }
+                var status = await cache.GetAsync<BlueberryMart.Api.Models.DTOs.AuthStatus>(cacheKey);
+                if (status is null)
+                {
+                    var db = services.GetRequiredService<BlueberryMartDbContext>();
+                    var row = await db.Users
+                        .Where(u => u.Id == userId)
+                        .Select(u => new { u.IsBanned, u.DeletedAt, u.PasswordChangedAt })
+                        .FirstOrDefaultAsync();
+
+                    if (row is null) { ctx.Fail("Account no longer exists."); return; }
+
+                    status = new BlueberryMart.Api.Models.DTOs.AuthStatus(
+                        row.IsBanned, row.DeletedAt, row.PasswordChangedAt);
+                    await cache.SetAsync(cacheKey, status, authStatusTtl);
+                }
+
                 if (status.DeletedAt is not null) { ctx.Fail("Account has been deleted."); return; }
                 if (status.IsBanned) { ctx.Fail("Account is banned."); return; }
 
