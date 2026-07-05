@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using BlueberryMart.Api.Configuration;
 using BlueberryMart.Api.Data;
 using BlueberryMart.Api.Models.Entities;
 using BlueberryMart.Api.Models.Events;
@@ -7,23 +8,37 @@ using BlueberryMart.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace BlueberryMart.Api.Controllers;
 
 [ApiController]
 [Route("api/inventory")]
-public class InventoryController(BlueberryMartDbContext context, IStockEventProducer stockEvents) : ControllerBase
+public class InventoryController(
+    BlueberryMartDbContext context,
+    IStockEventProducer stockEvents,
+    ICacheService cache,
+    IOptions<RedisOptions> redisOptions) : ControllerBase
 {
+    // Branch catalogues are read-heavy and change only on a write, which evicts the cache
+    // (CacheInvalidationInterceptor). A short TTL backstops anything not explicitly evicted.
+    private readonly TimeSpan _inventoryTtl = TimeSpan.FromSeconds(redisOptions.Value.InventoryTtlSeconds);
+
     [Authorize(Roles = "Customer,Shareholder")]
     [HttpGet("customer")]
     public async Task<ActionResult<IEnumerable<Inventory>>> GetForCustomer(
         [FromQuery] Guid branchId, [FromQuery] bool includeOutOfStock = false)
     {
+        var key = CacheKeys.InventoryCatalog(branchId, CacheKeys.CustomerCatalog, includeOutOfStock);
+        var cached = await cache.GetAsync<List<Inventory>>(key);
+        if (cached is not null) return Ok(cached);
+
         var query = context.Inventory.Where(i => i.BranchId == branchId && i.IsActive && !i.IsBulkOnly);
         if (!includeOutOfStock)   // default keeps sold-out items hidden
             query = query.Where(i => i.StockQuantity > 0);
 
         var items = await query.OrderByDescending(i => i.StockQuantity > 0).ThenBy(i => i.ItemName).ToListAsync();
+        await cache.SetAsync(key, items, _inventoryTtl);
         return Ok(items);
     }
 
@@ -32,18 +47,23 @@ public class InventoryController(BlueberryMartDbContext context, IStockEventProd
     [HttpGet("bulk")]
     public async Task<IActionResult> GetBulk([FromQuery] Guid branchId, [FromQuery] bool includeOutOfStock = false)
     {
+        // Membership is authorization — always checked live, never served from the catalogue cache.
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var user = await context.Users.FindAsync(userId);
         if (user is null || !user.IsMember)
             return StatusCode(StatusCodes.Status403Forbidden,
                 new { message = "Bulk ordering is available to Blueberry Plus members only." });
 
+        var key = CacheKeys.InventoryCatalog(branchId, CacheKeys.BulkCatalog, includeOutOfStock);
+        var cached = await cache.GetAsync<List<Inventory>>(key);
+        if (cached is not null) return Ok(cached);
+
         var query = context.Inventory.Where(i => i.BranchId == branchId && i.IsActive && i.IsBulkOnly);
         if (!includeOutOfStock)   // default keeps sold-out items hidden
             query = query.Where(i => i.StockQuantity > 0);
 
         var items = await query.OrderByDescending(i => i.StockQuantity > 0).ThenBy(i => i.ItemName).ToListAsync();
-
+        await cache.SetAsync(key, items, _inventoryTtl);
         return Ok(items);
     }
 
