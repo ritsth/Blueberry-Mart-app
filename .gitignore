@@ -49,3 +49,6 @@ Thumbs.db
 
 # ── Images ───────────────────────────────────────────────────
 BlueberryMart-screenshots
+
+# ── GCP Billing Alert Commands ───────────────────────────────────────────────────
+blueberry-mart-billing-setup.md
