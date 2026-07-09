@@ -16,23 +16,20 @@ Both actions are reversible in seconds — see "Resume service" below.
 You get the existing email alerts at 50/90/100/120% regardless of this function; this only adds
 an automatic action at 100%.
 
-All values below are specific to this project (confirmed via `gcloud` on 2026-07-08):
+**Project-specific values (real project ID, billing account ID, service account) are
+deliberately not written down here** — this directory is in a public repo. Fill in the
+placeholders below yourself (`gcloud config get-value project`, `gcloud billing accounts list`,
+etc.), or ask for the filled-in command sequence separately, somewhere that isn't committed.
 
-| Value | Setting |
-|---|---|
-| Project ID | `project-76ca6efe-7878-4dc8-bff` |
-| Project number | `278293545480` |
-| Billing account | `01F9E2-8429F1-9A7221` |
-| Region | `us-central1` |
-| Cloud Run services | `blueberrymart-api`, `blueberrymart-worker` |
-| Cloud SQL instance | `blueberrymart-db` |
+Placeholders used below: `PROJECT_ID`, `PROJECT_NUMBER`, `BILLING_ACCOUNT_ID`, `REGION`,
+`CLOUD_RUN_SERVICES` (comma-separated), `SQL_INSTANCE`, `BUDGET_NAME`.
 
 ---
 
 ## 1. Enable the APIs you'll need
 
 ```bash
-gcloud config set project project-76ca6efe-7878-4dc8-bff
+gcloud config set project PROJECT_ID
 
 gcloud services enable \
   cloudfunctions.googleapis.com \
@@ -61,20 +58,20 @@ gcloud iam service-accounts create billing-guard-sa \
 
 # Cloud Run: grant per-service, not project-wide
 gcloud run services add-iam-policy-binding blueberrymart-api \
-  --region=us-central1 \
-  --member="serviceAccount:billing-guard-sa@project-76ca6efe-7878-4dc8-bff.iam.gserviceaccount.com" \
+  --region=REGION \
+  --member="serviceAccount:billing-guard-sa@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/run.developer"
 
 gcloud run services add-iam-policy-binding blueberrymart-worker \
-  --region=us-central1 \
-  --member="serviceAccount:billing-guard-sa@project-76ca6efe-7878-4dc8-bff.iam.gserviceaccount.com" \
+  --region=REGION \
+  --member="serviceAccount:billing-guard-sa@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/run.developer"
 
 # Cloud SQL has no per-instance IAM binding, only project-level — this is the one broader grant
 # (roles/cloudsql.editor can resize/restart instances project-wide; there's no narrower
 # predefined role for just "patch activation policy").
-gcloud projects add-iam-policy-binding project-76ca6efe-7878-4dc8-bff \
-  --member="serviceAccount:billing-guard-sa@project-76ca6efe-7878-4dc8-bff.iam.gserviceaccount.com" \
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="serviceAccount:billing-guard-sa@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/cloudsql.editor"
 ```
 
@@ -86,29 +83,25 @@ From the repo root:
 gcloud functions deploy billing-guard \
   --gen2 \
   --runtime=python312 \
-  --region=us-central1 \
+  --region=REGION \
   --source=infra/billing-guard \
   --entry-point=budget_alert \
   --trigger-topic=billing-budget-alerts \
-  --service-account=billing-guard-sa@project-76ca6efe-7878-4dc8-bff.iam.gserviceaccount.com \
-  --set-env-vars=PROJECT_ID=project-76ca6efe-7878-4dc8-bff,REGION=us-central1,CLOUD_RUN_SERVICES=blueberrymart-api,SQL_INSTANCE=blueberrymart-db,TRIGGER_RATIO=1.0,BUDGET_DISPLAY_NAME="Blueberry Mart monthly"
+  --service-account=billing-guard-sa@PROJECT_ID.iam.gserviceaccount.com \
+  --env-vars-file=infra/billing-guard/env.yaml
 ```
 
-> Note: `CLOUD_RUN_SERVICES` is comma-separated if you list more than one — `gcloud`'s
-> `--set-env-vars` splits on commas, so if you need both services in that var, use
-> `--set-env-vars=^:^PROJECT_ID=...:CLOUD_RUN_SERVICES=blueberrymart-api,blueberrymart-worker:...`
-> (custom delimiter `:`) or pass a `--env-vars-file=env.yaml` instead — simplest is a YAML file:
+> `--env-vars-file` avoids the `--set-env-vars` comma-splitting problem (`CLOUD_RUN_SERVICES`
+> needs a comma-separated value). Create `infra/billing-guard/env.yaml` locally — it's
+> gitignored, don't commit it:
 > ```yaml
-> PROJECT_ID: project-76ca6efe-7878-4dc8-bff
-> REGION: us-central1
+> PROJECT_ID: PROJECT_ID
+> REGION: REGION
 > CLOUD_RUN_SERVICES: blueberrymart-api,blueberrymart-worker
-> SQL_INSTANCE: blueberrymart-db
+> SQL_INSTANCE: SQL_INSTANCE
 > TRIGGER_RATIO: "1.0"
-> BUDGET_DISPLAY_NAME: "Blueberry Mart monthly"
+> BUDGET_DISPLAY_NAME: "BUDGET_NAME"
 > ```
-> then `--env-vars-file=infra/billing-guard/env.yaml` instead of `--set-env-vars`. Use whichever
-> `gcloud` accepts cleanly — the exact env-var flag syntax varies slightly by `gcloud` version;
-> if it errors, run `gcloud functions deploy --help` and adjust.
 
 If the deploy warns about a missing Eventarc/Pub/Sub invoker binding, it will print the exact
 `gcloud` command to fix it — run that command as shown.
@@ -117,15 +110,15 @@ If the deploy warns about a missing Eventarc/Pub/Sub invoker binding, it will pr
 
 ```bash
 gcloud billing budgets create \
-  --billing-account=01F9E2-8429F1-9A7221 \
-  --display-name="Blueberry Mart monthly" \
+  --billing-account=BILLING_ACCOUNT_ID \
+  --display-name="BUDGET_NAME" \
   --budget-amount=30USD \
-  --filter-projects=projects/278293545480 \
+  --filter-projects=projects/PROJECT_NUMBER \
   --threshold-rule=percent=0.5 \
   --threshold-rule=percent=0.9 \
   --threshold-rule=percent=1.0 \
   --threshold-rule=percent=1.2 \
-  --notifications-rule-pubsub-topic=projects/project-76ca6efe-7878-4dc8-bff/topics/billing-budget-alerts
+  --notifications-rule-pubsub-topic=projects/PROJECT_ID/topics/billing-budget-alerts
 ```
 
 This keeps the email alerts at 50/90/100/120% (default recipients = billing account admins,
@@ -143,17 +136,17 @@ the resume steps below, not by accident.
 
 ```bash
 gcloud pubsub topics publish billing-budget-alerts \
-  --message='{"budgetDisplayName":"Blueberry Mart monthly","costAmount":31,"budgetAmount":30,"currencyCode":"USD"}'
+  --message='{"budgetDisplayName":"BUDGET_NAME","costAmount":31,"budgetAmount":30,"currencyCode":"USD"}'
 ```
 
 Then check:
 ```bash
 # Cloud Function logs — should show "Stopping billable resources", then the two actions
-gcloud functions logs read billing-guard --region=us-central1 --gen2 --limit=20
+gcloud functions logs read billing-guard --region=REGION --gen2 --limit=20
 
 # Confirm the services actually scaled down
-gcloud run services describe blueberrymart-api --region=us-central1 --format="value(spec.template.metadata.annotations['autoscaling.knative.dev/minScale'],spec.template.metadata.annotations['autoscaling.knative.dev/maxScale'])"
-gcloud sql instances describe blueberrymart-db --format="value(settings.activationPolicy)"
+gcloud run services describe blueberrymart-api --region=REGION --format="value(spec.template.metadata.annotations['autoscaling.knative.dev/minScale'],spec.template.metadata.annotations['autoscaling.knative.dev/maxScale'])"
+gcloud sql instances describe SQL_INSTANCE --format="value(settings.activationPolicy)"
 ```
 
 Publish it again — the second run should log "already scaled to 0/0" / "already stopped" and
@@ -163,21 +156,21 @@ make no further changes (idempotency check).
 
 ## Resume service (after you've dealt with whatever caused the spend)
 
-Restores the exact configuration confirmed before this was set up (2026-07-08):
+Record your *own* current min/max instance values before you ever trigger this for real
+(`gcloud run services describe ... --format="value(...)"`, same as the verify step above), so
+you know exactly what to restore. As a general shape:
 
 ```bash
 # Cloud SQL back on
-gcloud sql instances patch blueberrymart-db --activation-policy=ALWAYS
+gcloud sql instances patch SQL_INSTANCE --activation-policy=ALWAYS
 
-# blueberrymart-api: min 0 / max 3 (original)
-gcloud run services update blueberrymart-api --region=us-central1 --min-instances=0 --max-instances=3
-
-# blueberrymart-worker: min 1 / max 1 (always-on consumer — original)
-gcloud run services update blueberrymart-worker --region=us-central1 --min-instances=1 --max-instances=1
+# Restore each Cloud Run service to its own prior min/max (fill in your real values)
+gcloud run services update blueberrymart-api --region=REGION --min-instances=<prior-min> --max-instances=<prior-max>
+gcloud run services update blueberrymart-worker --region=REGION --min-instances=<prior-min> --max-instances=<prior-max>
 ```
 
 Cloud SQL takes a couple of minutes to come back up; Cloud Run services will start serving as
-soon as a request arrives (or immediately for the worker, since it has `min-instances=1`).
+soon as a request arrives (or immediately for a service with `min-instances >= 1`).
 
 ---
 

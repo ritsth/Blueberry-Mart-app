@@ -28,6 +28,9 @@ web-build/
 .env
 .env.local
 
+# ── Infra runbook secrets (real project/account IDs, never committed) ──
+infra/billing-guard/env.yaml
+
 # ── Uploaded user content ─────────────────────────────────
 BlueberryMart.Api/wwwroot/images/reviews/*.jpg
 BlueberryMart.Api/wwwroot/images/reviews/*.jpeg
