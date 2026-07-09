@@ -19,7 +19,7 @@ config (no code change): Groq, Google Gemini, OpenRouter, a local Ollama, OpenAI
 
 > **Why not Gemini?** We tried it first but Gemini's API returns **`free_tier … limit: 0`**
 > for this project — even with a fresh, valid `AIzaSy…` key minted directly in the
-> billing-enabled project (`project-76ca6efe-…`, `billingAccounts/01F9E2-…`). Gemini's
+> billing-enabled project (see `GCP_SERVICES.md` for the project/billing IDs). Gemini's
 > **paid tier doesn't activate** here (region / trial-credit billing), so there's simply no
 > quota to spend. Switched to **Groq**, which is genuinely free and works in-region.
 
@@ -113,13 +113,14 @@ default to Groq, so only the key is needed:
 **Production (Cloud Run)** — store the key in Secret Manager, then point the service at it.
 The runtime SA already has `secretmanager.secretAccessor`.
 ```bash
-# 1) store the key (run yourself; never paste the key in chat)
+# 1) store the key (run yourself; never paste the key in chat). Uses whatever project your
+#    gcloud CLI is currently set to — see GCP_SERVICES.md to point it at the right one first.
 printf %s "gsk_YOURKEY" | gcloud secrets create groq-api-key \
-  --data-file=- --project=project-76ca6efe-7878-4dc8-bff
+  --data-file=- --project="$(gcloud config get-value project)"
 #    (if it already exists, use: gcloud secrets versions add groq-api-key --data-file=- …)
 
 # 2) wire it + (belt-and-suspenders) the Groq endpoint/model, and redeploy
-gcloud run services update blueberrymart-api --region us-central1 --project project-76ca6efe-7878-4dc8-bff \
+gcloud run services update blueberrymart-api --region us-central1 --project "$(gcloud config get-value project)" \
   --update-env-vars "Chat__BaseUrl=https://api.groq.com/openai/v1/chat/completions,Chat__Model=llama-3.3-70b-versatile" \
   --update-secrets Chat__ApiKey=groq-api-key:latest
 ```
