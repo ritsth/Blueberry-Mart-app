@@ -205,9 +205,10 @@ public class ManageOrdersController(
         try
         {
             var requestedIds = request.Items.Select(i => i.ItemId).ToList();
-            var inventoryItems = await context.Inventory
-                .Where(i => i.BranchId == branchId.Value && requestedIds.Contains(i.Id))
-                .ToListAsync();
+            // Lock the rows FOR UPDATE before checking/deducting stock (see OrdersController.PlaceOrder)
+            // so a till sale can't oversell against a concurrent online order for the same item.
+            var lockedItems = await InventoryLock.ForUpdateAsync(context, requestedIds);
+            var inventoryItems = lockedItems.Where(i => i.BranchId == branchId.Value).ToList();
 
             var missingIds = requestedIds.Except(inventoryItems.Select(i => i.Id)).ToList();
             if (missingIds.Count > 0)

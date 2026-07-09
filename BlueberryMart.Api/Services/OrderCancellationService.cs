@@ -20,16 +20,24 @@ public sealed class OrderCancellationService(
 {
     public async Task CancelAsync(Order order, CancellationToken ct = default)
     {
-        // Return the stock reserved at placement.
-        var lines = await (from oi in context.OrderItems
-                           join inv in context.Inventory on oi.ItemId equals inv.Id
-                           where oi.OrderId == order.Id
-                           select new { oi.Quantity, Inv = inv }).ToListAsync(ct);
-
         var events = new List<StockChangedEvent>();
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         try
         {
+            // Lock the inventory rows this order restocks before reading/modifying them, so the
+            // return-of-stock serialises against a concurrent order/adjust on the same items.
+            var itemIds = await context.OrderItems
+                .Where(oi => oi.OrderId == order.Id)
+                .Select(oi => oi.ItemId)
+                .ToListAsync(ct);
+            await InventoryLock.ForUpdateAsync(context, itemIds, ct);
+
+            // Return the stock reserved at placement. The join returns the locked, tracked rows.
+            var lines = await (from oi in context.OrderItems
+                               join inv in context.Inventory on oi.ItemId equals inv.Id
+                               where oi.OrderId == order.Id
+                               select new { oi.Quantity, Inv = inv }).ToListAsync(ct);
+
             var now = DateTime.UtcNow;
             foreach (var line in lines)
             {

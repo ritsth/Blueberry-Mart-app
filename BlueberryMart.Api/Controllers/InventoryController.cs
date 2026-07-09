@@ -150,10 +150,22 @@ public class InventoryController(
 
     [Authorize(Roles = "Shareholder")]
     [HttpGet("shareholder")]
-    public async Task<ActionResult<IEnumerable<Inventory>>> GetForShareholder()
+    public async Task<ActionResult<IEnumerable<Inventory>>> GetForShareholder(
+        [FromQuery] int limit = 200, [FromQuery] int offset = 0)
     {
+        limit = Math.Clamp(limit, 1, 500);
+        offset = Math.Max(0, offset);
+
+        // Read-only + bounded: AsNoTracking (no change tracking overhead) and a cap so the full
+        // multi-branch catalogue can't be returned unbounded. Deterministic order for stable
+        // paging. Bare-array response shape unchanged; current catalogue is well under the cap.
         var items = await context.Inventory
+            .AsNoTracking()
             .Include(i => i.Branch)
+            .OrderBy(i => i.Branch.Name)
+            .ThenBy(i => i.ItemName)
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
 
         return Ok(items);
@@ -214,7 +226,11 @@ public class InventoryController(
         if (request.Quantity <= 0)
             return BadRequest(new { message = "Quantity must be positive." });
 
-        var item = await context.Inventory.FirstOrDefaultAsync(i => i.Id == id);
+        // Lock the row FOR UPDATE inside a transaction so a restock and a concurrent order (or a
+        // second restock) don't both read the same base quantity and lose one another's write.
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
+        var item = (await InventoryLock.ForUpdateAsync(context, [id])).FirstOrDefault();
         if (item is null)
             return NotFound(new { message = "Item not found." });
 
@@ -222,6 +238,7 @@ public class InventoryController(
         item.StockQuantity += request.Quantity;
         item.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         stockEvents.Publish(new StockChangedEvent(
             ItemId: item.Id,

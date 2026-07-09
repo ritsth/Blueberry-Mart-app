@@ -381,7 +381,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/", () => Results.Ok(new { service = "BlueberryMart API", status = "running", version = "1.0.0" }));
+// Liveness: cheap, no dependencies — Cloud Run's probe shouldn't hammer the DB.
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
+// Readiness: confirms the DB is actually reachable, so a container with a dead connection
+// reports unready (503) instead of masquerading as healthy.
+app.MapGet("/health/ready", async (BlueberryMartDbContext db, CancellationToken ct) =>
+    await db.Database.CanConnectAsync(ct)
+        ? Results.Ok(new { status = "ready" })
+        : Results.Json(new { status = "unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable));
 
 app.UseHttpsRedirection();
 
