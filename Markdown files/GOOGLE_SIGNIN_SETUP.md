@@ -6,7 +6,7 @@ button). It stays inert until you complete this one-time Google Cloud setup and 
 Google account."
 
 ## 1. Google Cloud — OAuth credentials
-In the Google Cloud Console for your project (`project-76ca6efe-7878-4dc8-bff`):
+In the Google Cloud Console for your project (see `GCP_SERVICES.md` for the project ID):
 
 1. **APIs & Services → OAuth consent screen**: External; app name **Blueberry Mart**; support email
    `akitirsth@gmail.com`; add scopes `email` and `profile` (both non-sensitive → no Google review).
@@ -38,7 +38,7 @@ The Web client ID is **not secret** (it ships in the app bundle), so plain env v
 env vars):
 ```bash
 gcloud run services update blueberrymart-api \
-  --region us-central1 --project project-76ca6efe-7878-4dc8-bff \
+  --region us-central1 --project "$(gcloud config get-value project)" \
   --update-env-vars Google__WebClientId=<WEB_CLIENT_ID>.apps.googleusercontent.com
 ```
 (For local dev, put `Google:WebClientId` in `appsettings.Development.json`.)

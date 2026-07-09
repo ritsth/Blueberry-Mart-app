@@ -62,8 +62,8 @@ a full backfill).
    view can't replace a table of the same name. Parity verified: **754 rows, 309 orders,
    revenue 1,014,480, 614 paid lines, 2 reviews**.
 6. **Paused** the hourly scheduled query (`bq update --transfer_config --no_auto_scheduling
-   projects/278293545480/locations/us/transferConfigs/6a3a1a5c-0000-241c-9309-f4f5e80ac3bc`) —
-   schedule now empty, no next run.
+   projects/<PROJECT_NUMBER>/locations/us/transferConfigs/6a3a1a5c-0000-241c-9309-f4f5e80ac3bc`
+   — see `GCP_SERVICES.md` for the project number) — schedule now empty, no next run.
 7. Verified the live worker logged `BigQuerySalesSink streaming sales.events -> …` and the
    transient "table not found" 404s (it started before step 3) stopped — the sink's retry guard
    kept the worker up.
@@ -84,8 +84,8 @@ Prod `sales_fact` is rebuilt from the **live prod Postgres** by a **BigQuery sch
 query with Cloud SQL federation** — Option A below. No Kafka, no app code, no always-on
 worker.
 
-- **Federation connection:** `project-76ca6efe-7878-4dc8-bff.us.bbm-cloudsql-us`
-  (BigQuery → Cloud SQL `blueberrymart-db`). A `US`-location connection so it matches the
+- **Federation connection:** `<PROJECT_ID>.us.bbm-cloudsql-us` (see `GCP_SERVICES.md` for the
+  project ID) (BigQuery → Cloud SQL `blueberrymart-db`). A `US`-location connection so it matches the
   `blueberrymart` dataset (which is US multi-region); it still reaches the us-central1 instance.
 - **Transform:** `analytics/sales_fact_transform.sql` — `CREATE OR REPLACE TABLE sales_fact AS
   SELECT … EXTERNAL_QUERY(…)` joining `orders`/`order_items`/`inventory`/`branches`/`users`/
@@ -116,8 +116,8 @@ The setup above. Properties:
 
 One-time setup that was done (for reference / disaster recovery):
 0. **API side (so prod reads BigQuery at all):** `BigQuery__ProjectId` set on Cloud Run via
-   `.github/workflows/deploy.yml` `--update-env-vars`; the Cloud Run runtime SA
-   `278293545480-compute@developer.gserviceaccount.com` granted `roles/bigquery.jobUser` +
+   `.github/workflows/deploy.yml` `--update-env-vars`; the Cloud Run runtime SA (default compute
+   SA — see `GCP_SERVICES.md`) granted `roles/bigquery.jobUser` +
    `roles/bigquery.dataViewer`. Without this the endpoints report `enabled:false`.
 1. `bq mk --connection --connection_type=CLOUD_SQL … --location=US bbm-cloudsql-us`
    (credentials pulled from the `db-connection-string` secret).

@@ -3,16 +3,18 @@
 A practical reference for the Google Cloud setup behind Blueberry Mart: what each
 service does, how they wire together, and the commands to inspect/change them.
 **No secret values live in this file** — only names and structure (it's in a public repo).
+The real project ID/number aren't published here either; ask the maintainer if you're a
+contributor who needs them (see `CONTRIBUTING.md`).
 
 ## Project facts
 
 | Thing | Value |
 |---|---|
-| Project ID | `project-76ca6efe-7878-4dc8-bff` |
-| Project number | `278293545480` |
+| Project ID | `<PROJECT_ID>` — ask the maintainer |
+| Project number | `<PROJECT_NUMBER>` — ask the maintainer |
 | Default region | `us-central1` |
 
-Set your CLI to this project once: `gcloud config set project project-76ca6efe-7878-4dc8-bff`
+Set your CLI to this project once: `gcloud config set project <PROJECT_ID>`
 
 ## The big picture
 
@@ -80,7 +82,7 @@ The production database. Migrations apply automatically on app startup
 | Instance | `blueberrymart-db` |
 | Version / tier | `POSTGRES_16` / `db-g1-small` |
 | Region | `us-central1` |
-| Connection name | `project-76ca6efe-7878-4dc8-bff:us-central1:blueberrymart-db` |
+| Connection name | `<PROJECT_ID>:us-central1:blueberrymart-db` |
 
 **How Cloud Run reaches it:** the service has a `cloudsql-instances` annotation pointing at
 the connection name; Cloud Run mounts a Unix socket at `/cloudsql/<connection-name>`, and the
@@ -90,7 +92,7 @@ the connection name; Cloud Run mounts a Unix socket at `/cloudsql/<connection-na
 tunnels securely using your gcloud identity (no DB password exposed on the wire):
 ```bash
 # one-time: download cloud-sql-proxy, then
-cloud-sql-proxy project-76ca6efe-7878-4dc8-bff:us-central1:blueberrymart-db &
+cloud-sql-proxy <PROJECT_ID>:us-central1:blueberrymart-db &
 psql "host=127.0.0.1 dbname=blueberry_mart user=postgres"   # password from the conn-string secret
 ```
 
@@ -112,7 +114,7 @@ Runs the .NET API as a container, autoscaling from zero.
 | Service | `blueberrymart-api` |
 | Region | `us-central1` |
 | URL | `https://blueberrymart-api-yoh5t4dkqq-uc.a.run.app` |
-| Runtime service account | `278293545480-compute@developer.gserviceaccount.com` (default compute SA) |
+| Runtime service account | `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com` (default compute SA) |
 
 **Deploys happen via CI** (`.github/workflows/deploy.yml`) on push to `main` — build image →
 push to Artifact Registry → `gcloud run deploy`. You normally never deploy by hand.
@@ -143,10 +145,10 @@ Non-secret env currently set: `ASPNETCORE_ENVIRONMENT=Production`, `BigQuery__Pr
 
 Stores the Docker images Cloud Run runs.
 
-- Repo: `us-central1-docker.pkg.dev/project-76ca6efe-7878-4dc8-bff/blueberrymart/api`
+- Repo: `us-central1-docker.pkg.dev/<PROJECT_ID>/blueberrymart/api`
 - Tagged by commit SHA + `latest` by CI.
 ```bash
-gcloud artifacts docker images list us-central1-docker.pkg.dev/project-76ca6efe-7878-4dc8-bff/blueberrymart/api
+gcloud artifacts docker images list us-central1-docker.pkg.dev/<PROJECT_ID>/blueberrymart/api
 ```
 
 ## 5. Workload Identity Federation (keyless CI auth)
@@ -154,22 +156,22 @@ gcloud artifacts docker images list us-central1-docker.pkg.dev/project-76ca6efe-
 Lets GitHub Actions authenticate to GCP **without a downloadable service-account JSON key**.
 GitHub presents an OIDC token; GCP trusts it and lets the workflow impersonate a service account.
 
-- Deployer SA: `github-actions-deployer@project-76ca6efe-7878-4dc8-bff.iam.gserviceaccount.com`
+- Deployer SA: `github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com`
 - GitHub repo secrets: `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT` (used by both `deploy.yml` and `portal-ci.yml`)
 - Roles on that SA: `run.developer`, `artifactregistry.writer`, `iam.serviceAccountUser`,
   `storage.objectViewer`, `firebasehosting.admin`
 
 ```bash
 # see what the deployer SA can do
-gcloud projects get-iam-policy project-76ca6efe-7878-4dc8-bff \
+gcloud projects get-iam-policy <PROJECT_ID> \
   --flatten="bindings[].members" \
-  --filter="bindings.members:github-actions-deployer@project-76ca6efe-7878-4dc8-bff.iam.gserviceaccount.com" \
+  --filter="bindings.members:github-actions-deployer@<PROJECT_ID>.iam.gserviceaccount.com" \
   --format="value(bindings.role)"
 ```
 
 ## 6. Cloud Storage (GCS)
 
-- Bucket `blueberrymart-review-images-278293545480` — customer review photos. The API writes
+- Bucket `blueberrymart-review-images-<PROJECT_NUMBER>` — customer review photos. The API writes
   here and returns absolute `https://storage.googleapis.com/...` URLs.
 
 ## 7. Firebase Hosting
@@ -200,7 +202,7 @@ gcloud run services describe blueberrymart-api --region us-central1
 gcloud run services logs read blueberrymart-api --region us-central1 --limit 50
 
 # DB access from laptop
-cloud-sql-proxy project-76ca6efe-7878-4dc8-bff:us-central1:blueberrymart-db
+cloud-sql-proxy <PROJECT_ID>:us-central1:blueberrymart-db
 
 # list service accounts and a SA's roles
 gcloud iam service-accounts list
