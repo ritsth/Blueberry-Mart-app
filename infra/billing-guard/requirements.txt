@@ -1,0 +1,4 @@
+functions-framework==3.*
+google-cloud-run==0.10.*
+google-api-python-client==2.*
+google-auth==2.*
