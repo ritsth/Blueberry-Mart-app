@@ -15,8 +15,8 @@ Decisions locked in:
   BigQuery table schema, so most columns are selectable. Wide-open feel, **no free-form
   SQL** (the safety line we hold).
 - **Scale & store:** ~200k order-line rows in **BigQuery** (`sales_fact`), realistic
-  seasonality/growth/branch-skew. Re-activates the parked BQ project
-  (`project-76ca6efe-7878-4dc8-bff`).
+  seasonality/growth/branch-skew. Re-activates the parked BQ project (see `GCP_SERVICES.md`
+  for the project ID).
 - Postgres stays the live OLTP; BigQuery is the analytical history. Saved-report
   **configs** live in Postgres.
 

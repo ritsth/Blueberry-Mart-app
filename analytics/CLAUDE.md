@@ -1,7 +1,7 @@
 # analytics/ — BigQuery SQL for the `sales_fact` warehouse
 
 SQL that defines the shareholder **Explore** warehouse in BigQuery
-(`project-76ca6efe-7878-4dc8-bff.blueberrymart`). Full design:
+(`<PROJECT_ID>.blueberrymart` — see `Markdown files/GCP_SERVICES.md` for the project ID). Full design:
 `Markdown files/Main/SALES_EVENT_PIPELINE.md` + `Markdown files/Main/BIGQUERY_ANALYTICS.md`.
 
 `sales_fact` is now a **VIEW** fed by the Kafka sales-event pipeline (cutover 2026-06-12); the
@@ -29,6 +29,6 @@ hourly federation rebuild is retired (schedule paused) and repurposed as the rec
   mirror the same keyword list used in the app + `SeedGen`.
 - A view can't replace a table of the same name: drop the old `sales_fact` table before creating
   the view.
-- Federation connection: `project-76ca6efe-7878-4dc8-bff.us.bbm-cloudsql-us` (US-location to match
+- Federation connection: `<PROJECT_ID>.us.bbm-cloudsql-us` (US-location to match
   the US dataset). Paused scheduled-query transfer config:
   `…/locations/us/transferConfigs/6a3a1a5c-0000-241c-9309-f4f5e80ac3bc`.

@@ -69,10 +69,12 @@ The sink streams into `blueberrymart.stock_events`. Grant the Cloud Run runtime 
 account (the default compute SA, unless you make a dedicated one) BigQuery write + query:
 
 ```bash
-SA=278293545480-compute@developer.gserviceaccount.com
-gcloud projects add-iam-policy-binding project-76ca6efe-7878-4dc8-bff \
+PROJECT="$(gcloud config get-value project)"
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
+SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:$SA" --role="roles/bigquery.dataEditor" --condition=None
-gcloud projects add-iam-policy-binding project-76ca6efe-7878-4dc8-bff \
+gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:$SA" --role="roles/bigquery.jobUser" --condition=None
 ```
 
@@ -85,13 +87,14 @@ Same image as the API, but consumer-on and always-warm. It also needs the DB + J
 (it runs the web host for Cloud Run's health check and uses the DB for notifications):
 
 ```bash
+PROJECT="$(gcloud config get-value project)"
 gcloud run deploy blueberrymart-worker \
-  --image us-central1-docker.pkg.dev/project-76ca6efe-7878-4dc8-bff/blueberrymart/api:latest \
-  --region us-central1 --project project-76ca6efe-7878-4dc8-bff \
+  --image "us-central1-docker.pkg.dev/$PROJECT/blueberrymart/api:latest" \
+  --region us-central1 --project "$PROJECT" \
   --min-instances 1 --max-instances 1 --no-cpu-throttling \
   --no-allow-unauthenticated --ingress internal \
-  --add-cloudsql-instances project-76ca6efe-7878-4dc8-bff:us-central1:blueberrymart-db \
-  --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Kafka__RunConsumers=true,BigQuery__ProjectId=project-76ca6efe-7878-4dc8-bff" \
+  --add-cloudsql-instances "$PROJECT:us-central1:blueberrymart-db" \
+  --update-env-vars "ASPNETCORE_ENVIRONMENT=Production,Kafka__RunConsumers=true,BigQuery__ProjectId=$PROJECT" \
   --update-secrets "Jwt__Secret=jwt-secret:latest,ConnectionStrings__DefaultConnection=db-connection-string:latest,Kafka__BootstrapServers=kafka-bootstrap:latest,Kafka__ApiKey=kafka-api-key:latest,Kafka__ApiSecret=kafka-api-secret:latest"
 ```
 

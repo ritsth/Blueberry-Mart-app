@@ -124,7 +124,7 @@ docker compose down            # add -v to wipe topic data
 
 BigQuery is cloud-only even locally: the sink uses **Application Default Credentials**
 (`gcloud auth application-default login`) against a real BQ dataset (`blueberrymart.stock_events`)
-in `project-76ca6efe-7878-4dc8-bff`.
+in the project (see `GCP_SERVICES.md` for the project ID).
 
 ## When *not* to reach for Kafka (honest trade-off)
 
