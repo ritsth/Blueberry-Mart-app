@@ -47,17 +47,26 @@ public sealed class OrderExpiryService(
         if (order is null || order.Status != "pending")
             return false;   // re-check under the loop — idempotent against races
 
-        var lines = await (from oi in db.OrderItems
-                           join inv in db.Inventory on oi.ItemId equals inv.Id
-                           where oi.OrderId == orderId
-                           select new { oi.Quantity, Inv = inv }).ToListAsync(ct);
-
         var events = new List<StockChangedEvent>();
         var now = DateTime.UtcNow;
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         try
         {
+            // Lock the inventory rows before returning their stock, so the release serialises
+            // against a concurrent order/adjust on the same items.
+            var itemIds = await db.OrderItems
+                .Where(oi => oi.OrderId == orderId)
+                .Select(oi => oi.ItemId)
+                .ToListAsync(ct);
+            await InventoryLock.ForUpdateAsync(db, itemIds, ct);
+
+            // The join returns the locked, tracked inventory rows.
+            var lines = await (from oi in db.OrderItems
+                               join inv in db.Inventory on oi.ItemId equals inv.Id
+                               where oi.OrderId == orderId
+                               select new { oi.Quantity, Inv = inv }).ToListAsync(ct);
+
             foreach (var line in lines)
             {
                 var oldQty = line.Inv.StockQuantity;

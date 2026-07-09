@@ -11,19 +11,29 @@ namespace BlueberryMart.Api.Controllers;
 [Authorize]
 public class NotificationsController(BlueberryMartDbContext context) : ControllerBase
 {
-    // GET /api/notifications
+    // GET /api/notifications?limit=&offset=
+    // Bounded so a long-lived account can't return an unbounded list. Params are optional and the
+    // response shape ({ unread, notifications }) is unchanged, so existing clients keep working.
     [HttpGet]
-    public async Task<IActionResult> GetMine()
+    public async Task<IActionResult> GetMine([FromQuery] int limit = 100, [FromQuery] int offset = 0)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        limit = Math.Clamp(limit, 1, 200);
+        offset = Math.Max(0, offset);
 
-        var notifications = await context.Notifications
-            .Where(n => n.UserId == userId)
+        var mine = context.Notifications.Where(n => n.UserId == userId);
+
+        // Count unread over ALL of the user's notifications, not just the returned page, so the
+        // badge stays correct once there are more than `limit` of them.
+        var unread = await mine.CountAsync(n => !n.IsRead);
+
+        var notifications = await mine
             .OrderByDescending(n => n.CreatedAt)
+            .Skip(offset)
+            .Take(limit)
             .Select(n => new { n.Id, n.Message, n.InventoryId, n.IsRead, n.CreatedAt })
             .ToListAsync();
 
-        var unread = notifications.Count(n => !n.IsRead);
         return Ok(new { unread, notifications });
     }
 

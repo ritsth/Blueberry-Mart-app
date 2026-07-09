@@ -167,9 +167,15 @@ public class ManageInventoryController(
         if (request.Delta == 0)
             return BadRequest(new { message = "Delta must be non-zero." });
 
-        var item = await context.Inventory.Include(i => i.Branch).FirstOrDefaultAsync(i => i.Id == id);
+        // Lock the row FOR UPDATE inside a transaction so the delta applies to a committed base
+        // quantity, not one a concurrent order/restock is about to overwrite.
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
+        var item = (await InventoryLock.ForUpdateAsync(context, [id])).FirstOrDefault();
         if (item is null) return NotFound(new { message = "Item not found." });
         if (GuardBranch(item.BranchId) is { } denied) return denied;
+        // The FOR UPDATE read doesn't populate the Branch nav; load it for the response.
+        await context.Entry(item).Reference(i => i.Branch).LoadAsync();
 
         var newQty = item.StockQuantity + request.Delta;
         if (newQty < 0)
@@ -194,6 +200,7 @@ public class ManageInventoryController(
             CreatedAt = now,
         });
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         // Feeds the Kafka stock pipeline / back-in-stock notifications, like restock.
         stockEvents.Publish(new StockChangedEvent(

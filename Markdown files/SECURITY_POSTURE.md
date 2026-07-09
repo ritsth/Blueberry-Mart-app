@@ -6,10 +6,11 @@ production-readiness items.
 
 **Status legend:** ✅ Done · ⚠️ Partial / acceptable for now · 🔜 Planned (deferred) · ❌ Missing
 
-_Last reviewed: 2026-06-25 (P2 batch 2 — idempotent order placement (`897d430`); CSP shipped
-report-only on the hosted pages; CI-secret cleanup reviewed and deliberately skipped as non-prod
-test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap, CORS; on top of the P0+P1 pass in
-`eb2e30d`)._
+_Last reviewed: 2026-07-09 (perf/security batch — pessimistic stock locking (no oversell), list
+pagination caps, `/health/ready`, outbox retention, notifications composite index). Prior: 2026-06-25
+P2 batch 2 — idempotent order placement (`897d430`); CSP shipped report-only; CI-secret cleanup
+reviewed and skipped as non-prod test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap,
+CORS; on top of the P0+P1 pass in `eb2e30d`)._
 
 ---
 
@@ -74,8 +75,10 @@ test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap, CORS; on top of 
   load.
 - **New:** explicit global request-body-size cap (10 MB `MultipartBodyLengthLimit`) so an oversized
   multipart request is rejected at the Kestrel level, before reaching any controller.
-- **Deferred (🔜):** pagination on a couple of list endpoints (notifications, shareholder
-  inventory). Low risk at tester volume.
+- **Fixed (2026-07-09):** the two previously-unbounded list endpoints (`GET /api/notifications`,
+  `GET /api/inventory/shareholder`) now cap results with optional `limit`/`offset` (defaults 100/200,
+  max 200/500). Response shapes unchanged, so existing app builds are unaffected. Shareholder
+  inventory also reads `AsNoTracking`.
 - **Where we are:** The previously weakest area is now in good shape.
 
 ---
@@ -104,12 +107,21 @@ test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap, CORS; on top of 
   filtered unique index on `(user_id, idempotency_key)`, so a double-tap or lost-response retry
   replays the original order instead of duplicating it. The eSewa payment callback was already
   idempotent (`TransactionUuid` + completed-status guard + status-API re-confirm).
+- **Concurrency / no oversell** ✅ **(Fixed 2026-07-09)** — stock read-modify-write was racy: two
+  concurrent orders could both pass the stock check and oversell (idempotency keys stop retries, not
+  races). Every stock mutation (order placement, in-store till, restock, adjust, cancellation/expiry
+  restock) now locks its inventory rows with `SELECT … FOR UPDATE` in id order inside a transaction
+  (`InventoryLock`), so concurrent updates serialise. Covered by a real-Postgres concurrency test.
 - **Transactions** ✅ — order placement, payments, stock adjustments use DB transactions with
   rollback.
 - **Event pipeline** ✅ — sales/stock events via a transactional outbox → Kafka → BigQuery.
+  **New (2026-07-09):** the worker prunes published `outbox_messages` older than 7 days (hourly), so
+  the table no longer grows without bound.
 
 ### Observability & ops
-- **Health endpoint** ✅ — `/health`.
+- **Health endpoint** ✅ — `/health` (liveness). **New (2026-07-09):** `/health/ready` (readiness)
+  pings the DB (`CanConnectAsync`) → 503 if unreachable, so a container with a dead DB connection
+  no longer reports healthy.
 - **Error tracking** 🔜 — wire up Sentry / Cloud Error Reporting for stack traces + alerting.
 - **Cost alerts** 🔜 — LLM, email, and BigQuery are pay-per-use; set a billing budget + alert.
 - **Cloud Run guardrails** 🔜 — set max-instances / concurrency and a cost ceiling.
@@ -129,11 +141,14 @@ test values. Batch 1 = `df6b2f2`: Dependabot, request-body cap, CORS; on top of 
 
 ## Quick "what to do next" (deferred backlog, roughly prioritized)
 _Done in batch 1 (`df6b2f2`): Dependabot ✅ · request-body-size cap ✅ · CORS re-verify ✅._
+_Done in the 2026-07-09 perf/security batch: stock oversell lock ✅ · list pagination ✅ ·
+`/health/ready` ✅ · outbox retention ✅._
 
 1. **(GCP console)** Confirm Cloud SQL backups/PITR are on; gate destructive migrations.
-2. **(GCP console)** Add error tracking + a billing budget alert.
+2. **(GCP console)** Add error tracking + a billing budget alert. _(billing budget auto-stop drafted
+   in `infra/billing-guard/` — apply per its runbook.)_
 3. **(GCP console)** Set Cloud Run max-instances / concurrency / cost ceiling.
-4. Pagination on the unbounded list endpoints.
+4. ~~Pagination on the unbounded list endpoints.~~ ✅ (2026-07-09).
 5. ~~Idempotency keys on order/payment~~ ✅ (`897d430`). _CSP shipped report-only — flip to
    enforcing after a live browser-console check of the reset/payment pages._
 6. ~~Stop committing the CI Postgres / eSewa-sandbox secrets.~~ **Decided not worth it

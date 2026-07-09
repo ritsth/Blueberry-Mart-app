@@ -231,7 +231,9 @@ public class BlueberryMartDbContext(DbContextOptions<BlueberryMartDbContext> opt
             e.Property(n => n.IsRead).HasColumnName("is_read").HasDefaultValue(false);
             e.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             e.HasOne(n => n.User).WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
-            e.HasIndex(n => n.UserId);
+            // The feed query is WHERE user_id ORDER BY created_at DESC; the composite serves both
+            // the filter and the sort (and still covers plain user_id lookups).
+            e.HasIndex(n => new { n.UserId, n.CreatedAt });
         });
 
         modelBuilder.Entity<StockAdjustment>(e =>

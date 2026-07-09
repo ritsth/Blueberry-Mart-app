@@ -153,9 +153,11 @@ public class OrdersController(
         try
         {
             var requestedIds = request.Items.Select(i => i.ItemId).ToList();
-            var inventoryItems = await context.Inventory
-                .Where(i => i.BranchId == request.BranchId && requestedIds.Contains(i.Id))
-                .ToListAsync();
+            // Lock the rows FOR UPDATE before checking/deducting stock so two concurrent orders
+            // for the same item can't both pass the check and oversell. Filter to this branch in
+            // memory (an id in another branch falls out and is reported missing, as before).
+            var lockedItems = await InventoryLock.ForUpdateAsync(context, requestedIds);
+            var inventoryItems = lockedItems.Where(i => i.BranchId == request.BranchId).ToList();
 
             // Validate all requested items exist in this branch
             var missingIds = requestedIds.Except(inventoryItems.Select(i => i.Id)).ToList();

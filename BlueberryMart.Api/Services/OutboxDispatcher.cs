@@ -18,6 +18,9 @@ public sealed class OutboxDispatcher(
     ILogger<OutboxDispatcher> logger) : BackgroundService
 {
     private const int BatchSize = 100;
+    private static readonly TimeSpan Retention = TimeSpan.FromDays(7);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
+    private DateTime _nextCleanup = DateTime.UtcNow;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -35,6 +38,16 @@ public sealed class OutboxDispatcher(
             try
             {
                 var published = await PublishBatchAsync(producer, stoppingToken);
+
+                // Published rows are kept only as a short audit trail — prune old ones so the
+                // table doesn't grow forever. Runs at most hourly, isolated so a cleanup failure
+                // never disrupts publishing.
+                if (DateTime.UtcNow >= _nextCleanup)
+                {
+                    _nextCleanup = DateTime.UtcNow + CleanupInterval;
+                    await CleanupPublishedAsync(stoppingToken);
+                }
+
                 // Nothing pending → back off; otherwise keep draining promptly.
                 if (published == 0)
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
@@ -74,5 +87,37 @@ public sealed class OutboxDispatcher(
 
         await db.SaveChangesAsync(ct);
         return batch.Count;
+    }
+
+    private async Task CleanupPublishedAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BlueberryMartDbContext>();
+            var deleted = await PruneOldPublishedAsync(db, Retention, ct);
+            if (deleted > 0)
+                logger.LogInformation("Outbox cleanup removed {Count} published row(s) older than {Days}d",
+                    deleted, (int)Retention.TotalDays);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Outbox cleanup failed; will retry next interval");
+        }
+    }
+
+    /// <summary>
+    /// Deletes outbox rows that were published longer than <paramref name="retention"/> ago.
+    /// Unpublished rows (<c>PublishedAt == null</c>) are always kept. Static + public so the
+    /// retention rule can be exercised directly in tests.
+    /// </summary>
+    public static Task<int> PruneOldPublishedAsync(
+        BlueberryMartDbContext db, TimeSpan retention, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - retention;
+        return db.OutboxMessages
+            .Where(m => m.PublishedAt != null && m.PublishedAt < cutoff)
+            .ExecuteDeleteAsync(ct);
     }
 }
